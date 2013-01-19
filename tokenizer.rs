@@ -56,7 +56,7 @@ enum Token {
     OpenParen, // (
     OpenBrace, // {
     CloseBraket, // ]
-    CloseParen, // (
+    CloseParen, // )
     CloseBrace, // }
 }
 
@@ -115,6 +115,14 @@ fn tokenize(input: &str//, transform_function_whitespace: bool,
         tokens.push(match consume_char(state) {
             '/' if !is_eof(state) && current_char(state) == '*'
                 => consume_comment(state),
+            ',' => Colon,
+            ';' => Semicolon,
+            '[' => OpenBraket,
+            '(' => OpenParen,
+            '{' => OpenBrace,
+            ']' => CloseBraket,
+            ')' => CloseParen,
+            '}' => CloseBrace,
             c => Delim(c),
         })
     }
@@ -143,9 +151,11 @@ fn test_tokenizer() {
         }
     }
     assert_tokens("", [], []);
-    assert_tokens(",/", [Delim(','), Delim('/')], []);
-    assert_tokens(",/* Li/*psum… */", [Delim(','), Comment], []);
-    assert_tokens(",/* Li/*psum… *//", [Delim(','), Comment, Delim('/')], []);
-    assert_tokens(",/* Lipsum", [Delim(','), Comment], [~"EOF in comment"]);
-    assert_tokens(",/*", [Delim(','), Comment], [~"EOF in comment"]);
+    assert_tokens("?/", [Delim('?'), Delim('/')], []);
+    assert_tokens("?/* Li/*psum… */", [Delim('?'), Comment], []);
+    assert_tokens("?/* Li/*psum… *//", [Delim('?'), Comment, Delim('/')], []);
+    assert_tokens("?/* Lipsum", [Delim('?'), Comment], [~"EOF in comment"]);
+    assert_tokens("?/*", [Delim('?'), Comment], [~"EOF in comment"]);
+    assert_tokens("[?}{)",
+        [OpenBraket, Delim('?'), CloseBrace, OpenBrace, CloseParen], []);
 }
