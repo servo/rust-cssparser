@@ -45,6 +45,7 @@ fn test_preprocess() {
 // composed of one or more characters.
 // Unicode-range tokens have a range of characters.
 
+#[deriving_eq]
 enum NumericValue {
     Integer(int),
     // The spec calls this "number".
@@ -53,6 +54,8 @@ enum NumericValue {
 }
 // TODO: add a NumberValue.as_float() method.
 
+
+#[deriving_eq]
 enum Token {
     Ident(~str),
     Function(~str),
@@ -79,4 +82,35 @@ enum Token {
     CloseBraket, // ]
     CloseParen, // (
     CloseBrace, // }
+}
+
+fn tokenize(input: &str//, transform_function_whitespace: bool,
+//            quirks_mode: bool
+            ) -> ~[Token] {
+    let mut tokens: ~[Token] = ~[];
+    // All non-ASCII characters are treated the same,
+    // so we can view our str input as [u8] and only care about bytes.
+    let mut i: uint = 0;
+    let length = input.len();
+    let consume: fn() -> u8 = || { let c = input[i]; i += 1; c };
+    while i < length {
+        match consume() {
+            c => tokens.push(Delim(c as char)),
+        }
+    }
+    tokens
+}
+
+
+#[test]
+fn test_tokenizer() {
+    fn assert_tokens(input: &str, expected: &[Token]) {
+        let result: &[Token] = tokenize(input//, false, false
+        );
+        if result != expected {
+            fail fmt!("%? != %?", result, expected);
+        }
+    }
+    assert_tokens("", []);
+    assert_tokens(",", [Delim(',')]);
 }
