@@ -63,13 +63,14 @@ enum Token {
 
 struct State {
     input: ~str,
+    length: uint,
     mut position: uint,
     mut errors: ~[~str]
 }
 
 
 fn is_eof(state: &State) -> bool {
-    state.input[state.position] == 0
+    state.position >= state.length
 }
 
 
@@ -92,7 +93,7 @@ fn consume_comment(state: &State) -> Token {
         Some(end_position) => state.position = end_position + 2,
         None => {
             state.errors.push(~"EOF in comment");
-            state.position = state.input.len() - 1;
+            state.position = state.input.len();
         }
     }
     Comment
@@ -103,17 +104,17 @@ fn consume_comment(state: &State) -> Token {
 fn tokenize(input: &str//, transform_function_whitespace: bool,
 //            quirks_mode: bool
             ) -> {tokens: ~[Token], parse_errors: ~[~str]} {
-    // preprocess() ensures there is no NULL byte, so we can use that
-    // as an EOF marker.
+    let input = cssparser::preprocess(input);
     let state = &State {
-        input: cssparser::preprocess(input) + "\x00",
+        input: input, length: input.len(),
         position: 0, errors: ~[] };
     let mut tokens: ~[Token] = ~[];
 
     // 3.3.4. Data state
     while !is_eof(state) {
         tokens.push(match consume_char(state) {
-            '/' if current_char(state) == '*' => consume_comment(state),
+            '/' if !is_eof(state) && current_char(state) == '*'
+                => consume_comment(state),
             c => Delim(c),
         })
     }
