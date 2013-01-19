@@ -64,12 +64,17 @@ enum Token {
 struct State {
     input: ~str,
     mut position: uint,
-    errors: ~[~str]
+    mut errors: ~[~str]
 }
 
 
 fn is_eof(state: &State) -> bool {
     state.input[state.position] == 0
+}
+
+
+fn current_char(state: &State) -> char {
+    str::char_at(state.input, state.position)
 }
 
 
@@ -80,10 +85,26 @@ fn consume_char(state: &State) -> char {
 }
 
 
+// 3.3.9. Comment state
+fn consume_comment(state: &State) -> Token {
+    state.position += 1;  // consume the * in /*
+    match str::find_str_from(state.input, "*/", state.position) {
+        Some(end_position) => state.position = end_position + 2,
+        None => {
+            state.errors.push(~"EOF in comment");
+            state.position = state.input.len() - 1;
+        }
+    }
+    Comment
+}
+
+
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 fn tokenize(input: &str//, transform_function_whitespace: bool,
 //            quirks_mode: bool
-            ) -> ~[Token] {
+            ) -> {tokens: ~[Token], parse_errors: ~[~str]} {
+    // preprocess() ensures there is no NULL byte, so we can use that
+    // as an EOF marker.
     let state = &State {
         input: cssparser::preprocess(input) + "\x00",
         position: 0, errors: ~[] };
@@ -92,22 +113,38 @@ fn tokenize(input: &str//, transform_function_whitespace: bool,
     // 3.3.4. Data state
     while !is_eof(state) {
         tokens.push(match consume_char(state) {
+            '/' if current_char(state) == '*' => consume_comment(state),
             c => Delim(c),
         })
     }
-    tokens
+
+    // Work around `error: moving out of mutable field`
+    // TODO: find a cleaner way.
+    let mut errors: ~[~str] = ~[];
+    errors <-> state.errors;
+    {tokens: tokens, parse_errors: errors}
 }
 
 
 #[test]
 fn test_tokenizer() {
-    fn assert_tokens(input: &str, expected: &[Token]) {
-        let result: &[Token] = tokenize(input//, false, false
+    fn assert_tokens(input: &str, expected_tokens: &[Token],
+                     expected_errors: &[~str]) {
+        let result = tokenize(input//, false, false
         );
-        if result != expected {
-            fail fmt!("%? != %?", result, expected);
+        let tokens: &[Token] = result.tokens;
+        let parse_errors: &[~str] = result.parse_errors;
+        if tokens != expected_tokens {
+            fail fmt!("%? != %?", tokens, expected_tokens);
+        }
+        if parse_errors != expected_errors {
+            fail fmt!("%? != %?", tokens, expected_errors);
         }
     }
-    assert_tokens("", []);
-    assert_tokens(",", [Delim(',')]);
+    assert_tokens("", [], []);
+    assert_tokens(",/", [Delim(','), Delim('/')], []);
+    assert_tokens(",/* Li/*psum… */", [Delim(','), Comment], []);
+    assert_tokens(",/* Li/*psum… *//", [Delim(','), Comment, Delim('/')], []);
+    assert_tokens(",/* Lipsum", [Delim(','), Comment], [~"EOF in comment"]);
+    assert_tokens(",/*", [Delim(','), Comment], [~"EOF in comment"]);
 }
