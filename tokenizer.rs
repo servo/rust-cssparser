@@ -65,11 +65,11 @@ enum Token {
 
 
 struct State {
-    input: ~str,
-    length: uint,
     transform_function_whitespace: bool,
     quirks_mode: bool,
-    mut position: uint,
+    input: ~str,
+    length: uint,  // Counted in bytes, not characters
+    mut position: uint,  // Counted in bytes, not characters
     mut errors: ~[~str]
 }
 
@@ -144,9 +144,11 @@ fn consume_token(state: &State) -> Token {
         ')' => CloseParen,
         '-' => {
             if is_eof(state) { Delim('-') } else {
-                // TODO: CDC, negative numbers
+                // TODO: negative numbers
                 match current_char(state) {
                     '\\' => {
+                        // XXX the spec is missing this part. See
+            // http://lists.w3.org/Archives/Public/www-style/2013Jan/0267.html
                         state.position += 1;
                         if is_eof(state) { state.position -= 1; Delim('-') }
                         else {
@@ -175,6 +177,7 @@ fn consume_token(state: &State) -> Token {
             if next_n_bytes(state, 3) == ~"!--"
             { state.position += 3; CDO } else { Delim('<') }
         }
+        '@' => consume_at_keyword(state),
         '[' => OpenBraket,
         '\\' => {
             if is_eof(state) {
@@ -283,6 +286,72 @@ fn consume_comment(state: &State) -> Token {
         }
     }
     Comment
+}
+
+
+// 3.3.10. At-keyword state
+fn consume_at_keyword(state: &State) -> Token {
+    let c = current_char(state);
+    let initial_char = match c {
+        '-' => {
+            state.position += 1;
+            if is_eof(state) { state.position -= 1; return Delim('@') }
+            else {
+                match current_char(state) {
+                    '\\' => {
+                        // XXX the spec is missing this part. See
+            // http://lists.w3.org/Archives/Public/www-style/2013Jan/0267.html
+                        state.position += 1;
+                        if is_eof(state) {
+                            state.position -= 2; return Delim('@')
+                        } else {
+                            match current_char(state) {
+                                '\n' | '\x0C' =>  {
+                                    state.position -= 2; return Delim('@') },
+                                _ => { state.position -= 1; '-' }
+                            }
+                        }
+                    },
+                    'a'..'z' | 'A'..'Z' | '_' => '-',
+                    c if c >= '\xA0' => '-',  // Non-ASCII
+                    _ => { state.position -= 1; return Delim('@') }
+                }
+            }
+        }
+        'a'..'z' | 'A'..'Z' | '_'  => {
+            state.position += 1; c },
+        _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
+        '\\' => {
+            state.position += 1;
+            if is_eof(state) { state.position -= 1; return Delim('@') }
+            match current_char(state) {
+                '\n' | '\x0C' => { state.position -= 1; return Delim('@') },
+                _ => consume_escape(state)
+            }
+        },
+        _ => return Delim('@')
+    };
+    // 3.3.11. At-keyword-rest state
+    let mut string: ~str = str::from_char(initial_char);
+    while !is_eof(state) {
+        let c = current_char(state);
+        let next_char = match c {
+            'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-'  => {
+                state.position += 1; c },
+            _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
+            '\\' => {
+                state.position += 1;
+                if is_eof(state) { state.position -= 1; break }
+                match current_char(state) {
+                    '\n' | '\x0C' => { state.position -= 1; break },
+                    _ => consume_escape(state)
+                }
+            },
+            _ => break
+        };
+        str::push_char(&mut string, next_char)
+    }
+    AtKeyword(string)
 }
 
 
@@ -445,9 +514,16 @@ fn test_tokenizer() {
         [Ident(~"func"), WhiteSpace, OpenParen, CloseParen], []);
     assert_tokens_flags("func ()", true, false,
         [Function(~"func"), CloseParen], []);
+
     assert_tokens("##00#\\##\\\n#\\",
         [Delim('#'), Hash(~"00"), Hash(~"#"), Delim('#'), Delim('\\'),
          WhiteSpace, Delim('#'), Delim('\\')],
+        [~"Invalid escape", ~"Invalid escape"]);
+
+    assert_tokens("@@page@\\x@-x@-\\x@--@\\\n@\\",
+        [Delim('@'), AtKeyword(~"page"), AtKeyword(~"x"), AtKeyword(~"-x"),
+         AtKeyword(~"-x"), Delim('@'), Delim('-'), Delim('-'),
+         Delim('@'), Delim('\\'), WhiteSpace, Delim('@'), Delim('\\')],
         [~"Invalid escape", ~"Invalid escape"]);
 
     assert_tokens("<!-<!-----><",
