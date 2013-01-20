@@ -103,6 +103,24 @@ fn consume_char(state: &State) -> char {
 }
 
 
+#[inline(always)]
+fn is_escaped_newline_or_eof(state: &State) -> bool {
+    match next_n_bytes(state, 2) {
+        ~"\\\n" | ~"\\\x0C" | ~"\\" => true,
+        _ => false,
+    }
+}
+
+#[inline(always)]
+fn is_namestart_or_escape(state: &State) -> bool {
+    match current_char(state) {
+        'a'..'z' | 'A'..'Z' | '_' => true,
+        '\\' => !is_escaped_newline_or_eof(state),
+        c => c >= '\xA0',  // Non-ASCII
+    }
+}
+
+
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 pub fn tokenize(input: &str, transform_function_whitespace: bool,
             quirks_mode: bool) -> {tokens: ~[Token], parse_errors: ~[~str]} {
@@ -127,87 +145,50 @@ pub fn tokenize(input: &str, transform_function_whitespace: bool,
 
 // 3.3.4. Data state
 fn consume_token(state: &State) -> Token {
-    let c = consume_char(state);
+    let c = current_char(state);
     match c {
-        '\t' | '\n' | '\x0C' | ' ' => {
-            while !is_eof(state) {
-                match current_char(state) {
-                    '\t' | '\n' | '\x0C' | ' ' => state.position += 1,
-                    _ => break,
-                }
-            }
-            WhiteSpace
-        },
-        '"' => consume_quoted_string(state, false, false),
-        '#' => consume_hash(state),
-        '\'' => consume_quoted_string(state, true, false),
-        '(' => OpenParen,
-        ')' => CloseParen,
         '-' => {
-            if is_eof(state) { Delim('-') } else {
-                // TODO: negative numbers
-                match current_char(state) {
-                    '\\' => {
-                        // XXX the spec is missing this part. See
-            // http://lists.w3.org/Archives/Public/www-style/2013Jan/0267.html
-                        state.position += 1;
-                        if is_eof(state) { state.position -= 1; Delim('-') }
-                        else {
-                            let c = current_char(state);
-                            state.position -= 1;
-                            match c {
-                                '\n' | '\x0C' => Delim('-'),
-                                _ => consume_ident(state, '-')
-                            }
-                        }
-                    },
-                    'a'..'z' | 'A'..'Z' | '_' => consume_ident(state, c),
-                    c if c >= '\xA0' => consume_ident(state, c),  // Non-ASCII
-                    _ => {
-                        if next_n_bytes(state, 2) == ~"->"
-                        { state.position += 2; CDC } else { Delim('-') }
-                    }
-                }
+            if next_n_bytes(state, 3) == ~"-->" { state.position += 3; CDC }
+            else {
+                // TODO: negative numeric
+                consume_ident(state)
             }
-        }
-        '/' if !is_eof(state) && current_char(state) == '*'
-            => consume_comment(state),
-        ':' => Colon,
-        ';' => Semicolon,
-        '<' => {
-            if next_n_bytes(state, 3) == ~"!--"
-            { state.position += 3; CDO } else { Delim('<') }
-        }
-        '@' => consume_at_keyword(state),
-        '[' => OpenBraket,
-        '\\' => {
-            if is_eof(state) {
-                state.errors.push(~"Invalid escape");
-                Delim('\\')
-            } else {
-                match current_char(state) {
-                    '\n' | '\x0C' => {
-                        state.errors.push(~"Invalid escape"); Delim('\\') },
-                    _ => consume_ident(state, consume_escape(state))
-                }
-            }
-        }
-        ']' => CloseBraket,
-        '{' => OpenBrace,
-        '}' => CloseBrace,
-        'u' | 'U' => {
-            let next_2 = next_n_bytes(state, 2);
-            if next_2.len() == 2 && next_2[0] as char == '+' {
-                match next_2[1] as char {
-                    '0'..'9' | 'a'..'f' | 'A'..'F' => {
-                        state.position += 1; consume_unicode_range(state) }
-                    _ => consume_ident(state, c)
-                }
-            } else { consume_ident(state, c) }
         },
-        'a'..'z' | 'A'..'Z' | '_' => consume_ident(state, c),
-        c if c >= '\xA0' => consume_ident(state, c),  // Non-ASCII
-        _ => Delim(c),
+        '<' => {
+            if next_n_bytes(state, 4) == ~"<!--" { state.position += 4; CDO }
+            else  { state.position += 1; Delim('<') }
+        },
+        'u' | 'U' => consume_unicode_range(state),
+        'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(state),
+        _ if c >= '\xA0' => consume_ident(state),  // Non-ASCII
+        _ => {
+            match consume_char(state) {
+                '\t' | '\n' | '\x0C' | ' ' => {
+                    while !is_eof(state) {
+                        match current_char(state) {
+                            '\t' | '\n' | '\x0C' | ' ' => state.position += 1,
+                            _ => break,
+                        }
+                    }
+                    WhiteSpace
+                },
+                '"' => consume_quoted_string(state, false, false),
+                '#' => consume_hash(state),
+                '\'' => consume_quoted_string(state, true, false),
+                '(' => OpenParen,
+                ')' => CloseParen,
+                '/' if !is_eof(state) && current_char(state) == '*'
+                    => consume_comment(state),
+                ':' => Colon,
+                ';' => Semicolon,
+                '@' => consume_at_keyword(state),
+                '[' => OpenBraket,
+                ']' => CloseBraket,
+                '{' => OpenBrace,
+                '}' => CloseBrace,
+                _ => Delim(c)
+            }
+        }
     }
 }
 
@@ -367,8 +348,22 @@ fn consume_at_keyword(state: &State) -> Token {
 
 // 3.3.12. Ident state
 // 3.3.13. Ident-rest state
-fn consume_ident(state: &State, initial_char: char) -> Token {
-    let mut string = str::from_char(initial_char);
+fn consume_ident(state: &State) -> Token {
+    match current_char(state) {
+        '-' => {
+            state.position += 1;
+            if !is_namestart_or_escape(state) { return Delim('-') }
+            state.position -= 1;
+        },
+        '\\' => if is_escaped_newline_or_eof(state) {
+            state.errors.push(~"Invalid escape");
+            state.position += 1;
+            return Delim('\\')
+        },
+        _ => assert is_namestart_or_escape(state)  // sanity check
+    }
+
+    let mut string = ~"";
     while !is_eof(state) {
         let c = current_char(state);
         let next_char = match c {
@@ -376,15 +371,12 @@ fn consume_ident(state: &State, initial_char: char) -> Token {
                 state.position += 1; c },
             _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
             '\\' => {
+                if is_escaped_newline_or_eof(state) { break }
                 state.position += 1;
-                if is_eof(state) { state.position -= 1; break }
-                match current_char(state) {
-                    '\n' | '\x0C' => { state.position -= 1; break },
-                    _ => consume_escape(state)
-                }
+                consume_escape(state)
             },
-            '\t' | '\n' | '\x0C' | ' ' if state.transform_function_whitespace
-            => {
+            '\t' | '\n' | '\x0C' | ' '
+            if state.transform_function_whitespace => {
                 state.position += 1;
                 return handle_transform_function_whitespace(state, string)
             }
@@ -504,6 +496,17 @@ fn consume_bad_url(state: &State, log_error: bool) -> Token {
 
 // 3.3.26. Unicode-range state
 fn consume_unicode_range(state: &State) -> Token {
+    let next_2 = next_n_bytes(state, 3);
+    // We got here with U or u
+    assert next_2[0] == 'u' as u8 || next_2[0] == 'U' as u8;
+    // Check if this is indeed an unicode range. Fallback on ident.
+    if next_2.len() == 3 && next_2[1] as char == '+' {
+        match next_2[2] as char {
+            '0'..'9' | 'a'..'f' | 'A'..'F' => state.position += 2,
+            _ => { return consume_ident(state) }
+        }
+    } else { return consume_ident(state) }
+
     let mut hex = ~[];
     while hex.len() < 6 && !is_eof(state) {
         let c = current_char(state);
@@ -603,10 +606,10 @@ fn test_tokenizer() {
         let tokens: &[Token] = result.tokens;
         let parse_errors: &[~str] = result.parse_errors;
         if tokens != expected_tokens {
-            fail fmt!("%? != %?", tokens, expected_tokens);
+            fail fmt!("%?\n!=\n%?", tokens, expected_tokens);
         }
         if parse_errors != expected_errors {
-            fail fmt!("%? != %?", parse_errors, expected_errors);
+            fail fmt!("%?\n!=\n%?", parse_errors, expected_errors);
         }
     }
     assert_tokens("", [], []);
