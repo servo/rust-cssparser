@@ -48,7 +48,8 @@ enum Token {
     Number(NumericValue, ~str),  // value, representation
     Percentage(NumericValue, ~str),  // value, representation
     Dimension(NumericValue, ~str, ~str),  // value, representation, unit
-    UnicodeRange(char, char),  // start, end. XXX what about empty ranges?
+    UnicodeRange(char, char),  // start, end
+    EmptyUnicodeRange,
     WhiteSpace,
     Comment,
     CDO,  // <!--
@@ -194,6 +195,16 @@ fn consume_token(state: &State) -> Token {
         ']' => CloseBraket,
         '{' => OpenBrace,
         '}' => CloseBrace,
+        'u' | 'U' => {
+            let next_2 = next_n_bytes(state, 2);
+            if next_2.len() == 2 && next_2[0] as char == '+' {
+                match next_2[1] as char {
+                    '0'..'9' | 'a'..'f' | 'A'..'F' => {
+                        state.position += 1; consume_unicode_range(state) }
+                    _ => consume_ident(state, c)
+                }
+            } else { consume_ident(state, c) }
+        },
         'a'..'z' | 'A'..'Z' | '_' => consume_ident(state, c),
         c if c >= '\xA0' => consume_ident(state, c),  // Non-ASCII
         _ => Delim(c),
@@ -408,6 +419,51 @@ fn handle_transform_function_whitespace(state: &State, string: ~str) -> Token {
 }
 
 
+// 3.3.26. Unicode-range state
+fn consume_unicode_range(state: &State) -> Token {
+    let mut hex = ~[];
+    while hex.len() < 6 && !is_eof(state) {
+        let c = current_char(state);
+        match c {
+            '0'..'9' | 'A'..'F' | 'a'..'f' => {
+                hex.push(c); state.position += 1 },
+            _ => break
+        }
+    }
+    assert hex.len() > 0;
+    let max_question_marks = 6u - hex.len();
+    let mut question_marks = 0u;
+    while question_marks < max_question_marks && !is_eof(state)
+            && current_char(state) == '?' {
+        question_marks += 1;
+        state.position += 1
+    }
+    let start: uint, end: uint;
+    if question_marks > 0 {
+        start = uint_from_hex(hex + vec::from_elem(question_marks, '0'));
+        end = uint_from_hex(hex + vec::from_elem(question_marks, 'F'));
+    } else {
+        start = uint_from_hex(hex);
+        hex = ~[];
+        if !is_eof(state) && current_char(state) == '-' {
+            state.position += 1;
+            while hex.len() < 6 && !is_eof(state) {
+                let c = current_char(state);
+                match c {
+                    '0'..'9' | 'A'..'F' | 'a'..'f' => {
+                        hex.push(c); state.position += 1 },
+                    _ => break
+                }
+            }
+        }
+        end = if hex.len() > 0 { uint_from_hex(hex) } else { start }
+    }
+    // 3.3.28. Set the unicode-range token's range
+    if start > MAX_UNICODE || end < start { EmptyUnicodeRange }
+    else { UnicodeRange(start as char, uint::min(end, MAX_UNICODE) as char) }
+}
+
+
 // 3.3.27. Consume an escaped character
 // Assumes that the U+005C REVERSE SOLIDUS (\) has already been consumed
 // and that the next input character has already been verified
@@ -431,14 +487,17 @@ fn consume_escape(state: &State) -> char {
                     _ => ()
                 }
             }
-            char_from_hex(hex)
+            let value = uint_from_hex(hex);
+            if value == 0 || value > MAX_UNICODE {
+                '\uFFFD'  // Replacement character
+            } else { value as char }
         },
         c => c
     }
 }
 
 
-fn char_from_hex(hex: &[char]) -> char {
+fn uint_from_hex(hex: &[char]) -> uint {
     let mut value = 0u;
     for hex.each |cc| {
         let c = *cc;
@@ -449,11 +508,7 @@ fn char_from_hex(hex: &[char]) -> char {
             _ => fail
         }
     }
-    if value == 0 || value > MAX_UNICODE {
-        '\uFFFD'  // Replacement character
-    } else {
-        value as char
-    }
+    value
 }
 
 
@@ -528,5 +583,12 @@ fn test_tokenizer() {
 
     assert_tokens("<!-<!-----><",
         [Delim('<'), Delim('!'), Delim('-'), CDO, Delim('-'), CDC, Delim('<')],
+        []);
+    assert_tokens("u+g u+fU+4?U+030-000039f U+FFFFF?U+42-42U+42-41U+42-110000",
+        [Ident(~"u"), Delim('+'), Ident(~"g"), WhiteSpace,
+         UnicodeRange('\x0F', '\x0F'), UnicodeRange('\x40', '\x4F'),
+         UnicodeRange('0', '9'), Ident(~"f"), WhiteSpace, EmptyUnicodeRange,
+         UnicodeRange('B', 'B'), EmptyUnicodeRange,
+         UnicodeRange('B', '\U0010FFFF')],
         []);
 }
