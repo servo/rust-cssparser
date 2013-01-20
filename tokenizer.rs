@@ -21,6 +21,9 @@
 use cssparser;
 
 
+const MAX_UNICODE: uint = 0x10FFFF;
+
+
 #[deriving_eq]
 enum NumericValue {
     Integer(int),
@@ -86,6 +89,99 @@ fn consume_char(state: &State) -> char {
 }
 
 
+fn consume_whitespace(state: &State) -> Token {
+    while !is_eof(state) {
+        match current_char(state) {
+            '\t' | '\n' | '\x0C' | ' ' => state.position += 1,
+            _ => break,
+        }
+    }
+    WhiteSpace
+}
+
+
+fn char_from_hex(hex: &[char]) -> char {
+    let mut value = 0u;
+    for hex.each |cc| {
+        let c = *cc;
+        value = value * 16 + c as uint - match c {
+            '0'..'9' => '0' as uint,
+            'A'..'F' => 'A' as uint - 10,
+            'a'..'f' => 'a' as uint - 10,
+            _ => fail
+        }
+    }
+    if value == 0 || value > MAX_UNICODE {
+        '\uFFFD'  // Replacement character
+    } else {
+        value as char
+    }
+}
+
+
+// 3.3.27. Consume an escaped character
+// Assumes that the U+005C REVERSE SOLIDUS (\) has already been consumed
+// and that the next input character has already been verified
+// to not be a newline or EOF.
+fn consume_escape(state: &State) -> char {
+    let c = consume_char(state);
+    match c {
+        '0'..'9' | 'A'..'F' | 'a'..'f' => {
+            let mut hex = ~[c];
+            while hex.len() < 6 && !is_eof(state) {
+                let c = current_char(state);
+                match c {
+                    '0'..'9' | 'A'..'F' | 'a'..'f' => {
+                        hex.push(c); state.position += 1 },
+                    _ => break
+                }
+            }
+            if !is_eof(state) {
+                match current_char(state) {
+                    '\t' | '\n' | '\x0C' | ' ' => state.position += 1,
+                    _ => ()
+                }
+            }
+            char_from_hex(hex)
+        },
+        c => c
+    }
+}
+
+
+// 3.3.5. Double-quote-string state
+// 3.3.6. Single-quote-string state
+fn consume_quoted_string(state: &State, single_quote: bool) -> Token {
+    let mut string: ~str = ~"";
+    loop {
+        if is_eof(state) {
+            state.errors.push(~"EOF in quoted string");
+            return String(string);
+        }
+        match consume_char(state) {
+            '"' if !single_quote => return String(string),
+            '\'' if single_quote => return String(string),
+            '\n' | '\x0C' => {
+                state.errors.push(~"Newline in quoted string");
+                return BadString
+            },
+            '\\' => {
+                if is_eof(state) {
+                    state.errors.push(~"EOF in a quoted string");
+                    return BadString
+                }
+                match current_char(state) {
+                    // Consume quoted newline
+                    '\n' | '\x0C' => state.position += 1,
+                    _ =>  str::push_char(&mut string, consume_escape(state))
+                }
+            }
+            c => str::push_char(&mut string, c),
+        }
+    }
+}
+
+
 // 3.3.9. Comment state
 fn consume_comment(state: &State) -> Token {
     state.position += 1;  // consume the * in /*
@@ -113,6 +209,9 @@ fn tokenize(input: &str//, transform_function_whitespace: bool,
     // 3.3.4. Data state
     while !is_eof(state) {
         tokens.push(match consume_char(state) {
+            '\t' | '\n' | '\x0C' | ' ' => consume_whitespace(state),
+            '"' => consume_quoted_string(state, false),
+            '\'' => consume_quoted_string(state, true),
             '/' if !is_eof(state) && current_char(state) == '*'
                 => consume_comment(state),
             ',' => Colon,
@@ -147,7 +246,7 @@ fn test_tokenizer() {
             fail fmt!("%? != %?", tokens, expected_tokens);
         }
         if parse_errors != expected_errors {
-            fail fmt!("%? != %?", tokens, expected_errors);
+            fail fmt!("%? != %?", parse_errors, expected_errors);
         }
     }
     assert_tokens("", [], []);
@@ -158,4 +257,10 @@ fn test_tokenizer() {
     assert_tokens("?/*", [Delim('?'), Comment], [~"EOF in comment"]);
     assert_tokens("[?}{)",
         [OpenBraket, Delim('?'), CloseBrace, OpenBrace, CloseParen], []);
+    assert_tokens("(\n \t'Lore\\6d \"ipsu\\6D'",
+        [OpenParen, WhiteSpace, String(~"Lorem\"ipsum")], []);
+    assert_tokens("\"0\\0000000\"", [String(~"0\uFFFD0")], []);
+    assert_tokens("\"0\\000000 0\"", [String(~"0\uFFFD0")], []);
+    assert_tokens("'z\n'a", [BadString, String(~"a")],
+        [~"Newline in quoted string", ~"EOF in quoted string"]);
 }
