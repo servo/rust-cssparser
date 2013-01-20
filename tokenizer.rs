@@ -74,16 +74,27 @@ struct State {
 }
 
 
+#[inline(always)]
 fn is_eof(state: &State) -> bool {
     state.position >= state.length
 }
 
 
+#[inline(always)]
 fn current_char(state: &State) -> char {
     str::char_at(state.input, state.position)
 }
 
 
+// Return value may be smaller than n if we’re near the end of the input.
+#[inline(always)]
+fn next_n_bytes(state: &State, n: uint) -> ~str {
+    str::slice(state.input, state.position,
+               uint::min(state.position + n, state.length))
+}
+
+
+#[inline(always)]
 fn consume_char(state: &State) -> char {
     let range = str::char_range_at(state.input, state.position);
     state.position = range.next;
@@ -148,7 +159,10 @@ fn consume_token(state: &State) -> Token {
                     },
                     'a'..'z' | 'A'..'Z' | '_' => consume_ident(state, c),
                     c if c >= '\xA0' => consume_ident(state, c),  // Non-ASCII
-                    _ => Delim('-')
+                    _ => {
+                        if next_n_bytes(state, 2) == ~"->"
+                        { state.position += 2; CDC } else { Delim('-') }
+                    }
                 }
             }
         }
@@ -156,6 +170,10 @@ fn consume_token(state: &State) -> Token {
             => consume_comment(state),
         ':' => Colon,
         ';' => Semicolon,
+        '<' => {
+            if next_n_bytes(state, 3) == ~"!--"
+            { state.position += 3; CDO } else { Delim('<') }
+        }
         '[' => OpenBraket,
         '\\' => {
             if is_eof(state) {
@@ -385,4 +403,8 @@ fn test_tokenizer() {
         [Ident(~"func"), WhiteSpace, OpenParen, CloseParen], []);
     assert_tokens_flags("func ()", true, false,
         [Function(~"func"), CloseParen], []);
+
+    assert_tokens("<!-<!-----><",
+        [Delim('<'), Delim('!'), Delim('-'), CDO, Delim('-'), CDC, Delim('<')],
+        []);
 }
