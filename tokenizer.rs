@@ -53,7 +53,7 @@ enum Token {
     Comment,
     CDO,  // <!--
     CDC,  // -->
-    Colon,  // ,
+    Colon,  // :
     Semicolon,  // ;
     OpenBraket, // [
     OpenParen, // (
@@ -128,15 +128,49 @@ fn consume_token(state: &State) -> Token {
         },
         '"' => consume_quoted_string(state, false),
         '\'' => consume_quoted_string(state, true),
+        '(' => OpenParen,
+        ')' => CloseParen,
+        '-' => {
+            if is_eof(state) { Delim('-') } else {
+                // TODO: CDC, negative numbers
+                match current_char(state) {
+                    '\\' => {
+                        state.position += 1;
+                        if is_eof(state) { state.position -= 1; Delim('-') }
+                        else {
+                            let c = current_char(state);
+                            state.position -= 1;
+                            match c {
+                                '\n' | '\x0C' => Delim('-'),
+                                _ => consume_ident(state, '-')
+                            }
+                        }
+                    },
+                    'a'..'z' | 'A'..'Z' | '_' => consume_ident(state, c),
+                    c if c >= '\xA0' => consume_ident(state, c),  // Non-ASCII
+                    _ => Delim('-')
+                }
+            }
+        }
         '/' if !is_eof(state) && current_char(state) == '*'
             => consume_comment(state),
-        ',' => Colon,
+        ':' => Colon,
         ';' => Semicolon,
         '[' => OpenBraket,
-        '(' => OpenParen,
-        '{' => OpenBrace,
+        '\\' => {
+            if is_eof(state) {
+                state.errors.push(~"Invalid escape");
+                Delim('\\')
+            } else {
+                match current_char(state) {
+                    '\n' | '\x0C' => {
+                        state.errors.push(~"Invalid escape"); Delim('\\') },
+                    _ => consume_ident(state, consume_escape(state))
+                }
+            }
+        }
         ']' => CloseBraket,
-        ')' => CloseParen,
+        '{' => OpenBrace,
         '}' => CloseBrace,
         'a'..'z' | 'A'..'Z' | '_' => consume_ident(state, c),
         c if c >= '\xA0' => consume_ident(state, c),  // Non-ASCII
@@ -294,7 +328,6 @@ fn char_from_hex(hex: &[char]) -> char {
 }
 
 
-
 #[test]
 fn test_tokenizer() {
 
@@ -339,11 +372,14 @@ fn test_tokenizer() {
     assert_tokens("'z\n'a", [BadString, String(~"a")],
         [~"Newline in quoted string", ~"EOF in quoted string"]);
 
-    assert_tokens("Lorem\\ ipsu\\6D dolor sit",
+    assert_tokens("Lorem\\ ipsu\\6D dolor \\sit",
         [Ident(~"Lorem ipsumdolor"), WhiteSpace, Ident(~"sit")], []);
-    assert_tokens("foo\\", [Ident(~"foo"), Delim('\\')], []);
+    assert_tokens("foo\\", [Ident(~"foo"), Delim('\\')], [~"Invalid escape"]);
     assert_tokens("foo\\\nbar",
-        [Ident(~"foo"), Delim('\\'), WhiteSpace, Ident(~"bar")], []);
+        [Ident(~"foo"), Delim('\\'), WhiteSpace, Ident(~"bar")],
+        [~"Invalid escape"]);
+    assert_tokens("-Lipsum", [Ident(~"-Lipsum")], []);
+    assert_tokens("-\\Lipsum", [Ident(~"-Lipsum")], []);
     assert_tokens("func()", [Function(~"func"), CloseParen], []);
     assert_tokens("func ()",
         [Ident(~"func"), WhiteSpace, OpenParen, CloseParen], []);
