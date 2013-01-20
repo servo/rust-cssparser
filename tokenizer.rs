@@ -91,62 +91,56 @@ fn consume_char(state: &State) -> char {
 }
 
 
-fn consume_whitespace(state: &State) -> Token {
+// http://dev.w3.org/csswg/css3-syntax/#tokenization
+pub fn tokenize(input: &str, transform_function_whitespace: bool,
+            quirks_mode: bool) -> {tokens: ~[Token], parse_errors: ~[~str]} {
+    let input = cssparser::preprocess(input);
+    let state = &State {
+        input: input, length: input.len(), quirks_mode: quirks_mode,
+        transform_function_whitespace: transform_function_whitespace,
+        position: 0, errors: ~[] };
+    let mut tokens: ~[Token] = ~[];
+
     while !is_eof(state) {
-        match current_char(state) {
-            '\t' | '\n' | '\x0C' | ' ' => state.position += 1,
-            _ => break,
-        }
+        tokens.push(consume_token(state))
     }
-    WhiteSpace
+
+    // Work around `error: moving out of mutable field`
+    // TODO: find a cleaner way.
+    let mut errors: ~[~str] = ~[];
+    errors <-> state.errors;
+    {tokens: tokens, parse_errors: errors}
 }
 
 
-fn char_from_hex(hex: &[char]) -> char {
-    let mut value = 0u;
-    for hex.each |cc| {
-        let c = *cc;
-        value = value * 16 + c as uint - match c {
-            '0'..'9' => '0' as uint,
-            'A'..'F' => 'A' as uint - 10,
-            'a'..'f' => 'a' as uint - 10,
-            _ => fail
-        }
-    }
-    if value == 0 || value > MAX_UNICODE {
-        '\uFFFD'  // Replacement character
-    } else {
-        value as char
-    }
-}
-
-
-// 3.3.27. Consume an escaped character
-// Assumes that the U+005C REVERSE SOLIDUS (\) has already been consumed
-// and that the next input character has already been verified
-// to not be a newline or EOF.
-fn consume_escape(state: &State) -> char {
+// 3.3.4. Data state
+fn consume_token(state: &State) -> Token {
     let c = consume_char(state);
     match c {
-        '0'..'9' | 'A'..'F' | 'a'..'f' => {
-            let mut hex = ~[c];
-            while hex.len() < 6 && !is_eof(state) {
-                let c = current_char(state);
-                match c {
-                    '0'..'9' | 'A'..'F' | 'a'..'f' => {
-                        hex.push(c); state.position += 1 },
-                    _ => break
-                }
-            }
-            if !is_eof(state) {
+        '\t' | '\n' | '\x0C' | ' ' => {
+            while !is_eof(state) {
                 match current_char(state) {
                     '\t' | '\n' | '\x0C' | ' ' => state.position += 1,
-                    _ => ()
+                    _ => break,
                 }
             }
-            char_from_hex(hex)
+            WhiteSpace
         },
-        c => c
+        '"' => consume_quoted_string(state, false),
+        '\'' => consume_quoted_string(state, true),
+        '/' if !is_eof(state) && current_char(state) == '*'
+            => consume_comment(state),
+        ',' => Colon,
+        ';' => Semicolon,
+        '[' => OpenBraket,
+        '(' => OpenParen,
+        '{' => OpenBrace,
+        ']' => CloseBraket,
+        ')' => CloseParen,
+        '}' => CloseBrace,
+        'a'..'z' | 'A'..'Z' | '_' => consume_ident(state, c),
+        c if c >= '\xA0' => consume_ident(state, c),  // Non-ASCII
+        _ => Delim(c),
     }
 }
 
@@ -251,45 +245,54 @@ fn handle_transform_function_whitespace(state: &State, string: ~str) -> Token {
 }
 
 
-// http://dev.w3.org/csswg/css3-syntax/#tokenization
-fn tokenize(input: &str, transform_function_whitespace: bool,
-            quirks_mode: bool) -> {tokens: ~[Token], parse_errors: ~[~str]} {
-    let input = cssparser::preprocess(input);
-    let state = &State {
-        input: input, length: input.len(), quirks_mode: quirks_mode,
-        transform_function_whitespace: transform_function_whitespace,
-        position: 0, errors: ~[] };
-    let mut tokens: ~[Token] = ~[];
-
-    // 3.3.4. Data state
-    while !is_eof(state) {
-        let c = consume_char(state);
-        tokens.push(match c {
-            '\t' | '\n' | '\x0C' | ' ' => consume_whitespace(state),
-            '"' => consume_quoted_string(state, false),
-            '\'' => consume_quoted_string(state, true),
-            '/' if !is_eof(state) && current_char(state) == '*'
-                => consume_comment(state),
-            ',' => Colon,
-            ';' => Semicolon,
-            '[' => OpenBraket,
-            '(' => OpenParen,
-            '{' => OpenBrace,
-            ']' => CloseBraket,
-            ')' => CloseParen,
-            '}' => CloseBrace,
-            'a'..'z' | 'A'..'Z' | '_' => consume_ident(state, c),
-            c if c >= '\xA0' => consume_ident(state, c),  // Non-ASCII
-            _ => Delim(c),
-        })
+// 3.3.27. Consume an escaped character
+// Assumes that the U+005C REVERSE SOLIDUS (\) has already been consumed
+// and that the next input character has already been verified
+// to not be a newline or EOF.
+fn consume_escape(state: &State) -> char {
+    let c = consume_char(state);
+    match c {
+        '0'..'9' | 'A'..'F' | 'a'..'f' => {
+            let mut hex = ~[c];
+            while hex.len() < 6 && !is_eof(state) {
+                let c = current_char(state);
+                match c {
+                    '0'..'9' | 'A'..'F' | 'a'..'f' => {
+                        hex.push(c); state.position += 1 },
+                    _ => break
+                }
+            }
+            if !is_eof(state) {
+                match current_char(state) {
+                    '\t' | '\n' | '\x0C' | ' ' => state.position += 1,
+                    _ => ()
+                }
+            }
+            char_from_hex(hex)
+        },
+        c => c
     }
-
-    // Work around `error: moving out of mutable field`
-    // TODO: find a cleaner way.
-    let mut errors: ~[~str] = ~[];
-    errors <-> state.errors;
-    {tokens: tokens, parse_errors: errors}
 }
+
+
+fn char_from_hex(hex: &[char]) -> char {
+    let mut value = 0u;
+    for hex.each |cc| {
+        let c = *cc;
+        value = value * 16 + c as uint - match c {
+            '0'..'9' => '0' as uint,
+            'A'..'F' => 'A' as uint - 10,
+            'a'..'f' => 'a' as uint - 10,
+            _ => fail
+        }
+    }
+    if value == 0 || value > MAX_UNICODE {
+        '\uFFFD'  // Replacement character
+    } else {
+        value as char
+    }
+}
+
 
 
 #[test]
