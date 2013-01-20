@@ -21,7 +21,7 @@
 use cssparser;
 
 
-const MAX_UNICODE: uint = 0x10FFFF;
+const MAX_UNICODE: char = '\U0010FFFF';
 
 
 #[deriving_eq]
@@ -438,7 +438,7 @@ fn consume_url(state: &State) -> Token {
 // 3.3.21. URL-double-quote state
 // 3.3.22. URL-single-quote state
 fn consume_quoted_url(state: &State, single_quote: bool) -> Token {
-    state.position += 1;
+    state.position += 1;  // The initial quote
     match consume_quoted_string(state, single_quote, true) {
         String(string) => consume_url_end(state, string),
         BadString => consume_bad_url(state, false),
@@ -521,12 +521,12 @@ fn consume_unicode_range(state: &State) -> Token {
         question_marks += 1;
         state.position += 1
     }
-    let start: uint, end: uint;
+    let start: char, end: char;
     if question_marks > 0 {
-        start = uint_from_hex(hex + vec::from_elem(question_marks, '0'));
-        end = uint_from_hex(hex + vec::from_elem(question_marks, 'F'));
+        start = char_from_hex(hex + vec::from_elem(question_marks, '0'));
+        end = char_from_hex(hex + vec::from_elem(question_marks, 'F'));
     } else {
-        start = uint_from_hex(hex);
+        start = char_from_hex(hex);
         hex = ~[];
         if !is_eof(state) && current_char(state) == '-' {
             state.position += 1;
@@ -539,11 +539,12 @@ fn consume_unicode_range(state: &State) -> Token {
                 }
             }
         }
-        end = if hex.len() > 0 { uint_from_hex(hex) } else { start }
+        end = if hex.len() > 0 { char_from_hex(hex) } else { start }
     }
     // 3.3.28. Set the unicode-range token's range
     if start > MAX_UNICODE || end < start { EmptyUnicodeRange }
-    else { UnicodeRange(start as char, uint::min(end, MAX_UNICODE) as char) }
+    else { UnicodeRange(start,
+                        if end <= MAX_UNICODE { end } else { MAX_UNICODE }) }
 }
 
 
@@ -570,28 +571,17 @@ fn consume_escape(state: &State) -> char {
                     _ => ()
                 }
             }
-            let value = uint_from_hex(hex);
-            if value == 0 || value > MAX_UNICODE {
-                '\uFFFD'  // Replacement character
-            } else { value as char }
+            let c = char_from_hex(hex);
+            if '\x00' < c && c <= MAX_UNICODE { c }
+            else { '\uFFFD' }  // Replacement character
         },
         c => c
     }
 }
 
 
-fn uint_from_hex(hex: &[char]) -> uint {
-    let mut value = 0u;
-    for hex.each |cc| {
-        let c = *cc;
-        value = value * 16 + c as uint - match c {
-            '0'..'9' => '0' as uint,
-            'A'..'F' => 'A' as uint - 10,
-            'a'..'f' => 'a' as uint - 10,
-            _ => fail
-        }
-    }
-    value
+fn char_from_hex(hex: &[char]) -> char {
+    uint::from_str_radix(str::from_chars(hex), 16).get() as char
 }
 
 
