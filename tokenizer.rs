@@ -390,7 +390,8 @@ fn consume_ident(state: &State, initial_char: char) -> Token {
             }
             '(' => {
                 state.position += 1;
-                if ascii_lower(string) == ~"url" { return consume_url(state) }
+                if cssparser::ascii_lower(string) == ~"url" {
+                    return consume_url(state) }
                 return Function(string)
             },
             _ => break
@@ -591,16 +592,6 @@ fn uint_from_hex(hex: &[char]) -> uint {
         }
     }
     value
-}
-
-
-fn ascii_lower(string: &str) -> ~str {
-    do str::map(string) |c| {
-        match c {
-            'A'..'Z' => c - 'A' + 'a',
-            _ => c,
-        }
-    }
 }
 
 

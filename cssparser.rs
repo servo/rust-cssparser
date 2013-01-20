@@ -23,3 +23,13 @@ fn test_preprocess() {
     assert preprocess("Lorem\r\n\t\x00ipusm\ndoror\uFFFD\r")
         == ~"Lorem\n\t\uFFFDipusm\ndoror\uFFFD\n";
 }
+
+
+pub fn ascii_lower(string: &str) -> ~str {
+    do str::map(string) |c| {
+        match c {
+            'A'..'Z' => c - 'A' + 'a',
+            _ => c,
+        }
+    }
+}
