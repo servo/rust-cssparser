@@ -138,6 +138,7 @@ fn consume_token(state: &State) -> Token {
             WhiteSpace
         },
         '"' => consume_quoted_string(state, false),
+        '#' => consume_hash(state),
         '\'' => consume_quoted_string(state, true),
         '(' => OpenParen,
         ')' => CloseParen,
@@ -230,6 +231,47 @@ fn consume_quoted_string(state: &State, single_quote: bool) -> Token {
 }
 
 
+// 3.3.7. Hash state
+fn consume_hash(state: &State) -> Token {
+    let c = current_char(state);
+    let initial_char = match c {
+        'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-'  => {
+            state.position += 1; c },
+        _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
+        '\\' => {
+            state.position += 1;
+            if is_eof(state) { state.position -= 1; return Delim('#') }
+            match current_char(state) {
+                '\n' | '\x0C' => { state.position -= 1; return Delim('#') },
+                _ => consume_escape(state)
+            }
+        },
+        _ => return Delim('#')
+    };
+    // 3.3.8. Hash-rest state
+    let mut string: ~str = str::from_char(initial_char);
+    while !is_eof(state) {
+        let c = current_char(state);
+        let next_char = match c {
+            'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-'  => {
+                state.position += 1; c },
+            _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
+            '\\' => {
+                state.position += 1;
+                if is_eof(state) { state.position -= 1; break }
+                match current_char(state) {
+                    '\n' | '\x0C' => { state.position -= 1; break },
+                    _ => consume_escape(state)
+                }
+            },
+            _ => break
+        };
+        str::push_char(&mut string, next_char)
+    }
+    Hash(string)
+}
+
+
 // 3.3.9. Comment state
 fn consume_comment(state: &State) -> Token {
     state.position += 1;  // consume the * in /*
@@ -250,7 +292,7 @@ fn consume_ident(state: &State, initial_char: char) -> Token {
     let mut string = str::from_char(initial_char);
     while !is_eof(state) {
         let c = current_char(state);
-        let cc = match c {
+        let next_char = match c {
             'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-'  => {
                 state.position += 1; c },
             _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
@@ -274,7 +316,7 @@ fn consume_ident(state: &State, initial_char: char) -> Token {
             },
             _ => break
         };
-        str::push_char(&mut string, cc)
+        str::push_char(&mut string, next_char)
     }
     Ident(string)
 }
@@ -403,6 +445,10 @@ fn test_tokenizer() {
         [Ident(~"func"), WhiteSpace, OpenParen, CloseParen], []);
     assert_tokens_flags("func ()", true, false,
         [Function(~"func"), CloseParen], []);
+    assert_tokens("##00#\\##\\\n#\\",
+        [Delim('#'), Hash(~"00"), Hash(~"#"), Delim('#'), Delim('\\'),
+         WhiteSpace, Delim('#'), Delim('\\')],
+        [~"Invalid escape", ~"Invalid escape"]);
 
     assert_tokens("<!-<!-----><",
         [Delim('<'), Delim('!'), Delim('-'), CDO, Delim('-'), CDC, Delim('<')],
