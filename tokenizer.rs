@@ -67,6 +67,8 @@ enum Token {
 struct State {
     input: ~str,
     length: uint,
+    transform_function_whitespace: bool,
+    quirks_mode: bool,
     mut position: uint,
     mut errors: ~[~str]
 }
@@ -167,7 +169,7 @@ fn consume_quoted_string(state: &State, single_quote: bool) -> Token {
             },
             '\\' => {
                 if is_eof(state) {
-                    state.errors.push(~"EOF in a quoted string");
+                    state.errors.push(~"EOF in quoted string");
                     return BadString
                 }
                 match current_char(state) {
@@ -196,19 +198,73 @@ fn consume_comment(state: &State) -> Token {
 }
 
 
+// 3.3.12. Ident state
+// 3.3.13. Ident-rest state
+fn consume_ident(state: &State, initial_char: char) -> Token {
+    let mut string = str::from_char(initial_char);
+    while !is_eof(state) {
+        let c = current_char(state);
+        let cc = match c {
+            'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-'  => {
+                state.position += 1; c },
+            _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
+            '\\' => {
+                state.position += 1;
+                if is_eof(state) { state.position -= 1; break }
+                match current_char(state) {
+                    '\n' | '\x0C' => { state.position -= 1; break },
+                    _ => consume_escape(state)
+                }
+            },
+            '\t' | '\n' | '\x0C' | ' ' if state.transform_function_whitespace
+            => {
+                state.position += 1;
+                return handle_transform_function_whitespace(state, string)
+            }
+            '(' => {
+                state.position += 1;
+                // TODO: URLs
+                return Function(string)
+            },
+            _ => break
+        };
+        str::push_char(&mut string, cc)
+    }
+    Ident(string)
+}
+
+
+// 3.3.14. Transform-function-whitespace state
+fn handle_transform_function_whitespace(state: &State, string: ~str) -> Token {
+    while !is_eof(state) {
+        match current_char(state) {
+            '\t' | '\n' | '\x0C' | ' ' => state.position += 1,
+            '(' => { state.position += 1; return Function(string) }
+            _ => break,
+        }
+    }
+    // XXX I think the spec is wrong here.
+    // See http://lists.w3.org/Archives/Public/www-style/2013Jan/0266.html
+    // Go back for one whitespace character.
+    state.position -= 1;
+    return Ident(string)
+}
+
+
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
-fn tokenize(input: &str//, transform_function_whitespace: bool,
-//            quirks_mode: bool
-            ) -> {tokens: ~[Token], parse_errors: ~[~str]} {
+fn tokenize(input: &str, transform_function_whitespace: bool,
+            quirks_mode: bool) -> {tokens: ~[Token], parse_errors: ~[~str]} {
     let input = cssparser::preprocess(input);
     let state = &State {
-        input: input, length: input.len(),
+        input: input, length: input.len(), quirks_mode: quirks_mode,
+        transform_function_whitespace: transform_function_whitespace,
         position: 0, errors: ~[] };
     let mut tokens: ~[Token] = ~[];
 
     // 3.3.4. Data state
     while !is_eof(state) {
-        tokens.push(match consume_char(state) {
+        let c = consume_char(state);
+        tokens.push(match c {
             '\t' | '\n' | '\x0C' | ' ' => consume_whitespace(state),
             '"' => consume_quoted_string(state, false),
             '\'' => consume_quoted_string(state, true),
@@ -222,7 +278,9 @@ fn tokenize(input: &str//, transform_function_whitespace: bool,
             ']' => CloseBraket,
             ')' => CloseParen,
             '}' => CloseBrace,
-            c => Delim(c),
+            'a'..'z' | 'A'..'Z' | '_' => consume_ident(state, c),
+            c if c >= '\xA0' => consume_ident(state, c),  // Non-ASCII
+            _ => Delim(c),
         })
     }
 
@@ -236,10 +294,19 @@ fn tokenize(input: &str//, transform_function_whitespace: bool,
 
 #[test]
 fn test_tokenizer() {
+
     fn assert_tokens(input: &str, expected_tokens: &[Token],
                      expected_errors: &[~str]) {
-        let result = tokenize(input//, false, false
-        );
+        assert_tokens_flags(
+            input, false, false, expected_tokens, expected_errors)
+    }
+
+    fn assert_tokens_flags(
+            input: &str,
+            transform_function_whitespace: bool, quirks_mode: bool,
+            expected_tokens: &[Token], expected_errors: &[~str]) {
+        let result = tokenize(
+            input, transform_function_whitespace, quirks_mode);
         let tokens: &[Token] = result.tokens;
         let parse_errors: &[~str] = result.parse_errors;
         if tokens != expected_tokens {
@@ -257,10 +324,26 @@ fn test_tokenizer() {
     assert_tokens("?/*", [Delim('?'), Comment], [~"EOF in comment"]);
     assert_tokens("[?}{)",
         [OpenBraket, Delim('?'), CloseBrace, OpenBrace, CloseParen], []);
+
     assert_tokens("(\n \t'Lore\\6d \"ipsu\\6D'",
         [OpenParen, WhiteSpace, String(~"Lorem\"ipsum")], []);
+    assert_tokens("'\\''", [String(~"'")], []);
+    assert_tokens("\"\\\"\"", [String(~"\"")], []);
+    assert_tokens("\"\\\"", [String(~"\"")], [~"EOF in quoted string"]);
+    assert_tokens("'\\", [BadString], [~"EOF in quoted string"]);
     assert_tokens("\"0\\0000000\"", [String(~"0\uFFFD0")], []);
     assert_tokens("\"0\\000000 0\"", [String(~"0\uFFFD0")], []);
     assert_tokens("'z\n'a", [BadString, String(~"a")],
         [~"Newline in quoted string", ~"EOF in quoted string"]);
+
+    assert_tokens("Lorem\\ ipsu\\6D dolor sit",
+        [Ident(~"Lorem ipsumdolor"), WhiteSpace, Ident(~"sit")], []);
+    assert_tokens("foo\\", [Ident(~"foo"), Delim('\\')], []);
+    assert_tokens("foo\\\nbar",
+        [Ident(~"foo"), Delim('\\'), WhiteSpace, Ident(~"bar")], []);
+    assert_tokens("func()", [Function(~"func"), CloseParen], []);
+    assert_tokens("func ()",
+        [Ident(~"func"), WhiteSpace, OpenParen, CloseParen], []);
+    assert_tokens_flags("func ()", true, false,
+        [Function(~"func"), CloseParen], []);
 }
