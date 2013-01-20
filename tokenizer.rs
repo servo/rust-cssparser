@@ -138,9 +138,9 @@ fn consume_token(state: &State) -> Token {
             }
             WhiteSpace
         },
-        '"' => consume_quoted_string(state, false),
+        '"' => consume_quoted_string(state, false, false),
         '#' => consume_hash(state),
-        '\'' => consume_quoted_string(state, true),
+        '\'' => consume_quoted_string(state, true, false),
         '(' => OpenParen,
         ')' => CloseParen,
         '-' => {
@@ -214,13 +214,10 @@ fn consume_token(state: &State) -> Token {
 
 // 3.3.5. Double-quote-string state
 // 3.3.6. Single-quote-string state
-fn consume_quoted_string(state: &State, single_quote: bool) -> Token {
+fn consume_quoted_string(state: &State, single_quote: bool,
+                         eof_is_bad: bool) -> Token {
     let mut string: ~str = ~"";
-    loop {
-        if is_eof(state) {
-            state.errors.push(~"EOF in quoted string");
-            return String(string);
-        }
+    while !is_eof(state) {
         match consume_char(state) {
             '"' if !single_quote => return String(string),
             '\'' if single_quote => return String(string),
@@ -242,6 +239,8 @@ fn consume_quoted_string(state: &State, single_quote: bool) -> Token {
             c => str::push_char(&mut string, c),
         }
     }
+    state.errors.push(~"EOF in quoted string");
+    if eof_is_bad { BadString } else { String(string) }
 }
 
 
@@ -391,7 +390,7 @@ fn consume_ident(state: &State, initial_char: char) -> Token {
             }
             '(' => {
                 state.position += 1;
-                // TODO: URLs
+                if ascii_lower(string) == ~"url" { return consume_url(state) }
                 return Function(string)
             },
             _ => break
@@ -416,6 +415,89 @@ fn handle_transform_function_whitespace(state: &State, string: ~str) -> Token {
     // Go back for one whitespace character.
     state.position -= 1;
     return Ident(string)
+}
+
+
+// 3.3.20. URL state
+fn consume_url(state: &State) -> Token {
+    while !is_eof(state) {
+        match current_char(state) {
+            '\t' | '\n' | '\x0C' | ' ' => state.position += 1,
+            '"' => return consume_quoted_url(state, false),
+            '\'' => return consume_quoted_url(state, true),
+            ')' => { state.position += 1; return URL(~"") },
+            _ => return consume_unquoted_url(state),
+        }
+    }
+    state.errors.push(~"EOF in URL");
+    return BadURL
+}
+
+
+// 3.3.21. URL-double-quote state
+// 3.3.22. URL-single-quote state
+fn consume_quoted_url(state: &State, single_quote: bool) -> Token {
+    state.position += 1;
+    match consume_quoted_string(state, single_quote, true) {
+        String(string) => consume_url_end(state, string),
+        BadString => consume_bad_url(state, false),
+        _ => fail,
+    }
+}
+
+
+
+// 3.3.23. URL-end state
+fn consume_url_end(state: &State, string: ~str) -> Token {
+    while !is_eof(state) {
+        match consume_char(state) {
+            '\t' | '\n' | '\x0C' | ' ' => (),
+            ')' => return URL(string),
+            _ => return consume_bad_url(state, true)
+        }
+    }
+    state.errors.push(~"EOF in URL");
+    BadURL
+}
+
+
+// 3.3.24. URL-unquoted state
+fn consume_unquoted_url(state: &State) -> Token {
+    let mut string = ~"";
+    while !is_eof(state) {
+        let next_char = match consume_char(state) {
+            '\t' | '\n' | '\x0C' | ' ' => return consume_url_end(state, string),
+            ')' => return URL(string),
+            '\x00'..'\x08' | '\x0E'..'\x1F' | '\x7F'..'\x9F'  // non-printable
+                | '"' | '\'' | '(' => return consume_bad_url(state, true),
+            '\\' => {
+                if is_eof(state) { return consume_bad_url(state, true) }
+                match current_char(state) {
+                    '\n' | '\x0C' => return consume_bad_url(state, true),
+                    _ => consume_escape(state)
+                }
+            }
+            c => c
+        };
+        str::push_char(&mut string, next_char)
+    }
+    state.errors.push(~"EOF in URL");
+    BadURL
+}
+
+
+// 3.3.25. Bad-URL state
+fn consume_bad_url(state: &State, log_error: bool) -> Token {
+    if log_error { state.errors.push(~"Invalid URL syntax"); }
+    // Consume up to the closing )
+    while !is_eof(state) {
+        match consume_char(state) {
+            ')' => break,
+            '\\' => state.position += 1, // Skip an escaped ) or \
+            _ => ()
+        }
+    }
+    BadURL
 }
 
 
@@ -512,6 +594,16 @@ fn uint_from_hex(hex: &[char]) -> uint {
 }
 
 
+fn ascii_lower(string: &str) -> ~str {
+    do str::map(string) |c| {
+        match c {
+            'A'..'Z' => c - 'A' + 'a',
+            _ => c,
+        }
+    }
+}
+
+
 #[test]
 fn test_tokenizer() {
 
@@ -591,4 +683,18 @@ fn test_tokenizer() {
          UnicodeRange('B', 'B'), EmptyUnicodeRange,
          UnicodeRange('B', '\U0010FFFF')],
         []);
+
+    assert_tokens("url()URL()uRl()Ürl()",
+        [URL(~""), URL(~""), URL(~""), Function(~"Ürl"), CloseParen], []);
+    assert_tokens("url(  )url(\ta\n)url(\t'a'\n)url(\t'a'z)url(  ",
+        [URL(~""), URL(~"a"), URL(~"a"), BadURL, BadURL],
+        [~"Invalid URL syntax", ~"EOF in URL"]);
+    assert_tokens("url('a\nb')url('a", [BadURL, BadURL],
+        [~"Newline in quoted string", ~"EOF in quoted string"]);
+    assert_tokens("url(a'b)url(\x08z)url('a'", [BadURL, BadURL, BadURL],
+        [~"Invalid URL syntax", ~"Invalid URL syntax", ~"EOF in URL"]);
+    assert_tokens("url(Lorem\\ ipsu\\6D dolo\\r)url(a\nb)url(a\\\nb)",
+        [URL(~"Lorem ipsumdolor"), BadURL, BadURL],
+        [~"Invalid URL syntax", ~"Invalid URL syntax"]);
+
 }
