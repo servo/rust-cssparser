@@ -207,13 +207,13 @@ fn consume_quoted_string(state: &State, single_quote: bool,
                 return BadString
             },
             '\\' => {
-                if is_eof(state) {
-                    state.errors.push(~"EOF in quoted string");
-                    return BadString
-                }
-                match current_char(state) {
-                    // Consume quoted newline
-                    '\n' | '\x0C' => state.position += 1,
+                match next_n_bytes(state, 1) {
+                    ~"\n" | ~"\x0C" => state.position += 1, // Quoted newline
+                    ~"" => {
+                        // Even if not eof_is_bad
+                        state.errors.push(~"EOF in quoted string");
+                        return BadString
+                    },
                     _ =>  str::push_char(&mut string, consume_escape(state))
                 }
             }
@@ -227,42 +227,16 @@ fn consume_quoted_string(state: &State, single_quote: bool,
 
 // 3.3.7. Hash state
 fn consume_hash(state: &State) -> Token {
-    let c = current_char(state);
-    let initial_char = match c {
-        'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-'  => {
-            state.position += 1; c },
-        _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
-        '\\' => {
-            state.position += 1;
-            if is_eof(state) { state.position -= 1; return Delim('#') }
-            match current_char(state) {
-                '\n' | '\x0C' => { state.position -= 1; return Delim('#') },
-                _ => consume_escape(state)
+    if is_escaped_newline_or_eof(state) { return Delim('#') }
+    match current_char(state) {
+        'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-' | '\\' => {
+            match consume_ident_rest(state) {
+                Ident(string) => Hash(string),
+                _ => fail,
             }
         },
-        _ => return Delim('#')
-    };
-    // 3.3.8. Hash-rest state
-    let mut string: ~str = str::from_char(initial_char);
-    while !is_eof(state) {
-        let c = current_char(state);
-        let next_char = match c {
-            'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-'  => {
-                state.position += 1; c },
-            _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
-            '\\' => {
-                state.position += 1;
-                if is_eof(state) { state.position -= 1; break }
-                match current_char(state) {
-                    '\n' | '\x0C' => { state.position -= 1; break },
-                    _ => consume_escape(state)
-                }
-            },
-            _ => break
-        };
-        str::push_char(&mut string, next_char)
+        _ => Delim('#')
     }
-    Hash(string)
 }
 
 
@@ -282,72 +256,21 @@ fn consume_comment(state: &State) -> Token {
 
 // 3.3.10. At-keyword state
 fn consume_at_keyword(state: &State) -> Token {
-    let c = current_char(state);
-    let initial_char = match c {
-        '-' => {
-            state.position += 1;
-            if is_eof(state) { state.position -= 1; return Delim('@') }
-            else {
-                match current_char(state) {
-                    '\\' => {
-                        // XXX the spec is missing this part. See
-            // http://lists.w3.org/Archives/Public/www-style/2013Jan/0267.html
-                        state.position += 1;
-                        if is_eof(state) {
-                            state.position -= 2; return Delim('@')
-                        } else {
-                            match current_char(state) {
-                                '\n' | '\x0C' =>  {
-                                    state.position -= 2; return Delim('@') },
-                                _ => { state.position -= 1; '-' }
-                            }
-                        }
-                    },
-                    'a'..'z' | 'A'..'Z' | '_' => '-',
-                    c if c >= '\xA0' => '-',  // Non-ASCII
-                    _ => { state.position -= 1; return Delim('@') }
-                }
-            }
-        }
-        'a'..'z' | 'A'..'Z' | '_'  => {
-            state.position += 1; c },
-        _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
-        '\\' => {
-            state.position += 1;
-            if is_eof(state) { state.position -= 1; return Delim('@') }
-            match current_char(state) {
-                '\n' | '\x0C' => { state.position -= 1; return Delim('@') },
-                _ => consume_escape(state)
+    if is_escaped_newline_or_eof(state) { return Delim('@') }
+    match current_char(state) {
+        'a'..'z' | 'A'..'Z' | '_' | '-' | '\\' => {
+            match consume_ident(state) {
+                Ident(string) => AtKeyword(string),
+                Delim('-') => { state.position -=1; Delim('@') },
+                _ => fail,
             }
         },
-        _ => return Delim('@')
-    };
-    // 3.3.11. At-keyword-rest state
-    let mut string: ~str = str::from_char(initial_char);
-    while !is_eof(state) {
-        let c = current_char(state);
-        let next_char = match c {
-            'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-'  => {
-                state.position += 1; c },
-            _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
-            '\\' => {
-                state.position += 1;
-                if is_eof(state) { state.position -= 1; break }
-                match current_char(state) {
-                    '\n' | '\x0C' => { state.position -= 1; break },
-                    _ => consume_escape(state)
-                }
-            },
-            _ => break
-        };
-        str::push_char(&mut string, next_char)
+        _ => Delim('@')
     }
-    AtKeyword(string)
 }
 
 
 // 3.3.12. Ident state
-// 3.3.13. Ident-rest state
 fn consume_ident(state: &State) -> Token {
     match current_char(state) {
         '-' => {
@@ -362,7 +285,12 @@ fn consume_ident(state: &State) -> Token {
         },
         _ => assert is_namestart_or_escape(state)  // sanity check
     }
+    consume_ident_rest(state)
+}
 
+
+// 3.3.13. Ident-rest state
+fn consume_ident_rest(state: &State) -> Token {
     let mut string = ~"";
     while !is_eof(state) {
         let c = current_char(state);
@@ -463,13 +391,10 @@ fn consume_unquoted_url(state: &State) -> Token {
             ')' => return URL(string),
             '\x00'..'\x08' | '\x0E'..'\x1F' | '\x7F'..'\x9F'  // non-printable
                 | '"' | '\'' | '(' => return consume_bad_url(state, true),
-            '\\' => {
-                if is_eof(state) { return consume_bad_url(state, true) }
-                match current_char(state) {
-                    '\n' | '\x0C' => return consume_bad_url(state, true),
-                    _ => consume_escape(state)
-                }
-            }
+            '\\' => match next_n_bytes(state, 1) {
+                ~"\n" | ~"\x0C" | ~"" => return consume_bad_url(state, true),
+                _ => consume_escape(state)
+            },
             c => c
         };
         str::push_char(&mut string, next_char)
