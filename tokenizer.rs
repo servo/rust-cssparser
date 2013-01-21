@@ -121,6 +121,13 @@ fn is_namestart_or_escape(state: &State) -> bool {
 }
 
 
+macro_rules! push_char(
+    ($string:ident, $c:expr) => (
+        str::push_char(&mut $string, $c)
+    );
+)
+
+
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 pub fn tokenize(input: &str, transform_function_whitespace: bool,
             quirks_mode: bool) -> {tokens: ~[Token], parse_errors: ~[~str]} {
@@ -214,10 +221,10 @@ fn consume_quoted_string(state: &State, single_quote: bool,
                         state.errors.push(~"EOF in quoted string");
                         return BadString
                     },
-                    _ =>  str::push_char(&mut string, consume_escape(state))
+                    _ => push_char!(string, consume_escape(state))
                 }
             }
-            c => str::push_char(&mut string, c),
+            c => push_char!(string, c),
         }
     }
     state.errors.push(~"EOF in quoted string");
@@ -316,7 +323,7 @@ fn consume_ident_rest(state: &State) -> Token {
             },
             _ => break
         };
-        str::push_char(&mut string, next_char)
+        push_char!(string, next_char)
     }
     Ident(string)
 }
@@ -397,7 +404,7 @@ fn consume_unquoted_url(state: &State) -> Token {
             },
             c => c
         };
-        str::push_char(&mut string, next_char)
+        push_char!(string, next_char)
     }
     state.errors.push(~"EOF in URL");
     BadURL
