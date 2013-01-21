@@ -171,15 +171,13 @@ fn consume_token(state: &State) -> Token {
     match c {
         '-' => {
             if next_n_bytes(state, 3) == ~"-->" { state.position += 3; CDC }
-            else {
-                // TODO: negative numeric
-                consume_ident(state)
-            }
+            else { consume_numeric(state) }
         },
         '<' => {
             if next_n_bytes(state, 4) == ~"<!--" { state.position += 4; CDO }
             else  { state.position += 1; Delim('<') }
         },
+        '0'..'9' | '.' | '+' => consume_numeric(state),
         'u' | 'U' => consume_unicode_range(state),
         'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(state),
         _ if c >= '\xA0' => consume_ident(state),  // Non-ASCII
@@ -358,6 +356,105 @@ fn handle_transform_function_whitespace(state: &State, string: ~str) -> Token {
     // Go back for one whitespace character.
     state.position -= 1;
     return Ident(string)
+}
+
+
+// 3.3.15. Number state
+fn consume_numeric(state: &State) -> Token {
+    let c = consume_char(state);
+    match c {
+        '-' | '+' => match consume_numeric_sign(state, c) {
+            Delim('-') => { state.position -= 1; return consume_ident(state) },
+            token => token,
+        },
+        '.' => match current_char(state) {
+            '0'..'9' => consume_numeric_fraction(state, ~"."),
+            _ => Delim('.'),
+        },
+        '0'..'9' => consume_numeric_rest(state, c),
+        _ => fail, // consume_numeric() should not have been called here.
+    }
+}
+
+
+fn consume_numeric_sign(state: &State, sign: char) -> Token {
+    if is_eof(state) { return Delim(sign) }
+    match current_char(state) {
+        '.' => {
+            state.position += 1;
+            if is_eof(state) { state.position -= 1; return Delim(sign) }
+            match current_char(state) {
+                '0'..'9' => consume_numeric_fraction(
+                    state, str::from_char(sign) + ~"."),
+                _ => { state.position -= 1; return Delim(sign) }
+            }
+        },
+        '0'..'9' => consume_numeric_rest(state, sign),
+        _ => Delim(sign)
+    }
+}
+
+
+// 3.3.16. Number-rest state
+fn consume_numeric_rest(state: &State, initial_char: char) -> Token {
+    let mut string = str::from_char(initial_char);
+    while !is_eof(state) {
+        let c = current_char(state);
+        match c {
+            '0'..'9' => { push_char!(string, c); state.position += 1 },
+            '.' => {
+                state.position += 1;
+                if is_eof(state) { state.position -= 1; break }
+                match current_char(state) {
+                    '0'..'9' => {
+                        push_char!(string, '.');
+                        return consume_numeric_fraction(state, string);
+                    },
+                    _ => { state.position -= 1; break }
+                }
+            },
+            _ => break,
+        }
+    }
+    let value = Integer(int::from_str(string).get());
+    consume_numeric_end(state, string, value)
+}
+
+
+// 3.3.17. Number-fraction state
+fn consume_numeric_fraction(state: &State, string: ~str) -> Token {
+    let mut string: ~str = string;
+    while !is_eof(state) {
+        let c = current_char(state);
+        match c {
+            '0'..'9' => { push_char!(string, c); state.position += 1 },
+            _ => break,
+        }
+    }
+    let value = Float(float::from_str(string).get());
+    consume_numeric_end(state, string, value)
+}
+
+
+fn consume_numeric_end(state: &State, string: ~str,
+                       value: NumericValue) -> Token {
+    match current_char(state) {
+        '%' => { state.position += 1; return Percentage(value, string) },
+        'e' | 'E' => {
+            // TODO: scientific notation
+        },
+        'a'..'z' | 'A'..'Z' | '_' | '-' | '\\' => (),
+        _ => return Number(value, string)
+    }
+    // 3.3.18. Dimension state (kind of)
+    if is_escaped_newline_or_eof(state) {
+        return Number(value, string)
+    }
+    match consume_ident(state) {
+        Ident(unit) => Dimension(value, string, unit),
+        Delim('-') => { state.position -= 1; Number(value, string) },
+        _ => fail,
+    }
 }
 
 
