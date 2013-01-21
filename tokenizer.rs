@@ -95,6 +95,21 @@ fn next_n_bytes(state: &State, n: uint) -> ~str {
 }
 
 
+// Return value may be smaller than n if we’re near the end of the input.
+#[inline(always)]
+fn next_n_chars(state: &State, n: uint) -> ~[char] {
+    let mut chars: ~[char] = ~[];
+    let mut position = state.position;
+    for n.times {
+        if position >= state.length { break }
+        let range = str::char_range_at(state.input, position);
+        position = range.next;
+        chars.push(range.ch);
+    }
+    chars
+}
+
+
 #[inline(always)]
 fn consume_char(state: &State) -> char {
     let range = str::char_range_at(state.input, state.position);
@@ -268,7 +283,7 @@ fn consume_at_keyword(state: &State) -> Token {
         'a'..'z' | 'A'..'Z' | '_' | '-' | '\\' => {
             match consume_ident(state) {
                 Ident(string) => AtKeyword(string),
-                Delim('-') => { state.position -=1; Delim('@') },
+                Delim('-') => { state.position -= 1; Delim('@') },
                 _ => fail,
             }
         },
@@ -428,12 +443,12 @@ fn consume_bad_url(state: &State, log_error: bool) -> Token {
 
 // 3.3.26. Unicode-range state
 fn consume_unicode_range(state: &State) -> Token {
-    let next_2 = next_n_bytes(state, 3);
+    let next_3 = next_n_chars(state, 3);
     // We got here with U or u
-    assert next_2[0] == 'u' as u8 || next_2[0] == 'U' as u8;
+    assert next_3[0] == 'u' || next_3[0] == 'U';
     // Check if this is indeed an unicode range. Fallback on ident.
-    if next_2.len() == 3 && next_2[1] as char == '+' {
-        match next_2[2] as char {
+    if next_3.len() == 3 && next_3[1] == '+' {
+        match next_3[2] {
             '0'..'9' | 'a'..'f' | 'A'..'F' => state.position += 2,
             _ => { return consume_ident(state) }
         }
