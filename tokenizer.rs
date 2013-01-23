@@ -417,7 +417,10 @@ fn consume_numeric_rest(state: &State, initial_char: char) -> Token {
                     state.position -= 1; break
                 }
             },
-            _ => break,
+            _ => match consume_scientific_number(state, string) {
+                Ok(token) => return token,
+                Err(s) => { string = s; break }
+            }
         }
     }
     let value = Integer(int::from_str(string).get());
@@ -429,10 +432,12 @@ fn consume_numeric_rest(state: &State, initial_char: char) -> Token {
 fn consume_numeric_fraction(state: &State, string: ~str) -> Token {
     let mut string: ~str = string;
     while !is_eof(state) {
-        let c = current_char(state);
-        match c {
-            '0'..'9' => { push_char!(string, c); state.position += 1 },
-            _ => break,
+        match current_char(state) {
+            '0'..'9' => push_char!(string, consume_char(state)),
+            _ => match consume_scientific_number(state, string) {
+                Ok(token) => return token,
+                Err(s) => { string = s; break }
+            }
         }
     }
     let value = Float(float::from_str(string).get());
@@ -444,9 +449,6 @@ fn consume_numeric_end(state: &State, string: ~str,
                        value: NumericValue) -> Token {
     match current_char(state) {
         '%' => { state.position += 1; return Percentage(value, string) },
-        'e' | 'E' => {
-            // TODO: scientific notation
-        },
         'a'..'z' | 'A'..'Z' | '_' | '-' | '\\' => (),
         _ => return Number(value, string)
     }
@@ -458,6 +460,31 @@ fn consume_numeric_end(state: &State, string: ~str,
         Ident(unit) => Dimension(value, string, unit),
         Delim('-') => { state.position -= 1; Number(value, string) },
         _ => fail,
+    }
+}
+
+
+fn consume_scientific_number(state: &State, string: ~str)
+        -> Result<Token, ~str> {
+    let next_3 = next_n_chars(state, 3);
+    if (next_3.len() == 3
+        && (next_3[0] == 'e' || next_3[0] == 'E')
+        && (next_3[1] == '+' || next_3[1] == '-')
+        && is_match!(next_3[2], '0'..'9')
+    ) {
+        let mut string: ~str = string;
+        push_char!(string, next_3[0]);
+        push_char!(string, next_3[1]);
+        push_char!(string, next_3[2]);
+        state.position += 3;
+        // 3.3.19. Sci-notation state
+        while !is_eof(state) && is_match!(current_char(state), '0'..'9') {
+            push_char!(string, consume_char(state))
+        }
+        let value = Float(float::from_str(string).get());
+        Ok(Number(value, string))
+    } else {
+        Err(string)
     }
 }
 
@@ -728,5 +755,4 @@ fn test_tokenizer() {
     assert_tokens("url(Lorem\\ ipsu\\6D dolo\\r)url(a\nb)url(a\\\nb)",
         [URL(~"Lorem ipsumdolor"), BadURL, BadURL],
         [~"Invalid URL syntax", ~"Invalid URL syntax"]);
-
 }
