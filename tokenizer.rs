@@ -118,6 +118,13 @@ fn consume_char(state: &State) -> char {
 }
 
 
+macro_rules! is_match(
+    ($value:expr, $pattern:pat) => (
+        match $value { $pattern => true, _ => false }
+    );
+)
+
+
 #[inline(always)]
 fn is_escaped_newline_or_eof(state: &State) -> bool {
     match next_n_bytes(state, 2) {
@@ -382,11 +389,10 @@ fn consume_numeric_sign(state: &State, sign: char) -> Token {
     match current_char(state) {
         '.' => {
             state.position += 1;
-            if is_eof(state) { state.position -= 1; return Delim(sign) }
-            match current_char(state) {
-                '0'..'9' => consume_numeric_fraction(
-                    state, str::from_char(sign) + ~"."),
-                _ => { state.position -= 1; return Delim(sign) }
+            if !is_eof(state) && is_match!(current_char(state), '0'..'9') {
+                consume_numeric_fraction(state, str::from_char(sign) + ~".")
+            } else {
+                state.position -= 1; Delim(sign)
             }
         },
         '0'..'9' => consume_numeric_rest(state, sign),
@@ -404,13 +410,11 @@ fn consume_numeric_rest(state: &State, initial_char: char) -> Token {
             '0'..'9' => { push_char!(string, c); state.position += 1 },
             '.' => {
                 state.position += 1;
-                if is_eof(state) { state.position -= 1; break }
-                match current_char(state) {
-                    '0'..'9' => {
-                        push_char!(string, '.');
-                        return consume_numeric_fraction(state, string);
-                    },
-                    _ => { state.position -= 1; break }
+                if !is_eof(state) && is_match!(current_char(state), '0'..'9') {
+                    push_char!(string, '.');
+                    return consume_numeric_fraction(state, string);
+                } else {
+                    state.position -= 1; break
                 }
             },
             _ => break,
