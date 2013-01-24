@@ -126,20 +126,30 @@ macro_rules! is_match(
 
 
 #[inline(always)]
-fn is_escaped_newline_or_eof(state: &State) -> bool {
+fn is_invalid_escape(state: &State) -> bool {
     match next_n_bytes(state, 2) {
         ~"\\\n" | ~"\\\x0C" | ~"\\" => true,
         _ => false,
     }
 }
 
+
 #[inline(always)]
 fn is_namestart_or_escape(state: &State) -> bool {
     match current_char(state) {
         'a'..'z' | 'A'..'Z' | '_' => true,
-        '\\' => !is_escaped_newline_or_eof(state),
+        '\\' => !is_invalid_escape(state),
         c => c >= '\xA0',  // Non-ASCII
     }
+}
+
+
+#[inline(always)]
+fn next_is_namestart_or_escape(state: &State) -> bool {
+    state.position += 1;
+    let result = !is_eof(state) && is_namestart_or_escape(state);
+    state.position -= 1;
+    result
 }
 
 
@@ -254,16 +264,8 @@ fn consume_quoted_string(state: &State, single_quote: bool,
 
 // 3.3.7. Hash state
 fn consume_hash(state: &State) -> Token {
-    if is_escaped_newline_or_eof(state) { return Delim('#') }
-    match current_char(state) {
-        'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-' | '\\' => {
-            match consume_ident_rest(state) {
-                Ident(string) => Hash(string),
-                _ => fail,
-            }
-        },
-        _ => Delim('#')
-    }
+    let string = consume_ident_string_rest(state);
+    if string == ~"" { Delim('#') } else { Hash(string) }
 }
 
 
@@ -283,41 +285,60 @@ fn consume_comment(state: &State) -> Token {
 
 // 3.3.10. At-keyword state
 fn consume_at_keyword(state: &State) -> Token {
-    if is_escaped_newline_or_eof(state) { return Delim('@') }
-    match current_char(state) {
-        'a'..'z' | 'A'..'Z' | '_' | '-' | '\\' => {
-            match consume_ident(state) {
-                Ident(string) => AtKeyword(string),
-                Delim('-') => { state.position -= 1; Delim('@') },
-                _ => fail,
-            }
-        },
-        _ => Delim('@')
+    match consume_ident_string(state) {
+        Some(string) => AtKeyword(string),
+        None => Delim('@')
     }
 }
 
 
 // 3.3.12. Ident state
 fn consume_ident(state: &State) -> Token {
-    match current_char(state) {
-        '-' => {
-            state.position += 1;
-            if !is_namestart_or_escape(state) { return Delim('-') }
-            state.position -= 1;
+    match consume_ident_string(state) {
+        Some(string) => {
+            if is_eof(state) { return Ident(string) }
+            match current_char(state) {
+                '\t' | '\n' | '\x0C' | ' '
+                        if state.transform_function_whitespace => {
+                    state.position += 1;
+                    handle_transform_function_whitespace(state, string)
+                }
+                '(' => {
+                    state.position += 1;
+                    if cssparser::ascii_lower(string) == ~"url"
+                    { consume_url(state) } else { Function(string) }
+                },
+                _ => Ident(string)
+            }
         },
-        '\\' => if is_escaped_newline_or_eof(state) {
-            state.errors.push(~"Invalid escape");
-            state.position += 1;
-            return Delim('\\')
-        },
-        _ => assert is_namestart_or_escape(state)  // sanity check
+        None => match current_char(state) {
+            '-' => {
+                state.position += 1;
+                Delim('-')
+            },
+            '\\' => {
+                state.errors.push(~"Invalid escape");
+                state.position += 1;
+                Delim('\\')
+            },
+            _ => fail,  // Should not have called consume_ident() here.
+        }
     }
-    consume_ident_rest(state)
+}
+
+fn consume_ident_string(state: &State) -> Option<~str> {
+    match current_char(state) {
+        '-' => if !next_is_namestart_or_escape(state) { None }
+               else { Some(consume_ident_string_rest(state)) },
+        '\\' if is_invalid_escape(state) => return None,
+        _ if !is_namestart_or_escape(state) => return None,
+        _ => Some(consume_ident_string_rest(state))
+    }
 }
 
 
 // 3.3.13. Ident-rest state
-fn consume_ident_rest(state: &State) -> Token {
+fn consume_ident_string_rest(state: &State) -> ~str {
     let mut string = ~"";
     while !is_eof(state) {
         let c = current_char(state);
@@ -326,26 +347,15 @@ fn consume_ident_rest(state: &State) -> Token {
                 state.position += 1; c },
             _ if c >= '\xA0' => consume_char(state),  // Non-ASCII
             '\\' => {
-                if is_escaped_newline_or_eof(state) { break }
+                if is_invalid_escape(state) { break }
                 state.position += 1;
                 consume_escape(state)
-            },
-            '\t' | '\n' | '\x0C' | ' '
-            if state.transform_function_whitespace => {
-                state.position += 1;
-                return handle_transform_function_whitespace(state, string)
-            }
-            '(' => {
-                state.position += 1;
-                if cssparser::ascii_lower(string) == ~"url" {
-                    return consume_url(state) }
-                return Function(string)
             },
             _ => break
         };
         push_char!(string, next_char)
     }
-    Ident(string)
+    string
 }
 
 
@@ -358,8 +368,6 @@ fn handle_transform_function_whitespace(state: &State, string: ~str) -> Token {
             _ => break,
         }
     }
-    // XXX I think the spec is wrong here.
-    // See http://lists.w3.org/Archives/Public/www-style/2013Jan/0266.html
     // Go back for one whitespace character.
     state.position -= 1;
     return Ident(string)
@@ -448,18 +456,14 @@ fn consume_numeric_fraction(state: &State, string: ~str) -> Token {
 fn consume_numeric_end(state: &State, string: ~str,
                        value: NumericValue) -> Token {
     match current_char(state) {
-        '%' => { state.position += 1; return Percentage(value, string) },
-        'a'..'z' | 'A'..'Z' | '_' | '-' | '\\' => (),
-        _ => return Number(value, string)
-    }
-    // 3.3.18. Dimension state (kind of)
-    if is_escaped_newline_or_eof(state) {
-        return Number(value, string)
-    }
-    match consume_ident(state) {
-        Ident(unit) => Dimension(value, string, unit),
-        Delim('-') => { state.position -= 1; Number(value, string) },
-        _ => fail,
+        '%' => { state.position += 1; Percentage(value, string) },
+        _ => {
+            // 3.3.18. Dimension state (kind of)
+            match consume_ident_string(state) {
+                Some(unit) => Dimension(value, string, unit),
+                None => Number(value, string),
+            }
+        },
     }
 }
 
@@ -721,14 +725,14 @@ fn test_tokenizer() {
     assert_tokens_flags("func ()", true, false,
         [Function(~"func"), CloseParen], []);
 
-    assert_tokens("##00#\\##\\\n#\\",
-        [Delim('#'), Hash(~"00"), Hash(~"#"), Delim('#'), Delim('\\'),
-         WhiteSpace, Delim('#'), Delim('\\')],
+    assert_tokens("##00(#\\##\\\n#\\",
+        [Delim('#'), Hash(~"00"), OpenParen, Hash(~"#"), Delim('#'),
+         Delim('\\'), WhiteSpace, Delim('#'), Delim('\\')],
         [~"Invalid escape", ~"Invalid escape"]);
 
-    assert_tokens("@@page@\\x@-x@-\\x@--@\\\n@\\",
-        [Delim('@'), AtKeyword(~"page"), AtKeyword(~"x"), AtKeyword(~"-x"),
-         AtKeyword(~"-x"), Delim('@'), Delim('-'), Delim('-'),
+    assert_tokens("@@page(@\\x@-x@-\\x@--@\\\n@\\",
+        [Delim('@'), AtKeyword(~"page"), OpenParen, AtKeyword(~"x"),
+         AtKeyword(~"-x"), AtKeyword(~"-x"), Delim('@'), Delim('-'), Delim('-'),
          Delim('@'), Delim('\\'), WhiteSpace, Delim('@'), Delim('\\')],
         [~"Invalid escape", ~"Invalid escape"]);
 
