@@ -382,9 +382,12 @@ fn consume_numeric(state: &State) -> Token {
             Delim('-') => { state.position -= 1; return consume_ident(state) },
             token => token,
         },
-        '.' => match current_char(state) {
-            '0'..'9' => consume_numeric_fraction(state, ~"."),
-            _ => Delim('.'),
+        '.' => {
+            if is_eof(state) { return Delim('.') }
+            match current_char(state) {
+                '0'..'9' => consume_numeric_fraction(state, ~"."),
+                _ => Delim('.'),
+            }
         },
         '0'..'9' => consume_numeric_rest(state, c),
         _ => fail, // consume_numeric() should not have been called here.
@@ -431,7 +434,10 @@ fn consume_numeric_rest(state: &State, initial_char: char) -> Token {
             }
         }
     }
-    let value = Integer(int::from_str(string).get());
+    let value = Integer(int::from_str(
+        if string[0] != '+' as u8 { string }
+        else { str::slice(string, 1, string.len()) }
+    ).get());
     consume_numeric_end(state, string, value)
 }
 
@@ -455,6 +461,7 @@ fn consume_numeric_fraction(state: &State, string: ~str) -> Token {
 
 fn consume_numeric_end(state: &State, string: ~str,
                        value: NumericValue) -> Token {
+    if is_eof(state) { return Number(value, string) }
     match current_char(state) {
         '%' => { state.position += 1; Percentage(value, string) },
         _ => {
@@ -471,25 +478,33 @@ fn consume_numeric_end(state: &State, string: ~str,
 fn consume_scientific_number(state: &State, string: ~str)
         -> Result<Token, ~str> {
     let next_3 = next_n_chars(state, 3);
-    if (next_3.len() == 3
+    let mut string: ~str = string;
+    if (next_3.len() >= 2
+        && (next_3[0] == 'e' || next_3[0] == 'E')
+        && (is_match!(next_3[1], '0'..'9'))
+    ) {
+        push_char!(string, next_3[0]);
+        push_char!(string, next_3[1]);
+        state.position += 2;
+    } else if (
+        next_3.len() == 3
         && (next_3[0] == 'e' || next_3[0] == 'E')
         && (next_3[1] == '+' || next_3[1] == '-')
         && is_match!(next_3[2], '0'..'9')
     ) {
-        let mut string: ~str = string;
         push_char!(string, next_3[0]);
         push_char!(string, next_3[1]);
         push_char!(string, next_3[2]);
         state.position += 3;
-        // 3.3.19. Sci-notation state
-        while !is_eof(state) && is_match!(current_char(state), '0'..'9') {
-            push_char!(string, consume_char(state))
-        }
-        let value = Float(float::from_str(string).get());
-        Ok(Number(value, string))
     } else {
-        Err(string)
+        return Err(string)
     }
+    // 3.3.19. Sci-notation state
+    while !is_eof(state) && is_match!(current_char(state), '0'..'9') {
+        push_char!(string, consume_char(state))
+    }
+    let value = Float(float::from_str(string).get());
+    Ok(Number(value, string))
 }
 
 
@@ -719,6 +734,13 @@ fn test_tokenizer() {
         [~"Invalid escape"]);
     assert_tokens("-Lipsum", [Ident(~"-Lipsum")], []);
     assert_tokens("-\\Lipsum", [Ident(~"-Lipsum")], []);
+    assert_tokens("-", [Delim('-')], []);
+    assert_tokens("--Lipsum", [Delim('-'), Ident(~"-Lipsum")], []);
+    assert_tokens("-\\-Lipsum", [Ident(~"--Lipsum")], []);
+    assert_tokens("\\Lipsum", [Ident(~"Lipsum")], []);
+    assert_tokens("\\\nLipsum", [Delim('\\'), WhiteSpace, Ident(~"Lipsum")],
+        [~"Invalid escape"]);
+    assert_tokens("\\", [Delim('\\')], [~"Invalid escape"]);
     assert_tokens("func()", [Function(~"func"), CloseParen], []);
     assert_tokens("func ()",
         [Ident(~"func"), WhiteSpace, OpenParen, CloseParen], []);
@@ -759,4 +781,33 @@ fn test_tokenizer() {
     assert_tokens("url(Lorem\\ ipsu\\6D dolo\\r)url(a\nb)url(a\\\nb)",
         [URL(~"Lorem ipsumdolor"), BadURL, BadURL],
         [~"Invalid URL syntax", ~"Invalid URL syntax"]);
+
+    assert_tokens("42+42-42. 1.5+1.5-1.5.5+.5-.5+-.", [
+        Number(Integer(42), ~"42"),
+        Number(Integer(42), ~"+42"),
+        Number(Integer(-42), ~"-42"), Delim('.'), WhiteSpace,
+        Number(Float(1.5), ~"1.5"),
+        Number(Float(1.5), ~"+1.5"),
+        Number(Float(-1.5), ~"-1.5"),
+        Number(Float(0.5), ~".5"),
+        Number(Float(0.5), ~"+.5"),
+        Number(Float(-0.5), ~"-.5"), Delim('+'), Delim('-'), Delim('.')
+    ], []);
+    assert_tokens("42e2px 42e+2 42e-2.", [
+        Number(Float(4200.), ~"42e2"), Ident(~"px"), WhiteSpace,
+        Number(Float(4200.), ~"42e+2"), WhiteSpace,
+        Number(Float(0.42), ~"42e-2"), Delim('.')
+    ], []);
+    assert_tokens("42%+.5%-1%", [
+        Percentage(Integer(42), ~"42"),
+        Percentage(Float(0.5), ~"+.5"),
+        Percentage(Integer(-1), ~"-1"),
+    ], []);
+    assert_tokens("42-Px+.5\\u -1url(7-0\\", [
+        Dimension(Integer(42), ~"42", ~"-Px"),
+        Dimension(Float(0.5), ~"+.5", ~"u"), WhiteSpace,
+        Dimension(Integer(-1), ~"-1", ~"url"), OpenParen,
+        Number(Integer(7), ~"7"),
+        Number(Integer(0), ~"-0"), Delim('\\'),
+    ], [~"Invalid escape"]);
 }
