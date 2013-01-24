@@ -8,7 +8,7 @@ use str;
 
 
 // http://dev.w3.org/csswg/css3-syntax/#preprocessing-the-input-stream
-pub fn preprocess(input: &str) -> ~str {
+pub pure fn preprocess(input: &str) -> ~str {
     // TODO: Is this faster if done in one pass?
     str::replace(str::replace(str::replace(input,
     "\r\n", "\n"),
@@ -25,11 +25,21 @@ fn test_preprocess() {
 }
 
 
-pub fn ascii_lower(string: &str) -> ~str {
+const ASCII_LOWER_OFFSET: char = 'a' - 'A';
+
+pub pure fn ascii_lower(string: &str) -> ~str {
     do str::map(string) |c| {
         match c {
-            'A'..'Z' => c - 'A' + 'a',
+            'A'..'Z' => c + ASCII_LOWER_OFFSET,
             _ => c,
         }
     }
+}
+
+
+#[test]
+fn test_ascii_lower() {
+    assert ascii_lower("url()URL()uRl()Ürl") == ~"url()url()url()Ürl";
+    // Dotted capital I, Kelvin sign, Sharp S.
+    assert ascii_lower("HİKß") == ~"hİKß";
 }
