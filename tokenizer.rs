@@ -18,6 +18,39 @@
 // Unicode-range tokens have a range of characters.
 
 
+// Tokenizer is public but not State.
+pub enum Tokenizer = State;
+
+pub fn make_tokenizer(input: &str, transform_function_whitespace: bool)
+        -> Tokenizer {
+    let input = preprocess(input);
+    Tokenizer(State {
+        length: input.len(),
+        input: input,
+        position: 0,
+        errors: ~[],  // XXX
+        transform_function_whitespace: transform_function_whitespace
+    })
+}
+
+
+impl Tokenizer {
+    pub fn next_token(&self) -> Token {
+        let state: &State = &**self;
+        if is_eof(state) { EOF } else { consume_token(state) }
+    }
+
+    pub fn all_tokens(&self) -> ~[Token] {
+        let mut tokens: ~[Token] = ~[];
+        let state: &State = &**self;
+        while !is_eof(state) {
+            tokens.push(consume_token(state))
+        }
+        tokens
+    }
+}
+
+
 const MAX_UNICODE: char = '\U0010FFFF';
 
 
@@ -59,6 +92,7 @@ enum Token {
     CloseBraket, // ]
     CloseParen, // )
     CloseBrace, // }
+    EOF,
 }
 
 
@@ -154,27 +188,6 @@ macro_rules! push_char(
         str::push_char(&mut $string, $c)
     );
 )
-
-
-// http://dev.w3.org/csswg/css3-syntax/#tokenization
-pub fn tokenize(input: &str, transform_function_whitespace: bool)
-        -> {tokens: ~[Token], parse_errors: ~[~str]} {
-    let input = preprocess(input);
-    let state = &State {
-        input: input, length: input.len(), position: 0, errors: ~[],
-        transform_function_whitespace: transform_function_whitespace };
-    let mut tokens: ~[Token] = ~[];
-
-    while !is_eof(state) {
-        tokens.push(consume_token(state))
-    }
-
-    // Work around `error: moving out of mutable field`
-    // TODO: find a cleaner way.
-    let mut errors: ~[~str] = ~[];
-    errors <-> state.errors;
-    {tokens: tokens, parse_errors: errors}
-}
 
 
 // 3.3.4. Data state
@@ -679,7 +692,6 @@ fn char_from_hex(hex: &[char]) -> char {
 
 #[test]
 fn test_tokenizer() {
-
     fn assert_tokens(input: &str, expected_tokens: &[Token],
                      expected_errors: &[~str]) {
         assert_tokens_flags(
@@ -689,9 +701,9 @@ fn test_tokenizer() {
     fn assert_tokens_flags(
             input: &str, transform_function_whitespace: bool,
             expected_tokens: &[Token], expected_errors: &[~str]) {
-        let result = tokenize(input, transform_function_whitespace);
-        let tokens: &[Token] = result.tokens;
-        let parse_errors: &[~str] = result.parse_errors;
+        let tokenizer = make_tokenizer(input, transform_function_whitespace);
+        let tokens: &[Token] = tokenizer.all_tokens();
+        let parse_errors: &[~str] = (*tokenizer).errors;
         if tokens != expected_tokens {
             fail fmt!("%?\n!=\n%?", tokens, expected_tokens);
         }
@@ -699,6 +711,7 @@ fn test_tokenizer() {
             fail fmt!("%?\n!=\n%?", parse_errors, expected_errors);
         }
     }
+
     assert_tokens("", [], []);
     assert_tokens("?/", [Delim('?'), Delim('/')], []);
     assert_tokens("?/* Li/*psum… */", [Delim('?'), Comment], []);
