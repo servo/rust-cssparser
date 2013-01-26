@@ -36,6 +36,9 @@ fn test_preprocess() {
 const ASCII_LOWER_OFFSET: char = 'a' - 'A';
 
 pub pure fn ascii_lower(string: &str) -> ~str {
+    // Warning: premature optimization ahead ;)
+    // TODO: would it be more efficient to work on bytes,
+    // without decoding/re-encoding UTF-8?
     do str::map(string) |c| {
         match c {
             'A'..'Z' => c + ASCII_LOWER_OFFSET,

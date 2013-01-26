@@ -9,7 +9,8 @@ TODO
 ----
 
 * Tree construction
+* Packaging on cargo-central
 * Track line/column number for errors & tokens.
 * Figure out float and integer overflow
-* Packaging on cargo-central
+* Inclemental tokenization aka. accept "streamed" input instead of ~str
 * Make it fast!

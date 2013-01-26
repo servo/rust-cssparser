@@ -36,8 +36,7 @@ pub fn make_tokenizer(input: &str, transform_function_whitespace: bool)
 impl Tokenizer {
     pub fn next_token(&self) -> TokenResult {
         let state: &State = &**self;
-        if is_eof(state) { TokenResult {token: EOF, error: None} }
-        else { consume_token(state) }
+        if is_eof(state) { token(EOF) } else { consume_token(state) }
     }
 }
 
