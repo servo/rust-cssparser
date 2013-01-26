@@ -33,24 +33,6 @@ pub fn make_tokenizer(input: &str, transform_function_whitespace: bool)
 }
 
 
-pub struct TokenResult {
-    token: Token,
-    error: Option<~str>,
-}
-
-
-#[inline(always)]
-fn token(t: Token) -> TokenResult {
-    TokenResult {token: t, error: None}
-}
-
-
-#[inline(always)]
-fn error_token(t: Token, err: ~str) -> TokenResult {
-    TokenResult {token: t, error: Some(err)}
-}
-
-
 impl Tokenizer {
     pub fn next_token(&self) -> TokenResult {
         let state: &State = &**self;
@@ -60,11 +42,14 @@ impl Tokenizer {
 }
 
 
-const MAX_UNICODE: char = '\U0010FFFF';
+pub struct TokenResult {
+    token: Token,
+    error: Option<~str>,
+}
 
 
 #[deriving_eq]
-enum NumericValue {
+pub enum NumericValue {
     Integer(int),
     // The spec calls this "number".
     // Use "float" instead to reduce term overloading with "number token".
@@ -74,7 +59,7 @@ enum NumericValue {
 
 
 #[deriving_eq]
-enum Token {
+pub enum Token {
     Ident(~str),
     Function(~str),
     AtKeyword(~str),
@@ -105,11 +90,29 @@ enum Token {
 }
 
 
+//  ***********  End of public API  ***********
+
+
 struct State {
     transform_function_whitespace: bool,
     input: ~str,
     length: uint,  // Counted in bytes, not characters
     mut position: uint,  // Counted in bytes, not characters
+}
+
+
+const MAX_UNICODE: char = '\U0010FFFF';
+
+
+#[inline(always)]
+fn token(t: Token) -> TokenResult {
+    TokenResult {token: t, error: None}
+}
+
+
+#[inline(always)]
+fn error_token(t: Token, err: ~str) -> TokenResult {
+    TokenResult {token: t, error: Some(err)}
 }
 
 
