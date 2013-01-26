@@ -18,9 +18,6 @@
 // Unicode-range tokens have a range of characters.
 
 
-use cssparser;
-
-
 const MAX_UNICODE: char = '\U0010FFFF';
 
 
@@ -163,7 +160,7 @@ macro_rules! push_char(
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 pub fn tokenize(input: &str, transform_function_whitespace: bool,
             quirks_mode: bool) -> {tokens: ~[Token], parse_errors: ~[~str]} {
-    let input = cssparser::preprocess(input);
+    let input = preprocess(input);
     let state = &State {
         input: input, length: input.len(), quirks_mode: quirks_mode,
         transform_function_whitespace: transform_function_whitespace,
@@ -305,7 +302,7 @@ fn consume_ident(state: &State) -> Token {
                 }
                 '(' => {
                     state.position += 1;
-                    if cssparser::ascii_lower(string) == ~"url"
+                    if ascii_lower(string) == ~"url"
                     { consume_url(state) } else { Function(string) }
                 },
                 _ => Ident(string)
