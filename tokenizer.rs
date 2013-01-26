@@ -64,7 +64,6 @@ enum Token {
 
 struct State {
     transform_function_whitespace: bool,
-    quirks_mode: bool,
     input: ~str,
     length: uint,  // Counted in bytes, not characters
     mut position: uint,  // Counted in bytes, not characters
@@ -158,13 +157,12 @@ macro_rules! push_char(
 
 
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
-pub fn tokenize(input: &str, transform_function_whitespace: bool,
-            quirks_mode: bool) -> {tokens: ~[Token], parse_errors: ~[~str]} {
+pub fn tokenize(input: &str, transform_function_whitespace: bool)
+        -> {tokens: ~[Token], parse_errors: ~[~str]} {
     let input = preprocess(input);
     let state = &State {
-        input: input, length: input.len(), quirks_mode: quirks_mode,
-        transform_function_whitespace: transform_function_whitespace,
-        position: 0, errors: ~[] };
+        input: input, length: input.len(), position: 0, errors: ~[],
+        transform_function_whitespace: transform_function_whitespace };
     let mut tokens: ~[Token] = ~[];
 
     while !is_eof(state) {
@@ -685,15 +683,13 @@ fn test_tokenizer() {
     fn assert_tokens(input: &str, expected_tokens: &[Token],
                      expected_errors: &[~str]) {
         assert_tokens_flags(
-            input, false, false, expected_tokens, expected_errors)
+            input, false, expected_tokens, expected_errors)
     }
 
     fn assert_tokens_flags(
-            input: &str,
-            transform_function_whitespace: bool, quirks_mode: bool,
+            input: &str, transform_function_whitespace: bool,
             expected_tokens: &[Token], expected_errors: &[~str]) {
-        let result = tokenize(
-            input, transform_function_whitespace, quirks_mode);
+        let result = tokenize(input, transform_function_whitespace);
         let tokens: &[Token] = result.tokens;
         let parse_errors: &[~str] = result.parse_errors;
         if tokens != expected_tokens {
@@ -741,8 +737,7 @@ fn test_tokenizer() {
     assert_tokens("func()", [Function(~"func"), CloseParen], []);
     assert_tokens("func ()",
         [Ident(~"func"), WhiteSpace, OpenParen, CloseParen], []);
-    assert_tokens_flags("func ()", true, false,
-        [Function(~"func"), CloseParen], []);
+    assert_tokens_flags("func ()", true, [Function(~"func"), CloseParen], []);
 
     assert_tokens("##00(#\\##\\\n#\\",
         [Delim('#'), Hash(~"00"), OpenParen, Hash(~"#"), Delim('#'),
