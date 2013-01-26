@@ -3,6 +3,10 @@
 
 extern mod std;
 mod tokens;
+mod tree;
+
+
+const MAX_UNICODE: char = '\U0010FFFF';
 
 
 // TODO http://dev.w3.org/csswg/css3-syntax/#the-input-byte-stream
@@ -47,3 +51,13 @@ fn test_ascii_lower() {
     // Dotted capital I, Kelvin sign, Sharp S.
     assert ascii_lower("HİKß") == ~"hİKß";
 }
+
+
+#[deriving_eq]
+enum NumericValue {
+    Integer(int),
+    // The spec calls this "number".
+    // Use "float" instead to reduce term overloading with "number token".
+    Float(float),
+}
+// TODO: add a NumberValue.as_float() method.

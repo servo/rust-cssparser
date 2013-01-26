@@ -49,16 +49,6 @@ pub struct TokenResult {
 
 
 #[deriving_eq]
-pub enum NumericValue {
-    Integer(int),
-    // The spec calls this "number".
-    // Use "float" instead to reduce term overloading with "number token".
-    Float(float),
-}
-// TODO: add a NumberValue.as_float() method.
-
-
-#[deriving_eq]
 pub enum Token {
     Ident(~str),
     Function(~str),
@@ -99,9 +89,6 @@ struct State {
     length: uint,  // Counted in bytes, not characters
     mut position: uint,  // Counted in bytes, not characters
 }
-
-
-const MAX_UNICODE: char = '\U0010FFFF';
 
 
 #[inline(always)]
