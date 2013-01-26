@@ -22,31 +22,40 @@
 pub enum Tokenizer = State;
 
 pub fn make_tokenizer(input: &str, transform_function_whitespace: bool)
-        -> Tokenizer {
+        -> ~Tokenizer {
     let input = preprocess(input);
-    Tokenizer(State {
+    ~Tokenizer(State {
         length: input.len(),
         input: input,
         position: 0,
-        errors: ~[],  // XXX
         transform_function_whitespace: transform_function_whitespace
     })
 }
 
 
-impl Tokenizer {
-    pub fn next_token(&self) -> Token {
-        let state: &State = &**self;
-        if is_eof(state) { EOF } else { consume_token(state) }
-    }
+pub struct TokenResult {
+    token: Token,
+    error: Option<~str>,
+}
 
-    pub fn all_tokens(&self) -> ~[Token] {
-        let mut tokens: ~[Token] = ~[];
+
+#[inline(always)]
+fn token(t: Token) -> TokenResult {
+    TokenResult {token: t, error: None}
+}
+
+
+#[inline(always)]
+fn error_token(t: Token, err: ~str) -> TokenResult {
+    TokenResult {token: t, error: Some(err)}
+}
+
+
+impl Tokenizer {
+    pub fn next_token(&self) -> TokenResult {
         let state: &State = &**self;
-        while !is_eof(state) {
-            tokens.push(consume_token(state))
-        }
-        tokens
+        if is_eof(state) { TokenResult {token: EOF, error: None} }
+        else { consume_token(state) }
     }
 }
 
@@ -101,7 +110,6 @@ struct State {
     input: ~str,
     length: uint,  // Counted in bytes, not characters
     mut position: uint,  // Counted in bytes, not characters
-    mut errors: ~[~str]
 }
 
 
@@ -191,21 +199,23 @@ macro_rules! push_char(
 
 
 // 3.3.4. Data state
-fn consume_token(state: &State) -> Token {
+fn consume_token(state: &State) -> TokenResult {
     let c = current_char(state);
-    match c {
+    token(match c {
         '-' => {
             if next_n_bytes(state, 3) == ~"-->" { state.position += 3; CDC }
-            else { consume_numeric(state) }
+            else if next_is_namestart_or_escape(state) {
+                return consume_ident(state)
+            } else { consume_numeric(state) }
         },
         '<' => {
             if next_n_bytes(state, 4) == ~"<!--" { state.position += 4; CDO }
-            else  { state.position += 1; Delim('<') }
+            else { state.position += 1; Delim('<') }
         },
         '0'..'9' | '.' | '+' => consume_numeric(state),
-        'u' | 'U' => consume_unicode_range(state),
-        'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(state),
-        _ if c >= '\xA0' => consume_ident(state),  // Non-ASCII
+        'u' | 'U' => return consume_unicode_range(state),
+        'a'..'z' | 'A'..'Z' | '_' | '\\' => return consume_ident(state),
+        _ if c >= '\xA0' => return consume_ident(state),  // Non-ASCII
         _ => {
             match consume_char(state) {
                 '\t' | '\n' | '\x0C' | ' ' => {
@@ -217,13 +227,13 @@ fn consume_token(state: &State) -> Token {
                     }
                     WhiteSpace
                 },
-                '"' => consume_quoted_string(state, false, false),
+                '"' => return consume_quoted_string(state, false),
                 '#' => consume_hash(state),
-                '\'' => consume_quoted_string(state, true, false),
+                '\'' => return consume_quoted_string(state, true),
                 '(' => OpenParen,
                 ')' => CloseParen,
                 '/' if !is_eof(state) && current_char(state) == '*'
-                    => consume_comment(state),
+                    => return consume_comment(state),
                 ':' => Colon,
                 ';' => Semicolon,
                 '@' => consume_at_keyword(state),
@@ -234,39 +244,33 @@ fn consume_token(state: &State) -> Token {
                 _ => Delim(c)
             }
         }
-    }
+    })
 }
 
 
 // 3.3.5. Double-quote-string state
 // 3.3.6. Single-quote-string state
-fn consume_quoted_string(state: &State, single_quote: bool,
-                         eof_is_bad: bool) -> Token {
+fn consume_quoted_string(state: &State, single_quote: bool) -> TokenResult {
     let mut string: ~str = ~"";
     while !is_eof(state) {
         match consume_char(state) {
-            '"' if !single_quote => return String(string),
-            '\'' if single_quote => return String(string),
+            '"' if !single_quote => return token(String(string)),
+            '\'' if single_quote => return token(String(string)),
             '\n' | '\x0C' => {
-                state.errors.push(~"Newline in quoted string");
-                return BadString
+                return error_token(BadString, ~"Newline in quoted string");
             },
             '\\' => {
                 match next_n_bytes(state, 1) {
                     ~"\n" | ~"\x0C" => state.position += 1, // Quoted newline
-                    ~"" => {
-                        // Even if not eof_is_bad
-                        state.errors.push(~"EOF in quoted string");
-                        return BadString
-                    },
+                    ~"" =>
+                        return error_token(BadString, ~"EOF in quoted string"),
                     _ => push_char!(string, consume_escape(state))
                 }
             }
             c => push_char!(string, c),
         }
     }
-    state.errors.push(~"EOF in quoted string");
-    if eof_is_bad { BadString } else { String(string) }
+    error_token(String(string), ~"EOF in quoted string")
 }
 
 
@@ -278,16 +282,18 @@ fn consume_hash(state: &State) -> Token {
 
 
 // 3.3.9. Comment state
-fn consume_comment(state: &State) -> Token {
+fn consume_comment(state: &State) -> TokenResult {
     state.position += 1;  // consume the * in /*
     match str::find_str_from(state.input, "*/", state.position) {
-        Some(end_position) => state.position = end_position + 2,
+        Some(end_position) => {
+            state.position = end_position + 2;
+            token(Comment)
+        },
         None => {
-            state.errors.push(~"EOF in comment");
             state.position = state.input.len();
+            error_token(Comment, ~"EOF in comment")
         }
     }
-    Comment
 }
 
 
@@ -301,33 +307,32 @@ fn consume_at_keyword(state: &State) -> Token {
 
 
 // 3.3.12. Ident state
-fn consume_ident(state: &State) -> Token {
+fn consume_ident(state: &State) -> TokenResult {
     match consume_ident_string(state) {
         Some(string) => {
-            if is_eof(state) { return Ident(string) }
+            if is_eof(state) { return token(Ident(string)) }
             match current_char(state) {
                 '\t' | '\n' | '\x0C' | ' '
                         if state.transform_function_whitespace => {
                     state.position += 1;
-                    handle_transform_function_whitespace(state, string)
+                    token(handle_transform_function_whitespace(state, string))
                 }
                 '(' => {
                     state.position += 1;
                     if ascii_lower(string) == ~"url"
-                    { consume_url(state) } else { Function(string) }
+                    { consume_url(state) } else { token(Function(string)) }
                 },
-                _ => Ident(string)
+                _ => token(Ident(string))
             }
         },
         None => match current_char(state) {
             '-' => {
                 state.position += 1;
-                Delim('-')
+                token(Delim('-'))
             },
             '\\' => {
-                state.errors.push(~"Invalid escape");
                 state.position += 1;
-                Delim('\\')
+                error_token(Delim('\\'), ~"Invalid escape")
             },
             _ => fail,  // Should not have called consume_ident() here.
         }
@@ -386,10 +391,7 @@ fn handle_transform_function_whitespace(state: &State, string: ~str) -> Token {
 fn consume_numeric(state: &State) -> Token {
     let c = consume_char(state);
     match c {
-        '-' | '+' => match consume_numeric_sign(state, c) {
-            Delim('-') => { state.position -= 1; return consume_ident(state) },
-            token => token,
-        },
+        '-' | '+' => consume_numeric_sign(state, c),
         '.' => {
             if is_eof(state) { return Delim('.') }
             match current_char(state) {
@@ -398,7 +400,7 @@ fn consume_numeric(state: &State) -> Token {
             }
         },
         '0'..'9' => consume_numeric_rest(state, c),
-        _ => fail, // consume_numeric() should not have been called here.
+        _ => fail,  // consume_numeric() should not have been called here.
     }
 }
 
@@ -517,73 +519,77 @@ fn consume_scientific_number(state: &State, string: ~str)
 
 
 // 3.3.20. URL state
-fn consume_url(state: &State) -> Token {
+fn consume_url(state: &State) -> TokenResult {
     while !is_eof(state) {
         match current_char(state) {
             '\t' | '\n' | '\x0C' | ' ' => state.position += 1,
             '"' => return consume_quoted_url(state, false),
             '\'' => return consume_quoted_url(state, true),
-            ')' => { state.position += 1; return URL(~"") },
+            ')' => { state.position += 1; return token(URL(~"")) },
             _ => return consume_unquoted_url(state),
         }
     }
-    state.errors.push(~"EOF in URL");
-    return BadURL
+    error_token(BadURL, ~"EOF in URL")
 }
 
 
 // 3.3.21. URL-double-quote state
 // 3.3.22. URL-single-quote state
-fn consume_quoted_url(state: &State, single_quote: bool) -> Token {
+fn consume_quoted_url(state: &State, single_quote: bool) -> TokenResult {
     state.position += 1;  // The initial quote
-    match consume_quoted_string(state, single_quote, true) {
-        String(string) => consume_url_end(state, string),
-        BadString => consume_bad_url(state, false),
-        _ => fail,
+    match consume_quoted_string(state, single_quote) {
+        TokenResult {token: token, error: err} => match err {
+            Some(err) => match consume_bad_url(state) {
+                TokenResult {token: token, error: _}
+                    => error_token(token, err)
+            },
+            None => match token {
+                String(string) => consume_url_end(state, string),
+                // consume_quoted_string() never returns a non-String token
+                // without error:
+                _ => fail,
+            }
+        }
     }
 }
 
 
-
 // 3.3.23. URL-end state
-fn consume_url_end(state: &State, string: ~str) -> Token {
+fn consume_url_end(state: &State, string: ~str) -> TokenResult {
     while !is_eof(state) {
         match consume_char(state) {
             '\t' | '\n' | '\x0C' | ' ' => (),
-            ')' => return URL(string),
-            _ => return consume_bad_url(state, true)
+            ')' => return token(URL(string)),
+            _ => return consume_bad_url(state)
         }
     }
-    state.errors.push(~"EOF in URL");
-    BadURL
+    error_token(BadURL, ~"EOF in URL")
 }
 
 
 // 3.3.24. URL-unquoted state
-fn consume_unquoted_url(state: &State) -> Token {
+fn consume_unquoted_url(state: &State) -> TokenResult {
     let mut string = ~"";
     while !is_eof(state) {
         let next_char = match consume_char(state) {
             '\t' | '\n' | '\x0C' | ' ' => return consume_url_end(state, string),
-            ')' => return URL(string),
+            ')' => return token(URL(string)),
             '\x00'..'\x08' | '\x0E'..'\x1F' | '\x7F'..'\x9F'  // non-printable
-                | '"' | '\'' | '(' => return consume_bad_url(state, true),
+                | '"' | '\'' | '(' => return consume_bad_url(state),
             '\\' => match next_n_bytes(state, 1) {
-                ~"\n" | ~"\x0C" | ~"" => return consume_bad_url(state, true),
+                ~"\n" | ~"\x0C" | ~"" => return consume_bad_url(state),
                 _ => consume_escape(state)
             },
             c => c
         };
         push_char!(string, next_char)
     }
-    state.errors.push(~"EOF in URL");
-    BadURL
+    error_token(BadURL, ~"EOF in URL")
 }
 
 
 // 3.3.25. Bad-URL state
-fn consume_bad_url(state: &State, log_error: bool) -> Token {
-    if log_error { state.errors.push(~"Invalid URL syntax"); }
+fn consume_bad_url(state: &State) -> TokenResult {
     // Consume up to the closing )
     while !is_eof(state) {
         match consume_char(state) {
@@ -592,12 +598,12 @@ fn consume_bad_url(state: &State, log_error: bool) -> Token {
             _ => ()
         }
     }
-    BadURL
+    error_token(BadURL, ~"Invalid URL syntax")
 }
 
 
 // 3.3.26. Unicode-range state
-fn consume_unicode_range(state: &State) -> Token {
+fn consume_unicode_range(state: &State) -> TokenResult {
     let next_3 = next_n_chars(state, 3);
     // We got here with U or u
     assert next_3[0] == 'u' || next_3[0] == 'U';
@@ -647,9 +653,12 @@ fn consume_unicode_range(state: &State) -> Token {
         end = if hex.len() > 0 { char_from_hex(hex) } else { start }
     }
     // 3.3.28. Set the unicode-range token's range
-    if start > MAX_UNICODE || end < start { EmptyUnicodeRange }
-    else { UnicodeRange(start,
-                        if end <= MAX_UNICODE { end } else { MAX_UNICODE }) }
+    token(if start > MAX_UNICODE || end < start {
+        EmptyUnicodeRange
+    } else {
+        let end = if end <= MAX_UNICODE { end } else { MAX_UNICODE };
+        UnicodeRange(start, end)
+    })
 }
 
 
@@ -692,6 +701,25 @@ fn char_from_hex(hex: &[char]) -> char {
 
 #[test]
 fn test_tokenizer() {
+    struct VecResult{tokens: ~[Token], errors: ~[~str]};
+
+    fn all_tokens(tokenizer: &Tokenizer) -> VecResult {
+        let mut tokens: ~[Token] = ~[];
+        let mut errors: ~[~str] = ~[];
+        loop {
+            let result: TokenResult = tokenizer.next_token();
+            match copy result.error {
+                Some(err) => errors.push(err),
+                None => (),
+            }
+            match copy result.token {
+                EOF => break,
+                token => tokens.push(token),
+            }
+        }
+        VecResult{ tokens: tokens, errors: errors }
+    }
+
     fn assert_tokens(input: &str, expected_tokens: &[Token],
                      expected_errors: &[~str]) {
         assert_tokens_flags(
@@ -702,8 +730,9 @@ fn test_tokenizer() {
             input: &str, transform_function_whitespace: bool,
             expected_tokens: &[Token], expected_errors: &[~str]) {
         let tokenizer = make_tokenizer(input, transform_function_whitespace);
-        let tokens: &[Token] = tokenizer.all_tokens();
-        let parse_errors: &[~str] = (*tokenizer).errors;
+        let result = all_tokens(tokenizer);
+        let tokens: &[Token] = result.tokens;
+        let parse_errors: &[~str] = result.errors;
         if tokens != expected_tokens {
             fail fmt!("%?\n!=\n%?", tokens, expected_tokens);
         }
