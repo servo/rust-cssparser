@@ -2,7 +2,7 @@
 #[crate_type = "lib"];
 
 extern mod std;
-mod tokenizer;
+mod tokens;
 
 
 // TODO http://dev.w3.org/csswg/css3-syntax/#the-input-byte-stream
