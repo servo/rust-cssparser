@@ -6,6 +6,15 @@ mod tokens;
 mod tree;
 
 
+pub struct ParseError {
+    message: ~str,
+    // TODO: add these:
+//    source_name: ~str,  // Filename, URL, …
+//    source_line: uint,
+//    source_column: uint,
+}
+
+
 const MAX_UNICODE: char = '\U0010FFFF';
 
 

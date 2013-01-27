@@ -134,15 +134,15 @@ impl Parser {
         current_token <-> self.current_token;
         match current_token {
             Some(token) => token,
-            None => match self.tokenizer.next_token() {
-                tokens::TokenResult {token: token, error: err} => {
-                    match err {
+            None => {
+                let (token, err) = self.tokenizer.next_token();
+                match err {
+                    Some(ParseError{message: message}) =>
                         // TODO more contextual error handling?
-                        Some(err) => self.errors.push(err),
-                        None => ()
-                    }
-                    token
+                        self.errors.push(message),
+                    None => ()
                 }
+                token
             }
         }
     }

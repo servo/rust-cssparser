@@ -44,10 +44,7 @@ pub struct Tokenizer {
 }
 
 
-pub struct TokenResult {
-    token: Token,
-    error: Option<~str>,
-}
+pub type TokenResult = (Token, Option<ParseError>);
 
 
 #[deriving_eq]
@@ -87,13 +84,13 @@ pub enum Token {
 
 #[inline(always)]
 fn token(t: Token) -> TokenResult {
-    TokenResult {token: t, error: None}
+    (t, None)
 }
 
 
 #[inline(always)]
-fn error_token(t: Token, err: ~str) -> TokenResult {
-    TokenResult {token: t, error: Some(err)}
+fn error_token(t: Token, message: ~str) -> TokenResult {
+    (t, Some(ParseError{message: message}))
 }
 
 
@@ -539,18 +536,17 @@ fn consume_url(tokenizer: &Tokenizer) -> TokenResult {
 fn consume_quoted_url(tokenizer: &Tokenizer, single_quote: bool)
         -> TokenResult {
     tokenizer.position += 1;  // The initial quote
-    match consume_quoted_string(tokenizer, single_quote) {
-        TokenResult {token: token, error: err} => match err {
-            Some(err) => match consume_bad_url(tokenizer) {
-                TokenResult {token: token, error: _}
-                    => error_token(token, err)
-            },
-            None => match token {
-                String(string) => consume_url_end(tokenizer, string),
-                // consume_quoted_string() never returns a non-String token
-                // without error:
-                _ => fail,
-            }
+    let (token, err) = consume_quoted_string(tokenizer, single_quote);
+    match err {
+        Some(_) => {
+            let (token, _) = consume_bad_url(tokenizer);
+            (token, err)
+        },
+        None => match token {
+            String(string) => consume_url_end(tokenizer, string),
+            // consume_quoted_string() never returns a non-String token
+            // without error:
+            _ => fail,
         }
     }
 }
@@ -710,12 +706,12 @@ fn test_tokenizer() {
         let mut tokens: ~[Token] = ~[];
         let mut errors: ~[~str] = ~[];
         loop {
-            let result: TokenResult = tokenizer.next_token();
-            match copy result.error {
-                Some(err) => errors.push(err),
+            let (token, err) = tokenizer.next_token();
+            match err {
+                Some(ParseError{message: message}) => errors.push(message),
                 None => (),
             }
-            match copy result.token {
+            match token {
                 EOF => break,
                 token => tokens.push(token),
             }
