@@ -87,20 +87,22 @@ pub struct Parser {
 }
 
 
-fn make_parser(tokenizer: ~tokens::Tokenizer, quirks_mode: bool) -> ~Parser {
-    ~Parser {
-        tokenizer: tokenizer,
-        quirks_mode: quirks_mode,
-        current_token: None,
-        errors: ~[],
+impl Parser {
+    static fn from_tokenizer(
+            tokenizer: ~tokens::Tokenizer, quirks_mode: bool) -> ~Parser {
+        ~Parser {
+            tokenizer: tokenizer,
+            quirks_mode: quirks_mode,
+            current_token: None,
+            errors: ~[],
+        }
     }
-}
-
-
-fn parser_from_string(input: &str, transform_function_whitespace: bool,
+    static fn from_str(input: &str, transform_function_whitespace: bool,
                       quirks_mode: bool) -> ~Parser {
-    make_parser(tokens::make_tokenizer(input, transform_function_whitespace),
-                quirks_mode)
+        Parser::from_tokenizer(
+            tokens::Tokenizer::from_str(input, transform_function_whitespace),
+            quirks_mode)
+    }
 }
 
 
@@ -110,11 +112,11 @@ fn parser_from_string(input: &str, transform_function_whitespace: bool,
 fn consume_primitive_list(parser: &Parser) -> ~[Primitive] {
     let mut value: ~[Primitive] = ~[];
     loop {
-        match consume_next_token(parser) {
+        match parser.consume_token() {
             tokens::Comment => (),
             tokens::EOF => break,
             token => {
-                reconsume_token(parser, token);
+                parser.reconsume_token(token);
                 value.push(consume_primitive(parser))
             }
         }
@@ -126,31 +128,33 @@ fn consume_primitive_list(parser: &Parser) -> ~[Primitive] {
 //  ***********  End of public API  ***********
 
 
-fn consume_next_token(parser: &Parser) -> tokens::Token {
-    let mut current_token = None;
-    current_token <-> parser.current_token;
-    match current_token {
-        Some(token) => token,
-        None => match parser.tokenizer.next_token() {
-            tokens::TokenResult {token: token, error: err} => {
-                match err {
-                    // TODO more contextual error handling?
-                    Some(err) => parser.errors.push(err),
-                    None => ()
+impl Parser {
+    priv fn consume_token(&self) -> tokens::Token {
+        let mut current_token = None;
+        current_token <-> self.current_token;
+        match current_token {
+            Some(token) => token,
+            None => match self.tokenizer.next_token() {
+                tokens::TokenResult {token: token, error: err} => {
+                    match err {
+                        // TODO more contextual error handling?
+                        Some(err) => self.errors.push(err),
+                        None => ()
+                    }
+                    token
                 }
-                token
             }
         }
     }
-}
 
 
-// Fail if the is already a "current token".
-// The easiest way to ensure this does not fail it to call it only once
-// just after calling consume_next_token()
-fn reconsume_token(parser: &Parser, token: tokens::Token) {
-    assert parser.current_token.is_none();
-    parser.current_token = Some(token)
+    // Fail if the is already a "current token".
+    // The easiest way to ensure this does not fail it to call it only once
+    // just after calling parser.consume_token()
+    priv fn reconsume_token(&self, token: tokens::Token) {
+        assert self.current_token.is_none();
+        self.current_token = Some(token)
+    }
 }
 
 
@@ -195,7 +199,7 @@ fn preserved_token_to_primitive(token: tokens::Token) -> Primitive {
 
 // 3.5.15. Consume a primitive
 fn consume_primitive(parser: &Parser) -> Primitive {
-    match consume_next_token(parser) {
+    match parser.consume_token() {
         tokens::OpenBraket =>
             BraketBlock(consume_simple_block(parser, tokens::CloseBraket)),
         tokens::OpenParen =>
@@ -213,13 +217,13 @@ fn consume_simple_block(parser: &Parser, ending_token: tokens::Token)
         -> ~[Primitive] {
     let mut value: ~[Primitive] = ~[];
     loop {
-        match consume_next_token(parser) {
+        match parser.consume_token() {
             tokens::Comment => (),
             tokens::EOF => break,
             token => {
                 if token == ending_token { break }
                 else {
-                    reconsume_token(parser, token);
+                    parser.reconsume_token(token);
                     value.push(consume_primitive(parser))
                 }
             }
@@ -235,7 +239,7 @@ fn consume_function(parser: &Parser, name: ~str)
     let mut current_argument: ~[Primitive] = ~[];
     let mut arguments: ~[~[Primitive]] = ~[];
     loop {
-        match consume_next_token(parser) {
+        match parser.consume_token() {
             tokens::Comment => (),
             tokens::EOF | tokens::CloseParen => break,
             tokens::Delim(',') => {
@@ -254,7 +258,7 @@ fn consume_function(parser: &Parser, name: ~str)
                 }
             ),
             token => {
-                reconsume_token(parser, token);
+                parser.reconsume_token(token);
                 current_argument.push(consume_primitive(parser))
             }
         }
@@ -273,7 +277,7 @@ fn test_primitives() {
     }
     fn assert_primitives_flags(input: &str, expected_primitives: &[Primitive],
                                expected_errors: &[~str], quirks_mode: bool) {
-        let parser = parser_from_string(input, false, quirks_mode);
+        let parser = Parser::from_str(input, false, quirks_mode);
         let primitives: &[Primitive] = consume_primitive_list(parser);
         let errors: &[~str] = parser.errors;
         if primitives != expected_primitives {

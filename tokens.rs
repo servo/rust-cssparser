@@ -18,22 +18,29 @@
 // Unicode-range tokens have a range of characters.
 
 
-pub fn make_tokenizer(input: &str, transform_function_whitespace: bool)
-        -> ~Tokenizer {
-    let input = preprocess(input);
-    ~Tokenizer {
-        length: input.len(),
-        input: input,
-        position: 0,
-        transform_function_whitespace: transform_function_whitespace
+impl Tokenizer {
+    static fn from_str(input: &str, transform_function_whitespace: bool)
+            -> ~Tokenizer {
+        let input = preprocess(input);
+        ~Tokenizer {
+            length: input.len(),
+            input: input,
+            position: 0,
+            transform_function_whitespace: transform_function_whitespace
+        }
+    }
+
+    fn next_token(&self) -> TokenResult {
+        if is_eof(self) { token(EOF) } else { consume_token(self) }
     }
 }
 
 
-impl Tokenizer {
-    pub fn next_token(&self) -> TokenResult {
-        if is_eof(self) { token(EOF) } else { consume_token(self) }
-    }
+pub struct Tokenizer {
+    priv transform_function_whitespace: bool,
+    priv input: ~str,
+    priv length: uint,  // Counted in bytes, not characters
+    priv mut position: uint,  // Counted in bytes, not characters
 }
 
 
@@ -76,14 +83,6 @@ pub enum Token {
 
 
 //  ***********  End of public API  ***********
-
-
-pub struct Tokenizer {
-    priv transform_function_whitespace: bool,
-    priv input: ~str,
-    priv length: uint,  // Counted in bytes, not characters
-    priv mut position: uint,  // Counted in bytes, not characters
-}
 
 
 #[inline(always)]
@@ -733,7 +732,8 @@ fn test_tokenizer() {
     fn assert_tokens_flags(
             input: &str, transform_function_whitespace: bool,
             expected_tokens: &[Token], expected_errors: &[~str]) {
-        let tokenizer = make_tokenizer(input, transform_function_whitespace);
+        let tokenizer = Tokenizer::from_str(
+            input, transform_function_whitespace);
         let result = all_tokens(tokenizer);
         let tokens: &[Token] = result.tokens;
         let parse_errors: &[~str] = result.errors;
