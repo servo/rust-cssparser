@@ -30,8 +30,8 @@ impl Tokenizer {
         }
     }
 
-    fn next_token(&self) -> TokenResult {
-        if is_eof(self) { token(EOF) } else { consume_token(self) }
+    fn next_token(&self) -> (Token, Option<ParseError>) {
+        if is_eof(self) { (EOF, None) } else { consume_token(self) }
     }
 }
 
@@ -42,9 +42,6 @@ pub struct Tokenizer {
     priv length: uint,  // Counted in bytes, not characters
     priv mut position: uint,  // Counted in bytes, not characters
 }
-
-
-pub type TokenResult = (Token, Option<ParseError>);
 
 
 #[deriving_eq]
@@ -83,13 +80,7 @@ pub enum Token {
 
 
 #[inline(always)]
-fn token(t: Token) -> TokenResult {
-    (t, None)
-}
-
-
-#[inline(always)]
-fn error_token(t: Token, message: ~str) -> TokenResult {
+fn error_token(t: Token, message: ~str) -> (Token, Option<ParseError>) {
     (t, Some(ParseError{message: message}))
 }
 
@@ -180,16 +171,16 @@ macro_rules! push_char(
 
 
 // 3.3.4. Data state
-fn consume_token(tokenizer: &Tokenizer) -> TokenResult {
+fn consume_token(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     let c = current_char(tokenizer);
-    token(match c {
+    match c {
         '-' => {
             if next_n_bytes(tokenizer, 3) == ~"-->" {
                 tokenizer.position += 3;
-                CDC
+                (CDC, None)
             }
             else if next_is_namestart_or_escape(tokenizer) {
-                return consume_ident(tokenizer)
+                consume_ident(tokenizer)
             } else {
                 consume_numeric(tokenizer)
             }
@@ -197,16 +188,16 @@ fn consume_token(tokenizer: &Tokenizer) -> TokenResult {
         '<' => {
             if next_n_bytes(tokenizer, 4) == ~"<!--" {
                 tokenizer.position += 4;
-                CDO
+                (CDO, None)
             } else {
                 tokenizer.position += 1;
-                Delim('<')
+                (Delim('<'), None)
             }
         },
         '0'..'9' | '.' | '+' => consume_numeric(tokenizer),
-        'u' | 'U' => return consume_unicode_range(tokenizer),
-        'a'..'z' | 'A'..'Z' | '_' | '\\' => return consume_ident(tokenizer),
-        _ if c >= '\xA0' => return consume_ident(tokenizer),  // Non-ASCII
+        'u' | 'U' => consume_unicode_range(tokenizer),
+        'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(tokenizer),
+        _ if c >= '\xA0' => consume_ident(tokenizer),  // Non-ASCII
         _ => {
             match consume_char(tokenizer) {
                 '\t' | '\n' | '\x0C' | ' ' => {
@@ -217,38 +208,38 @@ fn consume_token(tokenizer: &Tokenizer) -> TokenResult {
                             _ => break,
                         }
                     }
-                    WhiteSpace
+                    (WhiteSpace, None)
                 },
-                '"' => return consume_quoted_string(tokenizer, false),
+                '"' => consume_quoted_string(tokenizer, false),
                 '#' => consume_hash(tokenizer),
-                '\'' => return consume_quoted_string(tokenizer, true),
-                '(' => OpenParen,
-                ')' => CloseParen,
+                '\'' => consume_quoted_string(tokenizer, true),
+                '(' => (OpenParen, None),
+                ')' => (CloseParen, None),
                 '/' if !is_eof(tokenizer) && current_char(tokenizer) == '*'
-                    => return consume_comment(tokenizer),
-                ':' => Colon,
-                ';' => Semicolon,
+                    => consume_comment(tokenizer),
+                ':' => (Colon, None),
+                ';' => (Semicolon, None),
                 '@' => consume_at_keyword(tokenizer),
-                '[' => OpenBraket,
-                ']' => CloseBraket,
-                '{' => OpenBrace,
-                '}' => CloseBrace,
-                _ => Delim(c)
+                '[' => (OpenBraket, None),
+                ']' => (CloseBraket, None),
+                '{' => (OpenBrace, None),
+                '}' => (CloseBrace, None),
+                _ => (Delim(c), None)
             }
         }
-    })
+    }
 }
 
 
 // 3.3.5. Double-quote-string state
 // 3.3.6. Single-quote-string state
 fn consume_quoted_string(tokenizer: &Tokenizer, single_quote: bool)
-        -> TokenResult {
+        -> (Token, Option<ParseError>) {
     let mut string: ~str = ~"";
     while !is_eof(tokenizer) {
         match consume_char(tokenizer) {
-            '"' if !single_quote => return token(String(string)),
-            '\'' if single_quote => return token(String(string)),
+            '"' if !single_quote => return (String(string), None),
+            '\'' if single_quote => return (String(string), None),
             '\n' | '\x0C' => {
                 return error_token(BadString, ~"Newline in quoted string");
             },
@@ -269,19 +260,19 @@ fn consume_quoted_string(tokenizer: &Tokenizer, single_quote: bool)
 
 
 // 3.3.7. Hash state
-fn consume_hash(tokenizer: &Tokenizer) -> Token {
+fn consume_hash(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     let string = consume_ident_string_rest(tokenizer);
-    if string == ~"" { Delim('#') } else { Hash(string) }
+    (if string == ~"" { Delim('#') } else { Hash(string) }, None)
 }
 
 
 // 3.3.9. Comment state
-fn consume_comment(tokenizer: &Tokenizer) -> TokenResult {
+fn consume_comment(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     tokenizer.position += 1;  // consume the * in /*
     match str::find_str_from(tokenizer.input, "*/", tokenizer.position) {
         Some(end_position) => {
             tokenizer.position = end_position + 2;
-            token(Comment)
+            (Comment, None)
         },
         None => {
             tokenizer.position = tokenizer.input.len();
@@ -292,38 +283,37 @@ fn consume_comment(tokenizer: &Tokenizer) -> TokenResult {
 
 
 // 3.3.10. At-keyword state
-fn consume_at_keyword(tokenizer: &Tokenizer) -> Token {
-    match consume_ident_string(tokenizer) {
+fn consume_at_keyword(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
+    (match consume_ident_string(tokenizer) {
         Some(string) => AtKeyword(string),
         None => Delim('@')
-    }
+    }, None)
 }
 
 
 // 3.3.12. Ident state
-fn consume_ident(tokenizer: &Tokenizer) -> TokenResult {
+fn consume_ident(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     match consume_ident_string(tokenizer) {
         Some(string) => {
-            if is_eof(tokenizer) { return token(Ident(string)) }
+            if is_eof(tokenizer) { return (Ident(string), None) }
             match current_char(tokenizer) {
                 '\t' | '\n' | '\x0C' | ' '
                         if tokenizer.transform_function_whitespace => {
                     tokenizer.position += 1;
-                    token(handle_transform_function_whitespace(
-                        tokenizer, string))
+                    handle_transform_function_whitespace(tokenizer, string)
                 }
                 '(' => {
                     tokenizer.position += 1;
                     if ascii_lower(string) == ~"url" { consume_url(tokenizer) }
-                    else { token(Function(string)) }
+                    else { (Function(string), None) }
                 },
-                _ => token(Ident(string))
+                _ => (Ident(string), None)
             }
         },
         None => match current_char(tokenizer) {
             '-' => {
                 tokenizer.position += 1;
-                token(Delim('-'))
+                (Delim('-'), None)
             },
             '\\' => {
                 tokenizer.position += 1;
@@ -368,30 +358,31 @@ fn consume_ident_string_rest(tokenizer: &Tokenizer) -> ~str {
 
 
 // 3.3.14. Transform-function-whitespace state
-fn handle_transform_function_whitespace(tokenizer: &Tokenizer, string: ~str) -> Token {
+fn handle_transform_function_whitespace(tokenizer: &Tokenizer, string: ~str)
+        -> (Token, Option<ParseError>) {
     while !is_eof(tokenizer) {
         match current_char(tokenizer) {
             '\t' | '\n' | '\x0C' | ' ' => tokenizer.position += 1,
-            '(' => { tokenizer.position += 1; return Function(string) }
+            '(' => { tokenizer.position += 1; return (Function(string), None) }
             _ => break,
         }
     }
     // Go back for one whitespace character.
     tokenizer.position -= 1;
-    return Ident(string)
+    (Ident(string), None)
 }
 
 
 // 3.3.15. Number state
-fn consume_numeric(tokenizer: &Tokenizer) -> Token {
+fn consume_numeric(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     let c = consume_char(tokenizer);
     match c {
         '-' | '+' => consume_numeric_sign(tokenizer, c),
         '.' => {
-            if is_eof(tokenizer) { return Delim('.') }
+            if is_eof(tokenizer) { return (Delim('.'), None) }
             match current_char(tokenizer) {
                 '0'..'9' => consume_numeric_fraction(tokenizer, ~"."),
-                _ => Delim('.'),
+                _ => (Delim('.'), None),
             }
         },
         '0'..'9' => consume_numeric_rest(tokenizer, c),
@@ -400,8 +391,9 @@ fn consume_numeric(tokenizer: &Tokenizer) -> Token {
 }
 
 
-fn consume_numeric_sign(tokenizer: &Tokenizer, sign: char) -> Token {
-    if is_eof(tokenizer) { return Delim(sign) }
+fn consume_numeric_sign(tokenizer: &Tokenizer, sign: char)
+        -> (Token, Option<ParseError>) {
+    if is_eof(tokenizer) { return (Delim(sign), None) }
     match current_char(tokenizer) {
         '.' => {
             tokenizer.position += 1;
@@ -410,17 +402,19 @@ fn consume_numeric_sign(tokenizer: &Tokenizer, sign: char) -> Token {
                 consume_numeric_fraction(
                     tokenizer, str::from_char(sign) + ~".")
             } else {
-                tokenizer.position -= 1; Delim(sign)
+                tokenizer.position -= 1;
+                (Delim(sign), None)
             }
         },
         '0'..'9' => consume_numeric_rest(tokenizer, sign),
-        _ => Delim(sign)
+        _ => (Delim(sign), None)
     }
 }
 
 
 // 3.3.16. Number-rest state
-fn consume_numeric_rest(tokenizer: &Tokenizer, initial_char: char) -> Token {
+fn consume_numeric_rest(tokenizer: &Tokenizer, initial_char: char)
+        -> (Token, Option<ParseError>) {
     let mut string = str::from_char(initial_char);
     while !is_eof(tokenizer) {
         let c = current_char(tokenizer);
@@ -437,40 +431,42 @@ fn consume_numeric_rest(tokenizer: &Tokenizer, initial_char: char) -> Token {
                 }
             },
             _ => match consume_scientific_number(tokenizer, string) {
-                Ok(token) => return token,
+                Ok(token) => return (token, None),
                 Err(s) => { string = s; break }
             }
         }
     }
     let value = Integer(int::from_str(
+        // Remove any + sign as int::from_str() does not parse them.
         if string[0] != '+' as u8 { string }
         else { str::slice(string, 1, string.len()) }
-    ).get());
+    ).get());  // XXX handle overflow
     consume_numeric_end(tokenizer, string, value)
 }
 
 
 // 3.3.17. Number-fraction state
-fn consume_numeric_fraction(tokenizer: &Tokenizer, string: ~str) -> Token {
+fn consume_numeric_fraction(tokenizer: &Tokenizer, string: ~str)
+        -> (Token, Option<ParseError>) {
     let mut string: ~str = string;
     while !is_eof(tokenizer) {
         match current_char(tokenizer) {
             '0'..'9' => push_char!(string, consume_char(tokenizer)),
             _ => match consume_scientific_number(tokenizer, string) {
-                Ok(token) => return token,
+                Ok(token) => return (token, None),
                 Err(s) => { string = s; break }
             }
         }
     }
-    let value = Float(float::from_str(string).get());
+    let value = Float(float::from_str(string).get());  // XXX handle overflow
     consume_numeric_end(tokenizer, string, value)
 }
 
 
 fn consume_numeric_end(tokenizer: &Tokenizer, string: ~str,
-                       value: NumericValue) -> Token {
-    if is_eof(tokenizer) { return Number(value, string) }
-    match current_char(tokenizer) {
+                       value: NumericValue) -> (Token, Option<ParseError>) {
+    if is_eof(tokenizer) { return (Number(value, string), None) }
+    (match current_char(tokenizer) {
         '%' => { tokenizer.position += 1; Percentage(value, string) },
         _ => {
             // 3.3.18. Dimension state (kind of)
@@ -479,7 +475,7 @@ fn consume_numeric_end(tokenizer: &Tokenizer, string: ~str,
                 None => Number(value, string),
             }
         },
-    }
+    }, None)
 }
 
 
@@ -517,13 +513,13 @@ fn consume_scientific_number(tokenizer: &Tokenizer, string: ~str)
 
 
 // 3.3.20. URL state
-fn consume_url(tokenizer: &Tokenizer) -> TokenResult {
+fn consume_url(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     while !is_eof(tokenizer) {
         match current_char(tokenizer) {
             '\t' | '\n' | '\x0C' | ' ' => tokenizer.position += 1,
             '"' => return consume_quoted_url(tokenizer, false),
             '\'' => return consume_quoted_url(tokenizer, true),
-            ')' => { tokenizer.position += 1; return token(URL(~"")) },
+            ')' => { tokenizer.position += 1; return (URL(~""), None) },
             _ => return consume_unquoted_url(tokenizer),
         }
     }
@@ -534,7 +530,7 @@ fn consume_url(tokenizer: &Tokenizer) -> TokenResult {
 // 3.3.21. URL-double-quote state
 // 3.3.22. URL-single-quote state
 fn consume_quoted_url(tokenizer: &Tokenizer, single_quote: bool)
-        -> TokenResult {
+        -> (Token, Option<ParseError>) {
     tokenizer.position += 1;  // The initial quote
     let (token, err) = consume_quoted_string(tokenizer, single_quote);
     match err {
@@ -553,11 +549,12 @@ fn consume_quoted_url(tokenizer: &Tokenizer, single_quote: bool)
 
 
 // 3.3.23. URL-end state
-fn consume_url_end(tokenizer: &Tokenizer, string: ~str) -> TokenResult {
+fn consume_url_end(tokenizer: &Tokenizer, string: ~str)
+        -> (Token, Option<ParseError>) {
     while !is_eof(tokenizer) {
         match consume_char(tokenizer) {
             '\t' | '\n' | '\x0C' | ' ' => (),
-            ')' => return token(URL(string)),
+            ')' => return (URL(string), None),
             _ => return consume_bad_url(tokenizer)
         }
     }
@@ -566,13 +563,13 @@ fn consume_url_end(tokenizer: &Tokenizer, string: ~str) -> TokenResult {
 
 
 // 3.3.24. URL-unquoted state
-fn consume_unquoted_url(tokenizer: &Tokenizer) -> TokenResult {
+fn consume_unquoted_url(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     let mut string = ~"";
     while !is_eof(tokenizer) {
         let next_char = match consume_char(tokenizer) {
             '\t' | '\n' | '\x0C' | ' '
                 => return consume_url_end(tokenizer, string),
-            ')' => return token(URL(string)),
+            ')' => return (URL(string), None),
             '\x00'..'\x08' | '\x0E'..'\x1F' | '\x7F'..'\x9F'  // non-printable
                 | '"' | '\'' | '(' => return consume_bad_url(tokenizer),
             '\\' => match next_n_bytes(tokenizer, 1) {
@@ -588,7 +585,7 @@ fn consume_unquoted_url(tokenizer: &Tokenizer) -> TokenResult {
 
 
 // 3.3.25. Bad-URL state
-fn consume_bad_url(tokenizer: &Tokenizer) -> TokenResult {
+fn consume_bad_url(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     // Consume up to the closing )
     while !is_eof(tokenizer) {
         match consume_char(tokenizer) {
@@ -602,7 +599,8 @@ fn consume_bad_url(tokenizer: &Tokenizer) -> TokenResult {
 
 
 // 3.3.26. Unicode-range state
-fn consume_unicode_range(tokenizer: &Tokenizer) -> TokenResult {
+fn consume_unicode_range(tokenizer: &Tokenizer)
+        -> (Token, Option<ParseError>) {
     let next_3 = next_n_chars(tokenizer, 3);
     // We got here with U or u
     assert next_3[0] == 'u' || next_3[0] == 'U';
@@ -652,12 +650,12 @@ fn consume_unicode_range(tokenizer: &Tokenizer) -> TokenResult {
         end = if hex.len() > 0 { char_from_hex(hex) } else { start }
     }
     // 3.3.28. Set the unicode-range token's range
-    token(if start > MAX_UNICODE || end < start {
+    (if start > MAX_UNICODE || end < start {
         EmptyUnicodeRange
     } else {
         let end = if end <= MAX_UNICODE { end } else { MAX_UNICODE };
         UnicodeRange(start, end)
-    })
+    }, None)
 }
 
 
