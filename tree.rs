@@ -163,6 +163,119 @@ impl Parser {
 }
 
 
+// 3.5.7. Declaration-block mode
+fn consume_declaration_block(parser: &Parser, is_nested: bool)
+        -> ~[DeclarationBlockItem] {
+    let mut items: ~[DeclarationBlockItem] = ~[];
+    for parser.each_token |token| {
+        match token {
+            tokens::WhiteSpace | tokens::Semicolon => (),
+            tokens::CloseBrace if is_nested => break,
+//            tokens::AtKeyword(name)
+//                => items.push(consume_at_rule(parser, name)),
+            tokens::Ident(name)
+                => items.push(consume_declaration(parser, is_nested, name)),
+            token => {
+                parser.reconsume_token(token);
+                items.push(consume_declaration_error(parser, is_nested, ~[]))
+            },
+        }
+    }
+    items
+}
+
+
+// 3.5.8. After-declaration-name mode
+fn consume_declaration(parser: &Parser, is_nested: bool, name: ~str)
+        -> DeclarationBlockItem {
+    let mut name = name;  // XXX see <-> below
+    for parser.each_token |token| {
+        match token {
+            tokens::WhiteSpace => (),
+            tokens::Colon => {
+                // XXX https://github.com/mozilla/rust/issues/4654
+                let mut name_ = ~"";
+                name_ <-> name;
+                return consume_declaration_value(parser, is_nested, name_)
+            }
+            _ => { parser.reconsume_token(token); break }
+        }
+    }
+    consume_declaration_error(parser, is_nested, ~[Ident(name)])
+}
+
+
+// 3.5.9. Declaration-value mode
+fn consume_declaration_value(parser: &Parser, is_nested: bool, name: ~str)
+        -> DeclarationBlockItem {
+    let mut name = name;  // XXX see <-> below
+    let mut value: ~[Primitive] = ~[];
+    for parser.each_token |token| {
+        match token {
+            tokens::CloseBrace if is_nested => {
+                parser.reconsume_token(token); break
+            }
+            tokens::Semicolon => break,
+            tokens::Delim('!') => {
+                // XXX https://github.com/mozilla/rust/issues/4654
+                let mut name_ = ~"";
+                let mut value_: ~[Primitive] = ~[];
+                name_ <-> name;
+                value_ <-> value;
+                return consume_declaration_important(
+                    parser, is_nested, name_, value_)
+            },
+            _ => value.push(consume_value_primitive(parser, name, token)),
+        }
+    }
+    Declaration(Declaration{name: name, value: value, important: false})
+}
+
+
+// 3.5.10. Declaration-important mode
+fn consume_declaration_important(parser: &Parser, is_nested: bool,
+                                 name: ~str, value: ~[Primitive])
+        -> DeclarationBlockItem {
+    // XXX Consume whitespace and comments here?
+    // http://lists.w3.org/Archives/Public/www-style/2013Jan/0491.html
+    let token = parser.consume_token();
+    let (is_important, token) = match token {
+        // TODO: consider "can be made important"?
+        tokens::Ident(value) =>
+            (ascii_lower(value) == ~"important", tokens::Ident(value)),
+        token => (false, token)
+    };
+    if is_important {
+        Declaration(Declaration {name: name, value: value, important: true})
+    } else {
+        parser.reconsume_token(token);
+        let mut invalid = ~[Ident(name), Colon];
+        let mut value = value;
+        vec::push_all_move(&mut invalid, value);
+        consume_declaration_error(parser, is_nested, invalid)
+    }
+}
+
+
+// 3.5.13. Next-declaration error mode
+fn consume_declaration_error(parser: &Parser, is_nested: bool,
+                             invalid: ~[Primitive]) -> DeclarationBlockItem {
+    let mut invalid = invalid;
+    parser.errors.push(~"Invalid declaration");
+    for parser.each_token |token| {
+        match token {
+            tokens::Semicolon => break,
+            tokens::CloseBrace if is_nested => {
+                parser.reconsume_token(token);
+                break
+            },
+            _ => invalid.push(consume_primitive(parser, token))
+        }
+    }
+    InvalidDeclaration(invalid)
+}
+
+
 // 3.5.15. Consume a primitive
 fn consume_primitive(parser: &Parser, first_token: tokens::Token)
         -> Primitive {
@@ -206,6 +319,91 @@ fn consume_primitive(parser: &Parser, first_token: tokens::Token)
 }
 
 
+// 3.5.16. Consume a primitive with the hashless color quirk
+const HASHLESS_COLOR_QUIRK: &[&str] = &[
+    &"background-color",
+    &"border-color",
+    &"border-top-color",
+    &"border-right-color",
+    &"border-bottom-color",
+    &"border-left-color",
+    &"color",
+];
+
+// 3.5.17. Consume a primitive with the unitless length quirk
+const UNITLESS_LENGTH_QUIRK: &[&str] = &[
+    &"border-top-width",
+    &"border-right-width",
+    &"border-bottom-width",
+    &"border-left-width",
+    &"border-width",
+    &"bottom",
+    &"font-size",
+    &"height",
+    &"left",
+    &"letter-spacing",
+    &"margin",
+    &"margin-right",
+    &"margin-left",
+    &"margin-top",
+    &"margin-bottom",
+    &"padding",
+    &"padding-top",
+    &"padding-right",
+    &"padding-bottom",
+    &"padding-left",
+    &"right",
+    &"top",
+    &"width",
+    &"word-spacing",
+];
+
+fn consume_value_primitive(parser: &Parser, name: &str, token: tokens::Token)
+        -> Primitive {
+    if !parser.quirks_mode {
+        return consume_primitive(parser, token)
+    }
+    #[inline(always)]
+    fn contains(haystack: &[&str], needle: &(&str)) -> bool {
+        // TODO: This is a O(n) linear search. We can probably do better.
+        vec::contains(haystack, needle)
+    }
+    #[inline(always)]
+    fn is_hex_color(value: &str) -> bool {
+        match value.len() {
+            3 | 6 => (),
+            _ => return false
+        }
+        for value.each_char |ch| {
+            match ch {
+                '0'..'9' | 'a'..'f' | 'A'..'F' => (),
+                _ => return false
+            }
+        }
+        true
+    }
+    match token {
+        tokens::Number(value, repr) => {
+            if is_hex_color(repr) && contains(HASHLESS_COLOR_QUIRK, &name) {
+                Hash(repr)
+            } else if contains(UNITLESS_LENGTH_QUIRK, &name) {
+                Dimension(value, repr, ~"px")
+            } else {
+                Number(value, repr)
+            }
+        }
+        tokens::Dimension(value, repr, unit) => {
+            let color = repr + unit;
+            if is_hex_color(color) && contains(HASHLESS_COLOR_QUIRK, &name) {
+                Hash(color)
+            } else {
+                Dimension(value, repr, unit)
+            }
+        }
+        token => consume_primitive(parser, token)
+    }
+}
+
 // 3.5.18. Consume a simple block  (kind of)
 fn consume_simple_block(parser: &Parser, ending_token: tokens::Token)
         -> ~[Primitive] {
@@ -227,6 +425,7 @@ fn consume_function(parser: &Parser, name: ~str)
         match token {
             tokens::CloseParen => break,
             tokens::Delim(',') => {
+                // XXX https://github.com/mozilla/rust/issues/4654
                 let mut arg: ~[Primitive] = ~[];
                 arg <-> current_argument;
                 arguments.push(arg);
