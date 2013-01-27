@@ -110,18 +110,12 @@ impl Parser {
 // Could be used for parsing eg. a stand-alone media query.
 // This is similar to consume_simple_block(), but there is no ending token.
 fn consume_primitive_list(parser: &Parser) -> ~[Primitive] {
-    let mut value: ~[Primitive] = ~[];
-    loop {
-        match parser.consume_token() {
-            tokens::Comment => (),
-            tokens::EOF => break,
-            token => {
-                parser.reconsume_token(token);
-                value.push(consume_primitive(parser))
-            }
-        }
+    let mut primitives: ~[Primitive] = ~[];
+    for parser.each_token |token| {
+        parser.reconsume_token(token);
+        primitives.push(consume_primitive(parser))
     }
-    value
+    primitives
 }
 
 
@@ -147,6 +141,16 @@ impl Parser {
         }
     }
 
+    // Skips comments
+    priv fn each_token(&self, it: fn(token: tokens::Token) -> bool) {
+        loop {
+            match self.consume_token() {
+                tokens::Comment => (),
+                tokens::EOF => break,
+                token => if !it(token) { break },
+            }
+        }
+    }
 
     // Fail if the is already a "current token".
     // The easiest way to ensure this does not fail it to call it only once
@@ -216,17 +220,11 @@ fn consume_primitive(parser: &Parser) -> Primitive {
 fn consume_simple_block(parser: &Parser, ending_token: tokens::Token)
         -> ~[Primitive] {
     let mut value: ~[Primitive] = ~[];
-    loop {
-        match parser.consume_token() {
-            tokens::Comment => (),
-            tokens::EOF => break,
-            token => {
-                if token == ending_token { break }
-                else {
-                    parser.reconsume_token(token);
-                    value.push(consume_primitive(parser))
-                }
-            }
+    for parser.each_token |token| {
+        if token == ending_token { break }
+        else {
+            parser.reconsume_token(token);
+            value.push(consume_primitive(parser))
         }
     }
     value
@@ -238,13 +236,13 @@ fn consume_function(parser: &Parser, name: ~str)
         -> Primitive {
     let mut current_argument: ~[Primitive] = ~[];
     let mut arguments: ~[~[Primitive]] = ~[];
-    loop {
-        match parser.consume_token() {
-            tokens::Comment => (),
-            tokens::EOF | tokens::CloseParen => break,
+    for parser.each_token |token| {
+        match token {
+            tokens::CloseParen => break,
             tokens::Delim(',') => {
-                arguments.push(current_argument);
-                current_argument = ~[];
+                let mut arg: ~[Primitive] = ~[];
+                arg <-> current_argument;
+                arguments.push(arg);
             },
             tokens::Number(value, repr) => current_argument.push(
                 if parser.quirks_mode && ascii_lower(name) == ~"rect" {
