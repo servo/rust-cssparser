@@ -15,6 +15,28 @@ pub struct ParseError {
 }
 
 
+#[deriving_eq]
+pub enum NumericValue {
+    Integer(int),
+    // The spec calls this "number".
+    // Use "float" instead to reduce term overloading with "number token".
+    Float(float),
+}
+
+
+impl NumericValue {
+    fn to_float(&self) -> float {
+        match *self {
+            Integer(value) => value as float,
+            Float(value) => value,
+        }
+    }
+}
+
+
+//  ***********  End of public API  ***********
+
+
 const MAX_UNICODE: char = '\U0010FFFF';
 
 
@@ -63,13 +85,3 @@ fn test_ascii_lower() {
     // Dotted capital I, Kelvin sign, Sharp S.
     assert ascii_lower("HİKß") == ~"hİKß";
 }
-
-
-#[deriving_eq]
-enum NumericValue {
-    Integer(int),
-    // The spec calls this "number".
-    // Use "float" instead to reduce term overloading with "number token".
-    Float(float),
-}
-// TODO: add a NumberValue.as_float() method.
