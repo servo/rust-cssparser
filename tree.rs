@@ -247,8 +247,6 @@ fn consume_function(parser: &Parser, name: ~str)
                 current_argument = ~[];
             },
             tokens::Number(value, repr) => current_argument.push(
-                // XXX case-sensitive or ASCII case-insensitive? See
-            // http://lists.w3.org/Archives/Public/www-style/2013Jan/0480.html
                 if parser.quirks_mode && ascii_lower(name) == ~"rect" {
                     // 3.5.17. Consume a primitive
                     // with the unitless length quirk
