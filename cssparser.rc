@@ -1,7 +1,9 @@
 #[link(name = "cssparser", vers = "0.1")];
 #[crate_type = "lib"];
 
+#[cfg(test)]
 extern mod std;
+
 mod tokens;
 mod tree;
 

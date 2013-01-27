@@ -43,17 +43,20 @@ pub enum Primitive {
 }
 
 
+#[deriving_eq]
 pub struct Declaration {
     name: ~str,
     value: ~[Primitive],
     important: bool,
 }
 
+#[deriving_eq]
 pub struct StyleRule {
     selector: ~[Primitive],
     value: ~[DeclarationBlockItem],
 }
 
+#[deriving_eq]
 pub struct AtRule {
     name: ~str,
     selector: ~[Primitive],
@@ -61,12 +64,15 @@ pub struct AtRule {
 }
 
 
+#[deriving_eq]
 pub enum AtRuleValue {
-    EmptyAtRule,  // @foo…;
+    NotFilled,  // @foo…;
     DeclarationFilled(~[DeclarationBlockItem]),
     RuleFilled(~[Rule]),
 }
 
+
+#[deriving_eq]
 pub enum DeclarationBlockItem {
     Declaration(Declaration),
     InvalidDeclaration(~[Primitive]),
@@ -74,6 +80,7 @@ pub enum DeclarationBlockItem {
     Decl_AtRule(AtRule),
 }
 
+#[deriving_eq]
 pub enum Rule {
     StyleRule(StyleRule),
     AtRule(AtRule),
@@ -105,19 +112,24 @@ impl Parser {
             tokens::Tokenizer::from_str(input, transform_function_whitespace),
             quirks_mode)
     }
-}
 
-
-// Consume the whole input and return a list of primitives.
-// Could be used for parsing eg. a stand-alone media query.
-// This is similar to consume_simple_block(), but there is no ending token.
-pub fn consume_primitive_list(parser: &Parser) -> ~[Primitive] {
-    let mut primitives: ~[Primitive] = ~[];
-    for parser.each_token |token| {
-        primitives.push(consume_primitive(parser, token))
+    // Consume the whole input and return a list of primitives.
+    // Could be used for parsing eg. a stand-alone media query.
+    // This is similar to consume_simple_block(), but there is no ending token.
+    fn parse_primitives(&self) -> ~[Primitive] {
+        let mut primitives: ~[Primitive] = ~[];
+        for self.each_token |token| {
+            primitives.push(consume_primitive(self, token))
+        }
+        primitives
     }
-    primitives
+
+    fn parse_declarations(&self) -> ~[DeclarationBlockItem] {
+        consume_declaration_block(self, /* is_nested= */false)
+    }
 }
+
+
 
 
 //  ***********  End of public API  ***********
@@ -189,9 +201,10 @@ fn consume_declaration_block(parser: &Parser, is_nested: bool)
 fn consume_declaration(parser: &Parser, is_nested: bool, name: ~str)
         -> DeclarationBlockItem {
     let mut name = name;  // XXX see <-> below
+    let mut has_whitespace = false;  // In case the property is invalid
     for parser.each_token |token| {
         match token {
-            tokens::WhiteSpace => (),
+            tokens::WhiteSpace => has_whitespace = true,
             tokens::Colon => {
                 // XXX https://github.com/mozilla/rust/issues/4654
                 let mut name_ = ~"";
@@ -201,7 +214,9 @@ fn consume_declaration(parser: &Parser, is_nested: bool, name: ~str)
             _ => { parser.reconsume_token(token); break }
         }
     }
-    consume_declaration_error(parser, is_nested, ~[Ident(name)])
+    consume_declaration_error(parser, is_nested,
+        if has_whitespace { ~[Ident(name), WhiteSpace] }
+        else { ~[Ident(name)] })
 }
 
 
@@ -238,7 +253,14 @@ fn consume_declaration_important(parser: &Parser, is_nested: bool,
         -> DeclarationBlockItem {
     // XXX Consume whitespace and comments here?
     // http://lists.w3.org/Archives/Public/www-style/2013Jan/0491.html
-    let token = parser.consume_token();
+    let mut has_whitespace = false;  // In case the property is invalid
+    let mut token = tokens::EOF;  // dummy values
+    for parser.each_token |t| {
+        match t {
+            tokens::WhiteSpace => has_whitespace = true,
+            t => { token = t; break }
+        }
+    }
     let (is_important, token) = match token {
         // TODO: consider "can be made important"?
         tokens::Ident(value) =>
@@ -251,7 +273,8 @@ fn consume_declaration_important(parser: &Parser, is_nested: bool,
         parser.reconsume_token(token);
         let mut invalid = ~[Ident(name), Colon];
         let mut value = value;
-        vec::push_all_move(&mut invalid, value);
+        invalid.push_all_move(value);
+        invalid.push(Delim('!'));
         consume_declaration_error(parser, is_nested, invalid)
     }
 }
@@ -384,6 +407,7 @@ fn consume_value_primitive(parser: &Parser, name: &str, token: tokens::Token)
     }
     match token {
         tokens::Number(value, repr) => {
+            let name: &str = ascii_lower(name);
             if is_hex_color(repr) && contains(HASHLESS_COLOR_QUIRK, &name) {
                 Hash(repr)
             } else if contains(UNITLESS_LENGTH_QUIRK, &name) {
@@ -393,6 +417,7 @@ fn consume_value_primitive(parser: &Parser, name: &str, token: tokens::Token)
             }
         }
         tokens::Dimension(value, repr, unit) => {
+            let name: &str = ascii_lower(name);
             let color = repr + unit;
             if is_hex_color(color) && contains(HASHLESS_COLOR_QUIRK, &name) {
                 Hash(color)
@@ -454,7 +479,7 @@ fn test_primitives() {
             expected_primitives: &[Primitive], expected_errors: &[~str]) {
         let parser = Parser::from_str(input, false, quirks_mode);
         tests::check_results(
-            consume_primitive_list(parser), expected_primitives,
+            parser.parse_primitives(), expected_primitives,
             parser.errors, expected_errors);
     }
 
@@ -491,4 +516,98 @@ fn test_primitives() {
         Function(~"Réct", ~[~[Number(Integer(1), ~"1")],
                             ~[Percentage(Integer(2), ~"2")]]),
     ], []);
+}
+
+
+#[test]
+fn test_declarations() {
+    fn assert_declarations(
+            input: &str, quirks_mode: bool,
+            expected_declarations: &[DeclarationBlockItem],
+            expected_errors: &[~str]) {
+        let parser = Parser::from_str(input, false, quirks_mode);
+        tests::check_results(
+            parser.parse_declarations(), expected_declarations,
+            parser.errors, expected_errors);
+    }
+    fn decl(name: ~str, value: ~[Primitive]) -> DeclarationBlockItem {
+        Declaration(Declaration{name: name, value: value, important: false})
+    }
+    fn important(name: ~str, value: ~[Primitive]) -> DeclarationBlockItem {
+        Declaration(Declaration{name: name, value: value, important: true})
+    }
+
+    assert_declarations("", false, [], []);
+    assert_declarations("", true, [], []);
+    assert_declarations(" \n  ;; ", false, [], []);
+    assert_declarations("color", false,
+        [InvalidDeclaration(~[Ident(~"color")])], [~"Invalid declaration"]);
+    assert_declarations("/**/ color:", false, [decl(~"color", ~[])], []);
+    assert_declarations("color/ red", false,
+        [InvalidDeclaration(~[
+            Ident(~"color"), Delim('/'), WhiteSpace, Ident(~"red")
+        ])], [~"Invalid declaration"]);
+    assert_declarations("a /{(;);}b; c:d", false, [
+        InvalidDeclaration(~[
+            Ident(~"a"), WhiteSpace, Delim('/'), BraceBlock(~[
+                ParenBlock(~[Semicolon]), Semicolon,
+            ]), Ident(~"b")
+        ]),
+        decl(~"c", ~[Ident(~"d")]),
+    ], [~"Invalid declaration"]);
+    assert_declarations("color /**/: black,red; ;", false,
+        [decl(~"color", ~[
+            WhiteSpace, Ident(~"black"), Delim(','), Ident(~"red")
+        ])], []);
+
+    // !important
+    assert_declarations("a:!important /**/; b:c!IMPORTant", false,
+        [important(~"a", ~[]), important(~"b", ~[Ident(~"c")])], []);
+    assert_declarations("a:!stuff; a:!!;a:!", false, [
+        InvalidDeclaration(~[Ident(~"a"), Colon, Delim('!'), Ident(~"stuff")]),
+        InvalidDeclaration(~[Ident(~"a"), Colon, Delim('!'), Delim('!')]),
+        InvalidDeclaration(~[Ident(~"a"), Colon, Delim('!')]),
+    ], [
+        ~"Invalid declaration", ~"Invalid declaration", ~"Invalid declaration"
+    ]);
+    // XXX See http://lists.w3.org/Archives/Public/www-style/2013Jan/0491.html
+    assert_declarations(
+        "a:! important; a:!/**/important;a:!/**/ important", false,
+        [important(~"a", ~[]), important(~"a", ~[]), important(~"a", ~[])],
+        []);
+
+    // Without quirks mode, for reference
+    assert_declarations("TOP:12; bottom:1.5; size:42", false, [
+        decl(~"TOP", ~[Number(Integer(12), ~"12")]),
+        decl(~"bottom", ~[Number(Float(1.5), ~"1.5")]),
+        decl(~"size", ~[Number(Integer(42), ~"42")]),
+    ], []);
+    assert_declarations("color:012;Color:0f2;bORDER-color:123456", false, [
+        decl(~"color", ~[Number(Integer(12), ~"012")]),
+        decl(~"Color", ~[Dimension(Integer(0), ~"0", ~"f2")]),
+        decl(~"bORDER-color", ~[Number(Integer(123456), ~"123456")]),
+    ], []);
+    assert_declarations("color:0123;color:0g2", false, [  // Not 3 or 6 hex
+        decl(~"color", ~[Number(Integer(123), ~"0123")]),
+        decl(~"color", ~[Dimension(Integer(0), ~"0", ~"g2")]),
+    ], []);
+    assert_declarations("fill:123", false,  // Not in the list
+        [decl(~"fill", ~[Number(Integer(123), ~"123")])], []);
+    // Quirks mode
+    assert_declarations("TOP:12; bottom:1.5; size:42", true, [
+        decl(~"TOP", ~[Dimension(Integer(12), ~"12", ~"px")]),
+        decl(~"bottom", ~[Dimension(Float(1.5), ~"1.5", ~"px")]),
+        decl(~"size", ~[Number(Integer(42), ~"42")]),
+    ], []);
+    assert_declarations("color:012;Color:0f2;bORDER-color:123456", true, [
+        decl(~"color", ~[Hash(~"012")]),
+        decl(~"Color", ~[Hash(~"0f2")]),
+        decl(~"bORDER-color", ~[Hash(~"123456")]),
+    ], []);
+    assert_declarations("color:0123;color:0g2", true, [  // Not 3 or 6 hex
+        decl(~"color", ~[Number(Integer(123), ~"0123")]),
+        decl(~"color", ~[Dimension(Integer(0), ~"0", ~"g2")]),
+    ], []);
+    assert_declarations("fill:123", true,  // Not in the list
+        [decl(~"fill", ~[Number(Integer(123), ~"123")])], []);
 }
