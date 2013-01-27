@@ -729,14 +729,8 @@ fn test_tokenizer() {
         let tokenizer = Tokenizer::from_str(
             input, transform_function_whitespace);
         let result = all_tokens(tokenizer);
-        let tokens: &[Token] = result.tokens;
-        let parse_errors: &[~str] = result.errors;
-        if tokens != expected_tokens {
-            fail fmt!("%?\n!=\n%?", tokens, expected_tokens);
-        }
-        if parse_errors != expected_errors {
-            fail fmt!("%?\n!=\n%?", parse_errors, expected_errors);
-        }
+        tests::check_results(
+            result.tokens, expected_tokens, result.errors, expected_errors)
     }
 
     assert_tokens("", [], []);

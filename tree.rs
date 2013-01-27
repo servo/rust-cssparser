@@ -449,26 +449,17 @@ fn consume_function(parser: &Parser, name: ~str)
 
 #[test]
 fn test_primitives() {
-    fn assert_primitives(input: &str, expected_primitives: &[Primitive],
-                         expected_errors: &[~str]) {
-        assert_primitives_flags(
-            input, expected_primitives, expected_errors, false)
-    }
-    fn assert_primitives_flags(input: &str, expected_primitives: &[Primitive],
-                               expected_errors: &[~str], quirks_mode: bool) {
+    fn assert_primitives(
+            input: &str, quirks_mode: bool,
+            expected_primitives: &[Primitive], expected_errors: &[~str]) {
         let parser = Parser::from_str(input, false, quirks_mode);
-        let primitives: &[Primitive] = consume_primitive_list(parser);
-        let errors: &[~str] = parser.errors;
-        if primitives != expected_primitives {
-            fail fmt!("%?\n!=\n%?", primitives, expected_primitives);
-        }
-        if errors != expected_errors {
-            fail fmt!("%?\n!=\n%?", errors, expected_errors);
-        }
+        tests::check_results(
+            consume_primitive_list(parser), expected_primitives,
+            parser.errors, expected_errors);
     }
 
-    assert_primitives("", [], []);
-    assert_primitives("42 foo([aa ()b], -){\n  }", [
+    assert_primitives("", false, [], []);
+    assert_primitives("42 foo([aa ()b], -){\n  }", false, [
         Number(Integer(42), ~"42"), WhiteSpace,
         Function(~"foo", ~[
             ~[BraketBlock(~[
