@@ -112,8 +112,7 @@ impl Parser {
 fn consume_primitive_list(parser: &Parser) -> ~[Primitive] {
     let mut primitives: ~[Primitive] = ~[];
     for parser.each_token |token| {
-        parser.reconsume_token(token);
-        primitives.push(consume_primitive(parser))
+        primitives.push(consume_primitive(parser, token))
     }
     primitives
 }
@@ -162,10 +161,11 @@ impl Parser {
 }
 
 
-// Convert a token from the tokenizer to a primitive.
-// Fails if it is not a preserved token. XXX do something else.
-fn preserved_token_to_primitive(token: tokens::Token) -> Primitive {
-    match token {
+// 3.5.15. Consume a primitive
+fn consume_primitive(parser: &Parser, first_token: tokens::Token)
+        -> Primitive {
+    match first_token {
+        // Preserved tokens
         tokens::Ident(string) => Ident(string),
         tokens::AtKeyword(string) => AtKeyword(string),
         tokens::Hash(string) => Hash(string),
@@ -180,38 +180,26 @@ fn preserved_token_to_primitive(token: tokens::Token) -> Primitive {
         tokens::WhiteSpace => WhiteSpace,
         tokens::Colon => Colon,
         tokens::Semicolon => Semicolon,
-        _ => fail,   // XXX
-        // These are special-cased in consume_primitive()
-//        tokens::Function(string) => fail,
-//        tokens::OpenBraket => fail,
-//        tokens::OpenParen => fail,
-//        tokens::OpenBrace => fail,
 
-        // These still need to be dealt with somehow.
-//        tokens::BadString => fail,
-//        tokens::BadURL => fail,
-//        tokens::Comment => fail,
-//        tokens::CDO => fail,
-//        tokens::CDC => fail,
-//        tokens::CloseBraket => fail,
-//        tokens::CloseParen => fail,
-//        tokens::CloseBrace => fail,
-//        tokens::EOF => fail,
-    }
-}
-
-
-// 3.5.15. Consume a primitive
-fn consume_primitive(parser: &Parser) -> Primitive {
-    match parser.consume_token() {
+        // Simple blocks
         tokens::OpenBraket =>
             BraketBlock(consume_simple_block(parser, tokens::CloseBraket)),
         tokens::OpenParen =>
             ParenBlock(consume_simple_block(parser, tokens::CloseParen)),
         tokens::OpenBrace =>
             BraceBlock(consume_simple_block(parser, tokens::CloseBrace)),
+
+        // Functions
         tokens::Function(string) => consume_function(parser, string),
-        token => preserved_token_to_primitive(token),
+
+        // Non-preserved tokens
+        // TODO These still need to be dealt with somehow.
+        tokens::BadString | tokens::BadURL | tokens::CDO | tokens::CDC
+            | tokens::CloseBraket | tokens::CloseParen | tokens::CloseBrace
+            => fail,
+
+        // Getting here is a  programming error.
+        tokens::Comment | tokens::EOF => fail,
     }
 }
 
@@ -222,10 +210,7 @@ fn consume_simple_block(parser: &Parser, ending_token: tokens::Token)
     let mut value: ~[Primitive] = ~[];
     for parser.each_token |token| {
         if token == ending_token { break }
-        else {
-            parser.reconsume_token(token);
-            value.push(consume_primitive(parser))
-        }
+        else { value.push(consume_primitive(parser, token)) }
     }
     value
 }
@@ -253,10 +238,7 @@ fn consume_function(parser: &Parser, name: ~str)
                     Number(value, repr)
                 }
             ),
-            token => {
-                parser.reconsume_token(token);
-                current_argument.push(consume_primitive(parser))
-            }
+            token => current_argument.push(consume_primitive(parser, token)),
         }
     }
     arguments.push(current_argument);
