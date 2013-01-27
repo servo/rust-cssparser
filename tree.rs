@@ -466,5 +466,29 @@ fn test_primitives() {
                 Ident(~"aa"), WhiteSpace, ParenBlock(~[]), Ident(~"b")])],
             ~[WhiteSpace, Delim('-')]]),
         BraceBlock(~[
-            WhiteSpace])], [])
+            WhiteSpace])], []);
+    assert_primitives(
+        "'foo", false, [String(~"foo")], [~"EOF in quoted string"]);
+    // Without quirks mode, for reference
+    assert_primitives("rgba(1,2%)rect(1,2%)Rect(1,2%)Réct(1,2%)", false, [
+        Function(~"rgba", ~[~[Number(Integer(1), ~"1")],
+                            ~[Percentage(Integer(2), ~"2")]]),
+        Function(~"rect", ~[~[Number(Integer(1), ~"1")],
+                            ~[Percentage(Integer(2), ~"2")]]),
+        Function(~"Rect", ~[~[Number(Integer(1), ~"1")],
+                            ~[Percentage(Integer(2), ~"2")]]),
+        Function(~"Réct", ~[~[Number(Integer(1), ~"1")],
+                            ~[Percentage(Integer(2), ~"2")]]),
+    ], []);
+    // With quirks mode
+    assert_primitives("rgba(1,2%)rect(1,2%)Rect(1,2%)Réct(1,2%)", true, [
+        Function(~"rgba", ~[~[Number(Integer(1), ~"1")],
+                            ~[Percentage(Integer(2), ~"2")]]),
+        Function(~"rect", ~[~[Dimension(Integer(1), ~"1", ~"px")],
+                            ~[Percentage(Integer(2), ~"2")]]),
+        Function(~"Rect", ~[~[Dimension(Integer(1), ~"1", ~"px")],
+                            ~[Percentage(Integer(2), ~"2")]]),
+        Function(~"Réct", ~[~[Number(Integer(1), ~"1")],
+                            ~[Percentage(Integer(2), ~"2")]]),
+    ], []);
 }
