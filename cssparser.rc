@@ -6,10 +6,11 @@ mod tokens;
 mod tree;
 
 
+// When reporting these errors to the user, the application is expected
+// to show the source filename/URL/location in addition to line and column.
 pub struct ParseError {
     message: ~str,
     // TODO: add these:
-//    source_name: ~str,  // Filename, URL, …
 //    source_line: uint,
 //    source_column: uint,
 }
@@ -25,7 +26,7 @@ pub enum NumericValue {
 
 
 impl NumericValue {
-    fn to_float(&self) -> float {
+    pure fn to_float(&self) -> float {
         match *self {
             Integer(value) => value as float,
             Float(value) => value,
@@ -34,7 +35,30 @@ impl NumericValue {
 }
 
 
+pub pure fn ascii_lower(string: &str) -> ~str {
+    // Warning: premature optimization ahead ;)
+    // TODO: would it be more efficient to work on bytes,
+    // without decoding/re-encoding UTF-8?
+    do str::map(string) |c| {
+        match c {
+            'A'..'Z' => c + ASCII_LOWER_OFFSET,
+            _ => c,
+        }
+    }
+}
+
+
 //  ***********  End of public API  ***********
+
+
+const ASCII_LOWER_OFFSET: char = 'a' - 'A';
+
+#[test]
+fn test_ascii_lower() {
+    assert ascii_lower("url()URL()uRl()Ürl") == ~"url()url()url()Ürl";
+    // Dotted capital I, Kelvin sign, Sharp S.
+    assert ascii_lower("HİKß") == ~"hİKß";
+}
 
 
 const MAX_UNICODE: char = '\U0010FFFF';
@@ -61,27 +85,4 @@ fn test_preprocess() {
     assert preprocess("") == ~"";
     assert preprocess("Lorem\r\n\t\x00ipusm\ndoror\uFFFD\r")
         == ~"Lorem\n\t\uFFFDipusm\ndoror\uFFFD\n";
-}
-
-
-const ASCII_LOWER_OFFSET: char = 'a' - 'A';
-
-pub pure fn ascii_lower(string: &str) -> ~str {
-    // Warning: premature optimization ahead ;)
-    // TODO: would it be more efficient to work on bytes,
-    // without decoding/re-encoding UTF-8?
-    do str::map(string) |c| {
-        match c {
-            'A'..'Z' => c + ASCII_LOWER_OFFSET,
-            _ => c,
-        }
-    }
-}
-
-
-#[test]
-fn test_ascii_lower() {
-    assert ascii_lower("url()URL()uRl()Ürl") == ~"url()url()url()Ürl";
-    // Dotted capital I, Kelvin sign, Sharp S.
-    assert ascii_lower("HİKß") == ~"hİKß";
 }
