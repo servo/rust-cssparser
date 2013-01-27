@@ -10,7 +10,7 @@ use tokens;
 
 
 #[deriving_eq]
-enum Primitive {
+pub enum Primitive {
     // Preserved tokens. Same as in the tokenizer.
     Ident(~str),
     AtKeyword(~str),
@@ -43,39 +43,41 @@ enum Primitive {
 }
 
 
-struct Declaration {
+pub struct Declaration {
     name: ~str,
     value: ~[Primitive],
     important: bool,
 }
 
-struct StyleRule {
+pub struct StyleRule {
     selector: ~[Primitive],
-    value: ~[DeclarationListItem],
+    value: ~[DeclarationBlockItem],
 }
 
-struct AtRule {
+pub struct AtRule {
     name: ~str,
     selector: ~[Primitive],
     value: AtRuleValue,
 }
 
 
-enum AtRuleValue {
+pub enum AtRuleValue {
     EmptyAtRule,  // @foo…;
-    DeclarationFilled(~[DeclarationListItem]),
-    RuleFilled(~[RuleListItem]),
+    DeclarationFilled(~[DeclarationBlockItem]),
+    RuleFilled(~[Rule]),
 }
 
-enum DeclarationListItem {
+pub enum DeclarationBlockItem {
     Declaration(Declaration),
+    InvalidDeclaration(~[Primitive]),
     // A better idea for a name that means "at-rule" but is not "AtRule"?
     Decl_AtRule(AtRule),
 }
 
-enum RuleListItem {
+pub enum Rule {
     StyleRule(StyleRule),
     AtRule(AtRule),
+    InvalidRule(~[Primitive]),
 }
 
 
@@ -109,7 +111,7 @@ impl Parser {
 // Consume the whole input and return a list of primitives.
 // Could be used for parsing eg. a stand-alone media query.
 // This is similar to consume_simple_block(), but there is no ending token.
-fn consume_primitive_list(parser: &Parser) -> ~[Primitive] {
+pub fn consume_primitive_list(parser: &Parser) -> ~[Primitive] {
     let mut primitives: ~[Primitive] = ~[];
     for parser.each_token |token| {
         primitives.push(consume_primitive(parser, token))
