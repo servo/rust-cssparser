@@ -79,16 +79,16 @@ enum RuleListItem {
 }
 
 
-struct State {
-    tokenizer: ~tokens::Tokenizer,
-    quirks_mode: bool,
-    mut current_token: Option<tokens::Token>,
-    mut errors: ~[~str],
+pub struct Parser {
+    priv tokenizer: ~tokens::Tokenizer,
+    priv quirks_mode: bool,
+    priv mut current_token: Option<tokens::Token>,
+    priv mut errors: ~[~str],
 }
 
 
-fn make_parser(tokenizer: ~tokens::Tokenizer, quirks_mode: bool) -> ~State {
-    ~State {
+fn make_parser(tokenizer: ~tokens::Tokenizer, quirks_mode: bool) -> ~Parser {
+    ~Parser {
         tokenizer: tokenizer,
         quirks_mode: quirks_mode,
         current_token: None,
@@ -98,7 +98,7 @@ fn make_parser(tokenizer: ~tokens::Tokenizer, quirks_mode: bool) -> ~State {
 
 
 fn parser_from_string(input: &str, transform_function_whitespace: bool,
-                      quirks_mode: bool) -> ~State {
+                      quirks_mode: bool) -> ~Parser {
     make_parser(tokens::make_tokenizer(input, transform_function_whitespace),
                 quirks_mode)
 }
@@ -107,15 +107,15 @@ fn parser_from_string(input: &str, transform_function_whitespace: bool,
 // Consume the whole input and return a list of primitives.
 // Could be used for parsing eg. a stand-alone media query.
 // This is similar to consume_simple_block(), but there is no ending token.
-fn consume_primitive_list(state: &State) -> ~[Primitive] {
+fn consume_primitive_list(parser: &Parser) -> ~[Primitive] {
     let mut value: ~[Primitive] = ~[];
     loop {
-        match consume_next_token(state) {
+        match consume_next_token(parser) {
             tokens::Comment => (),
             tokens::EOF => break,
             token => {
-                reconsume_token(state, token);
-                value.push(consume_primitive(state))
+                reconsume_token(parser, token);
+                value.push(consume_primitive(parser))
             }
         }
     }
@@ -126,16 +126,16 @@ fn consume_primitive_list(state: &State) -> ~[Primitive] {
 //  ***********  End of public API  ***********
 
 
-fn consume_next_token(state: &State) -> tokens::Token {
+fn consume_next_token(parser: &Parser) -> tokens::Token {
     let mut current_token = None;
-    current_token <-> state.current_token;
+    current_token <-> parser.current_token;
     match current_token {
         Some(token) => token,
-        None => match state.tokenizer.next_token() {
+        None => match parser.tokenizer.next_token() {
             tokens::TokenResult {token: token, error: err} => {
                 match err {
                     // TODO more contextual error handling?
-                    Some(err) => state.errors.push(err),
+                    Some(err) => parser.errors.push(err),
                     None => ()
                 }
                 token
@@ -148,9 +148,9 @@ fn consume_next_token(state: &State) -> tokens::Token {
 // Fail if the is already a "current token".
 // The easiest way to ensure this does not fail it to call it only once
 // just after calling consume_next_token()
-fn reconsume_token(state: &State, token: tokens::Token) {
-    assert state.current_token.is_none();
-    state.current_token = Some(token)
+fn reconsume_token(parser: &Parser, token: tokens::Token) {
+    assert parser.current_token.is_none();
+    parser.current_token = Some(token)
 }
 
 
@@ -194,33 +194,33 @@ fn preserved_token_to_primitive(token: tokens::Token) -> Primitive {
 
 
 // 3.5.15. Consume a primitive
-fn consume_primitive(state: &State) -> Primitive {
-    match consume_next_token(state) {
+fn consume_primitive(parser: &Parser) -> Primitive {
+    match consume_next_token(parser) {
         tokens::OpenBraket =>
-            BraketBlock(consume_simple_block(state, tokens::CloseBraket)),
+            BraketBlock(consume_simple_block(parser, tokens::CloseBraket)),
         tokens::OpenParen =>
-            ParenBlock(consume_simple_block(state, tokens::CloseParen)),
+            ParenBlock(consume_simple_block(parser, tokens::CloseParen)),
         tokens::OpenBrace =>
-            BraceBlock(consume_simple_block(state, tokens::CloseBrace)),
-        tokens::Function(string) => consume_function(state, string),
+            BraceBlock(consume_simple_block(parser, tokens::CloseBrace)),
+        tokens::Function(string) => consume_function(parser, string),
         token => preserved_token_to_primitive(token),
     }
 }
 
 
 // 3.5.18. Consume a simple block  (kind of)
-fn consume_simple_block(state: &State, ending_token: tokens::Token)
+fn consume_simple_block(parser: &Parser, ending_token: tokens::Token)
         -> ~[Primitive] {
     let mut value: ~[Primitive] = ~[];
     loop {
-        match consume_next_token(state) {
+        match consume_next_token(parser) {
             tokens::Comment => (),
             tokens::EOF => break,
             token => {
                 if token == ending_token { break }
                 else {
-                    reconsume_token(state, token);
-                    value.push(consume_primitive(state))
+                    reconsume_token(parser, token);
+                    value.push(consume_primitive(parser))
                 }
             }
         }
@@ -230,12 +230,12 @@ fn consume_simple_block(state: &State, ending_token: tokens::Token)
 
 
 // 3.5.19. Consume a function
-fn consume_function(state: &State, name: ~str)
+fn consume_function(parser: &Parser, name: ~str)
         -> Primitive {
     let mut current_argument: ~[Primitive] = ~[];
     let mut arguments: ~[~[Primitive]] = ~[];
     loop {
-        match consume_next_token(state) {
+        match consume_next_token(parser) {
             tokens::Comment => (),
             tokens::EOF | tokens::CloseParen => break,
             tokens::Delim(',') => {
@@ -245,7 +245,7 @@ fn consume_function(state: &State, name: ~str)
             tokens::Number(value, repr) => current_argument.push(
                 // XXX case-sensitive or ASCII case-insensitive? See
             // http://lists.w3.org/Archives/Public/www-style/2013Jan/0480.html
-                if state.quirks_mode && ascii_lower(name) == ~"rect" {
+                if parser.quirks_mode && ascii_lower(name) == ~"rect" {
                     // 3.5.17. Consume a primitive
                     // with the unitless length quirk
                     Dimension(value, repr, ~"px")
@@ -254,8 +254,8 @@ fn consume_function(state: &State, name: ~str)
                 }
             ),
             token => {
-                reconsume_token(state, token);
-                current_argument.push(consume_primitive(state))
+                reconsume_token(parser, token);
+                current_argument.push(consume_primitive(parser))
             }
         }
     }
