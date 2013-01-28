@@ -74,7 +74,6 @@ pub enum AtRuleValue {
 #[deriving_eq]
 pub enum DeclarationBlockItem {
     Declaration(Declaration),
-    InvalidDeclaration(~[Primitive]),
     // A better idea for a name that means "at-rule" but is not "AtRule"?
     Decl_AtRule(AtRule),
 }
@@ -83,7 +82,6 @@ pub enum DeclarationBlockItem {
 pub enum Rule {
     StyleRule(StyleRule),
     AtRule(AtRule),
-    InvalidRule(~[Primitive]),
 }
 
 
@@ -163,8 +161,7 @@ impl Parser {
     }
 
     // Fail if the is already a "current token".
-    // The easiest way to ensure this does not fail it to call it only once
-    // just after calling parser.consume_token()
+    // Call it at most once per iteration of .each_token()
     priv fn reconsume_token(&self, token: tokens::Token) {
         assert self.current_token.is_none();
         self.current_token = Some(token)
@@ -183,10 +180,13 @@ fn consume_declaration_block(parser: &Parser, is_nested: bool)
 //            tokens::AtKeyword(name)
 //                => items.push(consume_at_rule(parser, name)),
             tokens::Ident(name)
-                => items.push(consume_declaration(parser, is_nested, name)),
+            => match consume_declaration(parser, is_nested, name) {
+                Some(declaration) => items.push(Declaration(declaration)),
+                None => ()
+            },
             token => {
                 parser.reconsume_token(token);
-                items.push(consume_declaration_error(parser, is_nested, ~[]))
+                consume_declaration_error(parser, is_nested)
             },
         }
     }
@@ -196,12 +196,11 @@ fn consume_declaration_block(parser: &Parser, is_nested: bool)
 
 // 3.5.8. After-declaration-name mode
 fn consume_declaration(parser: &Parser, is_nested: bool, name: ~str)
-        -> DeclarationBlockItem {
+        -> Option<Declaration> {
     let mut name = name;  // XXX see <-> below
-    let mut has_whitespace = false;  // In case the property is invalid
     for parser.each_token |token| {
         match token {
-            tokens::WhiteSpace => has_whitespace = true,
+            tokens::WhiteSpace => (),
             tokens::Colon => {
                 // XXX https://github.com/mozilla/rust/issues/4654
                 let mut name_ = ~"";
@@ -211,15 +210,14 @@ fn consume_declaration(parser: &Parser, is_nested: bool, name: ~str)
             _ => { parser.reconsume_token(token); break }
         }
     }
-    consume_declaration_error(parser, is_nested,
-        if has_whitespace { ~[Ident(name), WhiteSpace] }
-        else { ~[Ident(name)] })
+    consume_declaration_error(parser, is_nested);
+    None
 }
 
 
 // 3.5.9. Declaration-value mode
 fn consume_declaration_value(parser: &Parser, is_nested: bool, name: ~str)
-        -> DeclarationBlockItem {
+        -> Option<Declaration> {
     let mut name = name;  // XXX see <-> below
     let mut value: ~[Primitive] = ~[];
     for parser.each_token |token| {
@@ -240,45 +238,36 @@ fn consume_declaration_value(parser: &Parser, is_nested: bool, name: ~str)
             _ => value.push(consume_value_primitive(parser, name, token)),
         }
     }
-    Declaration(Declaration{name: name, value: value, important: false})
+    Some(Declaration{name: name, value: value, important: false})
 }
 
 
 // 3.5.10. Declaration-important mode
 fn consume_declaration_important(parser: &Parser, is_nested: bool,
                                  name: ~str, value: ~[Primitive])
-        -> DeclarationBlockItem {
-    let mut has_whitespace = false;  // In case the property is invalid
-    let mut token = tokens::EOF;  // dummy values
-    for parser.each_token |t| {
-        match t {
-            tokens::WhiteSpace => has_whitespace = true,
-            t => { token = t; break }
+        -> Option<Declaration> {
+    let mut important = false;
+    for parser.each_token |token| {
+        match token {
+            tokens::WhiteSpace => (),
+            tokens::Ident(priority) => {
+                important = ascii_lower(priority) == ~"important";
+                break
+            },
+            token => { parser.reconsume_token(token); break }
         }
     }
-    let (is_important, token) = match token {
-        // TODO: consider "can be made important"?
-        tokens::Ident(value) =>
-            (ascii_lower(value) == ~"important", tokens::Ident(value)),
-        token => (false, token)
-    };
-    if is_important {
-        Declaration(Declaration {name: name, value: value, important: true})
+    if important {
+        Some(Declaration {name: name, value: value, important: true})
     } else {
-        parser.reconsume_token(token);
-        let mut invalid = ~[Ident(name), Colon];
-        let mut value = value;
-        invalid.push_all_move(value);
-        invalid.push(Delim('!'));
-        consume_declaration_error(parser, is_nested, invalid)
+        consume_declaration_error(parser, is_nested);
+        None
     }
 }
 
 
 // 3.5.13. Next-declaration error mode
-fn consume_declaration_error(parser: &Parser, is_nested: bool,
-                             invalid: ~[Primitive]) -> DeclarationBlockItem {
-    let mut invalid = invalid;
+fn consume_declaration_error(parser: &Parser, is_nested: bool) {
     parser.errors.push(~"Invalid declaration");
     for parser.each_token |token| {
         match token {
@@ -287,10 +276,9 @@ fn consume_declaration_error(parser: &Parser, is_nested: bool,
                 parser.reconsume_token(token);
                 break
             },
-            _ => invalid.push(consume_primitive(parser, token))
-        }
+            _ => consume_primitive(parser, token)  // Ignore the return value
+        };
     }
-    InvalidDeclaration(invalid)
 }
 
 
@@ -535,21 +523,11 @@ fn test_declarations() {
     assert_declarations("", false, [], []);
     assert_declarations("", true, [], []);
     assert_declarations(" \n  ;; ", false, [], []);
-    assert_declarations("color", false,
-        [InvalidDeclaration(~[Ident(~"color")])], [~"Invalid declaration"]);
+    assert_declarations("color", false, [], [~"Invalid declaration"]);
+    assert_declarations("color/ red", false, [], [~"Invalid declaration"]);
     assert_declarations("/**/ color:", false, [decl(~"color", ~[])], []);
-    assert_declarations("color/ red", false,
-        [InvalidDeclaration(~[
-            Ident(~"color"), Delim('/'), WhiteSpace, Ident(~"red")
-        ])], [~"Invalid declaration"]);
-    assert_declarations("a /{(;);}b; c:d", false, [
-        InvalidDeclaration(~[
-            Ident(~"a"), WhiteSpace, Delim('/'), BraceBlock(~[
-                ParenBlock(~[Semicolon]), Semicolon,
-            ]), Ident(~"b")
-        ]),
-        decl(~"c", ~[Ident(~"d")]),
-    ], [~"Invalid declaration"]);
+    assert_declarations("a /{(;);}b; c:d", false,
+        [decl(~"c", ~[Ident(~"d")])], [~"Invalid declaration"]);
     assert_declarations("color /**/: black,red; ;", false,
         [decl(~"color", ~[
             WhiteSpace, Ident(~"black"), Delim(','), Ident(~"red")
@@ -558,11 +536,7 @@ fn test_declarations() {
     // !important
     assert_declarations("a:!important /**/; b:c!IMPORTant", false,
         [important(~"a", ~[]), important(~"b", ~[Ident(~"c")])], []);
-    assert_declarations("a:!stuff; a:!!;a:!", false, [
-        InvalidDeclaration(~[Ident(~"a"), Colon, Delim('!'), Ident(~"stuff")]),
-        InvalidDeclaration(~[Ident(~"a"), Colon, Delim('!'), Delim('!')]),
-        InvalidDeclaration(~[Ident(~"a"), Colon, Delim('!')]),
-    ], [
+    assert_declarations("a:!stuff; a:!!;a:!", false, [], [
         ~"Invalid declaration", ~"Invalid declaration", ~"Invalid declaration"
     ]);
     // XXX See http://lists.w3.org/Archives/Public/www-style/2013Jan/0491.html
