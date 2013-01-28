@@ -702,9 +702,17 @@ fn char_from_hex(hex: &[char]) -> char {
 
 #[test]
 fn test_tokenizer() {
-    struct VecResult{tokens: ~[Token], errors: ~[~str]};
+    fn assert_tokens(input: &str, expected_tokens: &[Token],
+                     expected_errors: &[~str]) {
+        assert_tokens_flags(
+            input, false, expected_tokens, expected_errors)
+    }
 
-    fn all_tokens(tokenizer: &Tokenizer) -> VecResult {
+    fn assert_tokens_flags(
+            input: &str, transform_function_whitespace: bool,
+            expected_tokens: &[Token], expected_errors: &[~str]) {
+        let tokenizer = Tokenizer::from_str(
+            input, transform_function_whitespace);
         let mut tokens: ~[Token] = ~[];
         let mut errors: ~[~str] = ~[];
         loop {
@@ -718,23 +726,7 @@ fn test_tokenizer() {
                 token => tokens.push(token),
             }
         }
-        VecResult{ tokens: tokens, errors: errors }
-    }
-
-    fn assert_tokens(input: &str, expected_tokens: &[Token],
-                     expected_errors: &[~str]) {
-        assert_tokens_flags(
-            input, false, expected_tokens, expected_errors)
-    }
-
-    fn assert_tokens_flags(
-            input: &str, transform_function_whitespace: bool,
-            expected_tokens: &[Token], expected_errors: &[~str]) {
-        let tokenizer = Tokenizer::from_str(
-            input, transform_function_whitespace);
-        let result = all_tokens(tokenizer);
-        tests::check_results(
-            result.tokens, expected_tokens, result.errors, expected_errors)
+        tests::check_results(tokens, expected_tokens, errors, expected_errors)
     }
 
     assert_tokens("", [], []);
