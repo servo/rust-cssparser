@@ -16,7 +16,9 @@ pub enum Primitive {
     AtKeyword(~str),
     Hash(~str),
     String(~str),
+    BadString,
     URL(~str),
+    BadURL,
     Delim(char),
     Number(NumericValue, ~str),  // value, representation
     Percentage(NumericValue, ~str),  // value, representation
@@ -291,7 +293,9 @@ fn consume_primitive(parser: &Parser, first_token: tokens::Token)
         tokens::AtKeyword(string) => AtKeyword(string),
         tokens::Hash(string) => Hash(string),
         tokens::String(string) => String(string),
+        tokens::BadString => BadString,
         tokens::URL(string) => URL(string),
+        tokens::BadURL => BadURL,
         tokens::Delim(ch) => Delim(ch),
         tokens::Number(value, repr) => Number(value, repr),
         tokens::Percentage(value, repr) => Percentage(value, repr),
@@ -301,8 +305,12 @@ fn consume_primitive(parser: &Parser, first_token: tokens::Token)
         tokens::WhiteSpace => WhiteSpace,
         tokens::Colon => Colon,
         tokens::Semicolon => Semicolon,
+        tokens::CDO => CDO,
+        tokens::CDC => CDC,
+        tokens::CloseBraket => CloseBraket,
+        tokens::CloseParen => CloseParen,
+        tokens::CloseBrace => CloseBrace,
 
-        // Simple blocks
         tokens::OpenBraket =>
             BraketBlock(consume_simple_block(parser, tokens::CloseBraket)),
         tokens::OpenParen =>
@@ -310,14 +318,7 @@ fn consume_primitive(parser: &Parser, first_token: tokens::Token)
         tokens::OpenBrace =>
             BraceBlock(consume_simple_block(parser, tokens::CloseBrace)),
 
-        // Functions
         tokens::Function(string) => consume_function(parser, string),
-
-        // Non-preserved tokens
-        // TODO These still need to be dealt with somehow.
-        tokens::BadString | tokens::BadURL | tokens::CDO | tokens::CDC
-            | tokens::CloseBraket | tokens::CloseParen | tokens::CloseBrace
-            => fail,
 
         // Getting here is a  programming error.
         tokens::EOF => fail,
