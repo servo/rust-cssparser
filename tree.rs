@@ -248,8 +248,6 @@ fn consume_declaration_value(parser: &Parser, is_nested: bool, name: ~str)
 fn consume_declaration_important(parser: &Parser, is_nested: bool,
                                  name: ~str, value: ~[Primitive])
         -> DeclarationBlockItem {
-    // XXX Consume whitespace and comments here?
-    // http://lists.w3.org/Archives/Public/www-style/2013Jan/0491.html
     let mut has_whitespace = false;  // In case the property is invalid
     let mut token = tokens::EOF;  // dummy values
     for parser.each_token |t| {
