@@ -3,7 +3,7 @@
 // The output of the tokenization step is a series of zero or more
 // of the following tokens:
 // ident, function, at-keyword, hash, string, bad-string, url, bad-url,
-// delim, number, percentage, dimension, unicode-range, whitespace, comment,
+// delim, number, percentage, dimension, unicode-range, whitespace,
 // cdo, cdc, colon, semicolon, [, ], (, ), {, }.
 //
 // ident, function, at-keyword, hash, string, and url tokens
@@ -61,7 +61,6 @@ pub enum Token {
     UnicodeRange(char, char),  // start, end
     EmptyUnicodeRange,
     WhiteSpace,
-    Comment,
     CDO,  // <!--
     CDC,  // -->
     Colon,  // :
@@ -176,6 +175,13 @@ macro_rules! push_char(
 
 // 3.3.4. Data state
 fn consume_token(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
+    // Comments are special because they do not even emit a token,
+    // unless they reach EOF which is an error.
+    match consume_comments(tokenizer) {
+        Some(result) => return result,
+        None => ()
+    }
+    if is_eof(tokenizer) { return (EOF, None) }
     let c = current_char(tokenizer);
     match c {
         '-' => {
@@ -219,8 +225,6 @@ fn consume_token(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
                 '\'' => consume_quoted_string(tokenizer, true),
                 '(' => (OpenParen, None),
                 ')' => (CloseParen, None),
-                '/' if !is_eof(tokenizer) && current_char(tokenizer) == '*'
-                    => consume_comment(tokenizer),
                 ':' => (Colon, None),
                 ';' => (Semicolon, None),
                 '@' => consume_at_keyword(tokenizer),
@@ -271,18 +275,19 @@ fn consume_hash(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
 
 
 // 3.3.9. Comment state
-fn consume_comment(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
-    tokenizer.position += 1;  // consume the * in /*
-    match str::find_str_from(tokenizer.input, "*/", tokenizer.position) {
-        Some(end_position) => {
-            tokenizer.position = end_position + 2;
-            (Comment, None)
-        },
-        None => {
-            tokenizer.position = tokenizer.input.len();
-            error_token(Comment, ~"EOF in comment")
+fn consume_comments(tokenizer: &Tokenizer)
+        -> Option<(Token, Option<ParseError>)> {
+    while match_here(tokenizer, ~"/*") {
+        tokenizer.position += 2;  // consume /*
+        match str::find_str_from(tokenizer.input, "*/", tokenizer.position) {
+            Some(end_position) => tokenizer.position = end_position + 2,
+            None => {
+                tokenizer.position = tokenizer.length;
+                return Some(error_token(EOF, ~"Unclosed comment"))
+            }
         }
     }
+    None
 }
 
 
@@ -731,10 +736,13 @@ fn test_tokenizer() {
 
     assert_tokens("", [], []);
     assert_tokens("?/", [Delim('?'), Delim('/')], []);
-    assert_tokens("?/* Li/*psum… */", [Delim('?'), Comment], []);
-    assert_tokens("?/* Li/*psum… *//", [Delim('?'), Comment, Delim('/')], []);
-    assert_tokens("?/* Lipsum", [Delim('?'), Comment], [~"EOF in comment"]);
-    assert_tokens("?/*", [Delim('?'), Comment], [~"EOF in comment"]);
+    assert_tokens("?/* Li/*psum… */", [Delim('?')], []);
+    assert_tokens("?/* Li/*psum… *//", [Delim('?'), Delim('/')], []);
+    assert_tokens("?/* Lipsum", [Delim('?')], [~"Unclosed comment"]);
+    assert_tokens("?/*", [Delim('?')], [~"Unclosed comment"]);
+    assert_tokens("?/*/", [Delim('?')], [~"Unclosed comment"]);
+    assert_tokens("?/**/!", [Delim('?'), Delim('!')], []);
+    assert_tokens("?/**/", [Delim('?')], []);
     assert_tokens("[?}{)",
         [OpenBraket, Delim('?'), CloseBrace, OpenBrace, CloseParen], []);
 

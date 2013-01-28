@@ -24,7 +24,6 @@ pub enum Primitive {
     UnicodeRange(char, char),  // start, end
     EmptyUnicodeRange,
     WhiteSpace,
-    Comment,
     CDO,  // <!--
     CDC,  // -->
     Colon,  // :
@@ -154,11 +153,9 @@ impl Parser {
         }
     }
 
-    // Skips comments
     priv fn each_token(&self, it: fn(token: tokens::Token) -> bool) {
         loop {
             match self.consume_token() {
-                tokens::Comment => (),
                 tokens::EOF => break,
                 token => if !it(token) { break },
             }
@@ -337,7 +334,7 @@ fn consume_primitive(parser: &Parser, first_token: tokens::Token)
             => fail,
 
         // Getting here is a  programming error.
-        tokens::Comment | tokens::EOF => fail,
+        tokens::EOF => fail,
     }
 }
 
