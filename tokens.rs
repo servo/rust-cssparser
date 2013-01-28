@@ -99,9 +99,13 @@ fn current_char(tokenizer: &Tokenizer) -> char {
 
 // Return value may be smaller than n if we’re near the end of the input.
 #[inline(always)]
-fn next_n_bytes(tokenizer: &Tokenizer, n: uint) -> ~str {
-    str::slice(tokenizer.input, tokenizer.position,
-               uint::min(tokenizer.position + n, tokenizer.length))
+fn match_here(tokenizer: &Tokenizer, needle: ~str) -> bool {
+    // XXX Duplicate str::match_at which is not public.
+    let mut i = tokenizer.position;
+    if i + needle.len() > tokenizer.length { return false }
+    let haystack: &str = tokenizer.input;
+    for needle.each |c| { if haystack[i] != c { return false; } i += 1u; }
+    return true;
 }
 
 
@@ -137,8 +141,8 @@ macro_rules! is_match(
 
 #[inline(always)]
 fn is_invalid_escape(tokenizer: &Tokenizer) -> bool {
-    match next_n_bytes(tokenizer, 2) {
-        ~"\\\n" | ~"\\\x0C" | ~"\\" => true,
+    match next_n_chars(tokenizer, 2) {
+        ['\\', '\n'] | ['\\', '\x0C'] | ['\\'] => true,
         _ => false,
     }
 }
@@ -175,7 +179,7 @@ fn consume_token(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     let c = current_char(tokenizer);
     match c {
         '-' => {
-            if next_n_bytes(tokenizer, 3) == ~"-->" {
+            if match_here(tokenizer, ~"-->") {
                 tokenizer.position += 3;
                 (CDC, None)
             }
@@ -186,7 +190,7 @@ fn consume_token(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
             }
         },
         '<' => {
-            if next_n_bytes(tokenizer, 4) == ~"<!--" {
+            if match_here(tokenizer, ~"<!--") {
                 tokenizer.position += 4;
                 (CDO, None)
             } else {
@@ -244,10 +248,10 @@ fn consume_quoted_string(tokenizer: &Tokenizer, single_quote: bool)
                 return error_token(BadString, ~"Newline in quoted string");
             },
             '\\' => {
-                match next_n_bytes(tokenizer, 1) {
+                match next_n_chars(tokenizer, 1) {
                     // Quoted newline
-                    ~"\n" | ~"\x0C" => tokenizer.position += 1,
-                    ~"" =>
+                    ['\n'] | ['\x0C'] => tokenizer.position += 1,
+                    [] =>
                         return error_token(BadString, ~"EOF in quoted string"),
                     _ => push_char!(string, consume_escape(tokenizer))
                 }
@@ -572,8 +576,8 @@ fn consume_unquoted_url(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
             ')' => return (URL(string), None),
             '\x00'..'\x08' | '\x0E'..'\x1F' | '\x7F'..'\x9F'  // non-printable
                 | '"' | '\'' | '(' => return consume_bad_url(tokenizer),
-            '\\' => match next_n_bytes(tokenizer, 1) {
-                ~"\n" | ~"\x0C" | ~"" => return consume_bad_url(tokenizer),
+            '\\' => match next_n_chars(tokenizer, 1) {
+                ['\n'] | ['\x0C'] | [] => return consume_bad_url(tokenizer),
                 _ => consume_escape(tokenizer)
             },
             c => c
@@ -760,6 +764,7 @@ fn test_tokenizer() {
         [Ident(~"foo"), Delim('\\'), WhiteSpace, Ident(~"bar")],
         [~"Invalid escape"]);
     assert_tokens("-Lipsum", [Ident(~"-Lipsum")], []);
+    assert_tokens("-L\\ïpsum", [Ident(~"-Lïpsum")], []);
     assert_tokens("-\\Lipsum", [Ident(~"-Lipsum")], []);
     assert_tokens("-", [Delim('-')], []);
     assert_tokens("--Lipsum", [Delim('-'), Ident(~"-Lipsum")], []);
