@@ -30,17 +30,17 @@ pub enum Primitive {
     CDC,  // -->
     Colon,  // :
     Semicolon,  // ;
-    CloseBraket, // ]
-    CloseParen, // )
-    CloseBrace, // }
+    CloseParenthesis, // )
+    CloseSquareBraket, // ]
+    CloseCurlyBraket, // }
 
     // Function
     Function(~str, ~[~[Primitive]]),  // name, arguments
 
     // Simple block
-    BraketBlock(~[Primitive]),  // […]
-    ParenBlock(~[Primitive]),  // (…)
-    BraceBlock(~[Primitive]),  // {…}
+    ParenthesisBlock(~[Primitive]),  // (…)
+    SquareBraketBlock(~[Primitive]),  // […]
+    CurlyBraketBlock(~[Primitive]),  // {…}
 }
 
 
@@ -178,7 +178,7 @@ fn consume_declaration_block(parser: &Parser, is_nested: bool)
     for parser.each_token |token| {
         match token {
             tokens::WhiteSpace | tokens::Semicolon => (),
-            tokens::CloseBrace if is_nested => break,
+            tokens::CloseCurlyBraket if is_nested => break,
 //            tokens::AtKeyword(name)
 //                => items.push(consume_at_rule(parser, name)),
             tokens::Ident(name)
@@ -224,7 +224,7 @@ fn consume_declaration_value(parser: &Parser, is_nested: bool, name: ~str)
     let mut value: ~[Primitive] = ~[];
     for parser.each_token |token| {
         match token {
-            tokens::CloseBrace if is_nested => {
+            tokens::CloseCurlyBraket if is_nested => {
                 parser.reconsume_token(token); break
             }
             tokens::Semicolon => break,
@@ -274,7 +274,7 @@ fn consume_declaration_error(parser: &Parser, is_nested: bool) {
     for parser.each_token |token| {
         match token {
             tokens::Semicolon => break,
-            tokens::CloseBrace if is_nested => {
+            tokens::CloseCurlyBraket if is_nested => {
                 parser.reconsume_token(token);
                 break
             },
@@ -307,16 +307,16 @@ fn consume_primitive(parser: &Parser, first_token: tokens::Token)
         tokens::Semicolon => Semicolon,
         tokens::CDO => CDO,
         tokens::CDC => CDC,
-        tokens::CloseBraket => CloseBraket,
-        tokens::CloseParen => CloseParen,
-        tokens::CloseBrace => CloseBrace,
+        tokens::CloseSquareBraket => CloseSquareBraket,
+        tokens::CloseParenthesis => CloseParenthesis,
+        tokens::CloseCurlyBraket => CloseCurlyBraket,
 
-        tokens::OpenBraket =>
-            BraketBlock(consume_simple_block(parser, tokens::CloseBraket)),
-        tokens::OpenParen =>
-            ParenBlock(consume_simple_block(parser, tokens::CloseParen)),
-        tokens::OpenBrace =>
-            BraceBlock(consume_simple_block(parser, tokens::CloseBrace)),
+        tokens::OpenSquareBraket => SquareBraketBlock(
+            consume_simple_block(parser, tokens::CloseSquareBraket)),
+        tokens::OpenParenthesis => ParenthesisBlock(
+            consume_simple_block(parser, tokens::CloseParenthesis)),
+        tokens::OpenCurlyBraket => CurlyBraketBlock(
+            consume_simple_block(parser, tokens::CloseCurlyBraket)),
 
         tokens::Function(string) => consume_function(parser, string),
 
@@ -432,7 +432,7 @@ fn consume_function(parser: &Parser, name: ~str)
     let mut arguments: ~[~[Primitive]] = ~[];
     for parser.each_token |token| {
         match token {
-            tokens::CloseParen => break,
+            tokens::CloseParenthesis => break,
             tokens::Delim(',') => {
                 // XXX https://github.com/mozilla/rust/issues/4654
                 let mut arg: ~[Primitive] = ~[];
@@ -471,10 +471,10 @@ fn test_primitives() {
     assert_primitives("42 foo([aa ()b], -){\n  }", false, [
         Number(Integer(42), ~"42"), WhiteSpace,
         Function(~"foo", ~[
-            ~[BraketBlock(~[
-                Ident(~"aa"), WhiteSpace, ParenBlock(~[]), Ident(~"b")])],
+            ~[SquareBraketBlock(~[
+                Ident(~"aa"), WhiteSpace, ParenthesisBlock(~[]), Ident(~"b")])],
             ~[WhiteSpace, Delim('-')]]),
-        BraceBlock(~[
+        CurlyBraketBlock(~[
             WhiteSpace])], []);
     assert_primitives(
         "'foo", false, [String(~"foo")], [~"EOF in quoted string"]);

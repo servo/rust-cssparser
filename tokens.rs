@@ -65,12 +65,12 @@ pub enum Token {
     CDC,  // -->
     Colon,  // :
     Semicolon,  // ;
-    OpenBraket, // [
-    OpenParen, // (
-    OpenBrace, // {
-    CloseBraket, // ]
-    CloseParen, // )
-    CloseBrace, // }
+    OpenParenthesis, // (
+    OpenSquareBraket, // [
+    OpenCurlyBraket, // {
+    CloseParenthesis, // )
+    CloseSquareBraket, // ]
+    CloseCurlyBraket, // }
     EOF,
 }
 
@@ -223,15 +223,15 @@ fn consume_token(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
                 '"' => consume_quoted_string(tokenizer, false),
                 '#' => consume_hash(tokenizer),
                 '\'' => consume_quoted_string(tokenizer, true),
-                '(' => (OpenParen, None),
-                ')' => (CloseParen, None),
+                '(' => (OpenParenthesis, None),
+                ')' => (CloseParenthesis, None),
                 ':' => (Colon, None),
                 ';' => (Semicolon, None),
                 '@' => consume_at_keyword(tokenizer),
-                '[' => (OpenBraket, None),
-                ']' => (CloseBraket, None),
-                '{' => (OpenBrace, None),
-                '}' => (CloseBrace, None),
+                '[' => (OpenSquareBraket, None),
+                ']' => (CloseSquareBraket, None),
+                '{' => (OpenCurlyBraket, None),
+                '}' => (CloseCurlyBraket, None),
                 _ => (Delim(c), None)
             }
         }
@@ -743,11 +743,13 @@ fn test_tokenizer() {
     assert_tokens("?/*/", [Delim('?')], [~"Unclosed comment"]);
     assert_tokens("?/**/!", [Delim('?'), Delim('!')], []);
     assert_tokens("?/**/", [Delim('?')], []);
-    assert_tokens("[?}{)",
-        [OpenBraket, Delim('?'), CloseBrace, OpenBrace, CloseParen], []);
+    assert_tokens("[?}{)", [
+        OpenSquareBraket, Delim('?'), CloseCurlyBraket,
+        OpenCurlyBraket, CloseParenthesis
+    ], []);
 
     assert_tokens("(\n \t'Lore\\6d \"ipsu\\6D'",
-        [OpenParen, WhiteSpace, String(~"Lorem\"ipsum")], []);
+        [OpenParenthesis, WhiteSpace, String(~"Lorem\"ipsum")], []);
     assert_tokens("'\\''", [String(~"'")], []);
     assert_tokens("\"\\\"\"", [String(~"\"")], []);
     assert_tokens("\"\\\"", [String(~"\"")], [~"EOF in quoted string"]);
@@ -773,21 +775,22 @@ fn test_tokenizer() {
     assert_tokens("\\\nLipsum", [Delim('\\'), WhiteSpace, Ident(~"Lipsum")],
         [~"Invalid escape"]);
     assert_tokens("\\", [Delim('\\')], [~"Invalid escape"]);
-    assert_tokens("func()", [Function(~"func"), CloseParen], []);
+    assert_tokens("func()", [Function(~"func"), CloseParenthesis], []);
     assert_tokens("func ()",
-        [Ident(~"func"), WhiteSpace, OpenParen, CloseParen], []);
-    assert_tokens_flags("func ()", true, [Function(~"func"), CloseParen], []);
+        [Ident(~"func"), WhiteSpace, OpenParenthesis, CloseParenthesis], []);
+    assert_tokens_flags("func ()", true,
+        [Function(~"func"), CloseParenthesis], []);
 
     assert_tokens("##00(#\\##\\\n#\\",
-        [Delim('#'), Hash(~"00"), OpenParen, Hash(~"#"), Delim('#'),
+        [Delim('#'), Hash(~"00"), OpenParenthesis, Hash(~"#"), Delim('#'),
          Delim('\\'), WhiteSpace, Delim('#'), Delim('\\')],
         [~"Invalid escape", ~"Invalid escape"]);
 
-    assert_tokens("@@page(@\\x@-x@-\\x@--@\\\n@\\",
-        [Delim('@'), AtKeyword(~"page"), OpenParen, AtKeyword(~"x"),
-         AtKeyword(~"-x"), AtKeyword(~"-x"), Delim('@'), Delim('-'), Delim('-'),
-         Delim('@'), Delim('\\'), WhiteSpace, Delim('@'), Delim('\\')],
-        [~"Invalid escape", ~"Invalid escape"]);
+    assert_tokens("@@page(@\\x@-x@-\\x@--@\\\n@\\", [
+        Delim('@'), AtKeyword(~"page"), OpenParenthesis, AtKeyword(~"x"),
+        AtKeyword(~"-x"), AtKeyword(~"-x"), Delim('@'), Delim('-'), Delim('-'),
+        Delim('@'), Delim('\\'), WhiteSpace, Delim('@'), Delim('\\')
+    ], [~"Invalid escape", ~"Invalid escape"]);
 
     assert_tokens("<!-<!-----><",
         [Delim('<'), Delim('!'), Delim('-'), CDO, Delim('-'), CDC, Delim('<')],
@@ -801,7 +804,8 @@ fn test_tokenizer() {
         []);
 
     assert_tokens("url()URL()uRl()Ürl()",
-        [URL(~""), URL(~""), URL(~""), Function(~"Ürl"), CloseParen], []);
+        [URL(~""), URL(~""), URL(~""), Function(~"Ürl"), CloseParenthesis],
+        []);
     assert_tokens("url(  )url(\ta\n)url(\t'a'\n)url(\t'a'z)url(  ",
         [URL(~""), URL(~"a"), URL(~"a"), BadURL, BadURL],
         [~"Invalid URL syntax", ~"EOF in URL"]);
@@ -837,7 +841,7 @@ fn test_tokenizer() {
     assert_tokens("42-Px+.5\\u -1url(7-0\\", [
         Dimension(Integer(42), ~"42", ~"-Px"),
         Dimension(Float(0.5), ~"+.5", ~"u"), WhiteSpace,
-        Dimension(Integer(-1), ~"-1", ~"url"), OpenParen,
+        Dimension(Integer(-1), ~"-1", ~"url"), OpenParenthesis,
         Number(Integer(7), ~"7"),
         Number(Integer(0), ~"-0"), Delim('\\'),
     ], [~"Invalid escape"]);
