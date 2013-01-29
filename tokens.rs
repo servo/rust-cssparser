@@ -173,7 +173,7 @@ macro_rules! push_char(
 )
 
 
-// 3.3.4. Data state
+// 4.4.1. Data state
 fn consume_token(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     // Comments are special because they do not even emit a token,
     // unless they reach EOF which is an error.
@@ -239,8 +239,8 @@ fn consume_token(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
 }
 
 
-// 3.3.5. Double-quote-string state
-// 3.3.6. Single-quote-string state
+// 4.4.2. Double-quote-string state
+// 4.4.3. Single-quote-string state
 fn consume_quoted_string(tokenizer: &Tokenizer, single_quote: bool)
         -> (Token, Option<ParseError>) {
     let mut string: ~str = ~"";
@@ -267,14 +267,14 @@ fn consume_quoted_string(tokenizer: &Tokenizer, single_quote: bool)
 }
 
 
-// 3.3.7. Hash state
+// 4.4.4. Hash state
 fn consume_hash(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     let string = consume_ident_string_rest(tokenizer);
     (if string == ~"" { Delim('#') } else { Hash(string) }, None)
 }
 
 
-// 3.3.9. Comment state
+// 4.4.6. Comment state
 fn consume_comments(tokenizer: &Tokenizer)
         -> Option<(Token, Option<ParseError>)> {
     while match_here(tokenizer, ~"/*") {
@@ -291,7 +291,7 @@ fn consume_comments(tokenizer: &Tokenizer)
 }
 
 
-// 3.3.10. At-keyword state
+// 4.4.7. At-keyword state
 fn consume_at_keyword(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     (match consume_ident_string(tokenizer) {
         Some(string) => AtKeyword(string),
@@ -300,7 +300,7 @@ fn consume_at_keyword(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
 }
 
 
-// 3.3.12. Ident state
+// 4.4.9. Ident state
 fn consume_ident(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     match consume_ident_string(tokenizer) {
         Some(string) => {
@@ -344,7 +344,7 @@ fn consume_ident_string(tokenizer: &Tokenizer) -> Option<~str> {
 }
 
 
-// 3.3.13. Ident-rest state
+// 4.4.10. Ident-rest state
 fn consume_ident_string_rest(tokenizer: &Tokenizer) -> ~str {
     let mut string = ~"";
     while !is_eof(tokenizer) {
@@ -366,7 +366,7 @@ fn consume_ident_string_rest(tokenizer: &Tokenizer) -> ~str {
 }
 
 
-// 3.3.14. Transform-function-whitespace state
+// 4.4.11. Transform-function-whitespace state
 fn handle_transform_function_whitespace(tokenizer: &Tokenizer, string: ~str)
         -> (Token, Option<ParseError>) {
     while !is_eof(tokenizer) {
@@ -382,7 +382,7 @@ fn handle_transform_function_whitespace(tokenizer: &Tokenizer, string: ~str)
 }
 
 
-// 3.3.15. Number state
+// 4.4.12. Number state
 fn consume_numeric(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     let c = consume_char(tokenizer);
     match c {
@@ -421,7 +421,7 @@ fn consume_numeric_sign(tokenizer: &Tokenizer, sign: char)
 }
 
 
-// 3.3.16. Number-rest state
+// 4.4.13. Number-rest state
 fn consume_numeric_rest(tokenizer: &Tokenizer, initial_char: char)
         -> (Token, Option<ParseError>) {
     let mut string = str::from_char(initial_char);
@@ -454,7 +454,7 @@ fn consume_numeric_rest(tokenizer: &Tokenizer, initial_char: char)
 }
 
 
-// 3.3.17. Number-fraction state
+// 4.4.14. Number-fraction state
 fn consume_numeric_fraction(tokenizer: &Tokenizer, string: ~str)
         -> (Token, Option<ParseError>) {
     let mut string: ~str = string;
@@ -478,7 +478,7 @@ fn consume_numeric_end(tokenizer: &Tokenizer, string: ~str,
     (match current_char(tokenizer) {
         '%' => { tokenizer.position += 1; Percentage(value, string) },
         _ => {
-            // 3.3.18. Dimension state (kind of)
+            // 4.4.15. Dimension state (kind of)
             match consume_ident_string(tokenizer) {
                 Some(unit) => Dimension(value, string, unit),
                 None => Number(value, string),
@@ -512,7 +512,7 @@ fn consume_scientific_number(tokenizer: &Tokenizer, string: ~str)
     } else {
         return Err(string)
     }
-    // 3.3.19. Sci-notation state
+    // 4.4.16. Sci-notation state
     while !is_eof(tokenizer) && is_match!(current_char(tokenizer), '0'..'9') {
         push_char!(string, consume_char(tokenizer))
     }
@@ -521,7 +521,7 @@ fn consume_scientific_number(tokenizer: &Tokenizer, string: ~str)
 }
 
 
-// 3.3.20. URL state
+// 4.4.17. URL state
 fn consume_url(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     while !is_eof(tokenizer) {
         match current_char(tokenizer) {
@@ -536,8 +536,8 @@ fn consume_url(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
 }
 
 
-// 3.3.21. URL-double-quote state
-// 3.3.22. URL-single-quote state
+// 4.4.18. URL-double-quote state
+// 4.4.19. URL-single-quote state
 fn consume_quoted_url(tokenizer: &Tokenizer, single_quote: bool)
         -> (Token, Option<ParseError>) {
     tokenizer.position += 1;  // The initial quote
@@ -557,7 +557,7 @@ fn consume_quoted_url(tokenizer: &Tokenizer, single_quote: bool)
 }
 
 
-// 3.3.23. URL-end state
+// 4.4.20. URL-end state
 fn consume_url_end(tokenizer: &Tokenizer, string: ~str)
         -> (Token, Option<ParseError>) {
     while !is_eof(tokenizer) {
@@ -571,7 +571,7 @@ fn consume_url_end(tokenizer: &Tokenizer, string: ~str)
 }
 
 
-// 3.3.24. URL-unquoted state
+// 4.4.21. URL-unquoted state
 fn consume_unquoted_url(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     let mut string = ~"";
     while !is_eof(tokenizer) {
@@ -593,7 +593,7 @@ fn consume_unquoted_url(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
 }
 
 
-// 3.3.25. Bad-URL state
+// 4.4.22. Bad-URL state
 fn consume_bad_url(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
     // Consume up to the closing )
     while !is_eof(tokenizer) {
@@ -607,7 +607,7 @@ fn consume_bad_url(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
 }
 
 
-// 3.3.26. Unicode-range state
+// 4.4.23. Unicode-range state
 fn consume_unicode_range(tokenizer: &Tokenizer)
         -> (Token, Option<ParseError>) {
     let next_3 = next_n_chars(tokenizer, 3);
@@ -658,7 +658,7 @@ fn consume_unicode_range(tokenizer: &Tokenizer)
         }
         end = if hex.len() > 0 { char_from_hex(hex) } else { start }
     }
-    // 3.3.28. Set the unicode-range token's range
+    // 4.6. Set the unicode-range token's range
     (if start > MAX_UNICODE || end < start {
         EmptyUnicodeRange
     } else {
@@ -668,7 +668,7 @@ fn consume_unicode_range(tokenizer: &Tokenizer)
 }
 
 
-// 3.3.27. Consume an escaped character
+// 4.5. Consume an escaped character
 // Assumes that the U+005C REVERSE SOLIDUS (\) has already been consumed
 // and that the next input character has already been verified
 // to not be a newline or EOF.

@@ -171,7 +171,7 @@ impl Parser {
 }
 
 
-// 3.5.7. Declaration-block mode
+// 5.3.5. Declaration-block mode
 fn consume_declaration_block(parser: &Parser, is_nested: bool)
         -> ~[DeclarationBlockItem] {
     let mut items: ~[DeclarationBlockItem] = ~[];
@@ -196,7 +196,7 @@ fn consume_declaration_block(parser: &Parser, is_nested: bool)
 }
 
 
-// 3.5.8. After-declaration-name mode
+// 5.3.6. After-declaration-name mode
 fn consume_declaration(parser: &Parser, is_nested: bool, name: ~str)
         -> Option<Declaration> {
     let mut name = name;  // XXX see <-> below
@@ -217,7 +217,7 @@ fn consume_declaration(parser: &Parser, is_nested: bool, name: ~str)
 }
 
 
-// 3.5.9. Declaration-value mode
+// 5.3.7. Declaration-value mode
 fn consume_declaration_value(parser: &Parser, is_nested: bool, name: ~str)
         -> Option<Declaration> {
     let mut name = name;  // XXX see <-> below
@@ -244,7 +244,7 @@ fn consume_declaration_value(parser: &Parser, is_nested: bool, name: ~str)
 }
 
 
-// 3.5.10. Declaration-important mode
+// 5.3.8. Declaration-important mode
 fn consume_declaration_important(parser: &Parser, is_nested: bool,
                                  name: ~str, value: ~[Primitive])
         -> Option<Declaration> {
@@ -268,7 +268,7 @@ fn consume_declaration_important(parser: &Parser, is_nested: bool,
 }
 
 
-// 3.5.13. Next-declaration error mode
+// 5.3.11. Next-declaration error mode
 fn consume_declaration_error(parser: &Parser, is_nested: bool) {
     parser.errors.push(~"Invalid declaration");
     for parser.each_token |token| {
@@ -284,7 +284,7 @@ fn consume_declaration_error(parser: &Parser, is_nested: bool) {
 }
 
 
-// 3.5.15. Consume a primitive
+// 5.4. Consume a primitive
 fn consume_primitive(parser: &Parser, first_token: tokens::Token)
         -> Primitive {
     match first_token {
@@ -326,7 +326,7 @@ fn consume_primitive(parser: &Parser, first_token: tokens::Token)
 }
 
 
-// 3.5.16. Consume a primitive with the hashless color quirk
+// 5.5. Consume a primitive with the hashless color quirk
 const HASHLESS_COLOR_QUIRK: &[&str] = &[
     &"background-color",
     &"border-color",
@@ -337,7 +337,7 @@ const HASHLESS_COLOR_QUIRK: &[&str] = &[
     &"color",
 ];
 
-// 3.5.17. Consume a primitive with the unitless length quirk
+// 5.6. Consume a primitive with the unitless length quirk
 const UNITLESS_LENGTH_QUIRK: &[&str] = &[
     &"border-top-width",
     &"border-right-width",
@@ -413,7 +413,7 @@ fn consume_value_primitive(parser: &Parser, name: &str, token: tokens::Token)
     }
 }
 
-// 3.5.18. Consume a simple block  (kind of)
+// 5.7. Consume a simple block  (kind of)
 fn consume_simple_block(parser: &Parser, ending_token: tokens::Token)
         -> ~[Primitive] {
     let mut value: ~[Primitive] = ~[];
@@ -425,7 +425,7 @@ fn consume_simple_block(parser: &Parser, ending_token: tokens::Token)
 }
 
 
-// 3.5.19. Consume a function
+// 5.8. Consume a function
 fn consume_function(parser: &Parser, name: ~str)
         -> Primitive {
     let mut current_argument: ~[Primitive] = ~[];
@@ -441,7 +441,7 @@ fn consume_function(parser: &Parser, name: ~str)
             },
             tokens::Number(value, repr) => current_argument.push(
                 if parser.quirks_mode && ascii_lower(name) == ~"rect" {
-                    // 3.5.17. Consume a primitive
+                    // 5.6. Consume a primitive
                     // with the unitless length quirk
                     Dimension(value, repr, ~"px")
                 } else {
