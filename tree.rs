@@ -16,9 +16,7 @@ pub enum Primitive {
     AtKeyword(~str),
     Hash(~str),
     String(~str),
-    BadString,
     URL(~str),
-    BadURL,
     Delim(char),
     Number(NumericValue, ~str),  // value, representation
     Percentage(NumericValue, ~str),  // value, representation
@@ -26,13 +24,8 @@ pub enum Primitive {
     UnicodeRange(char, char),  // start, end
     EmptyUnicodeRange,
     WhiteSpace,
-    CDO,  // <!--
-    CDC,  // -->
     Colon,  // :
     Semicolon,  // ;
-    CloseParenthesis, // )
-    CloseSquareBraket, // ]
-    CloseCurlyBraket, // }
 
     // Function
     Function(~str, ~[~[Primitive]]),  // name, arguments
@@ -41,6 +34,15 @@ pub enum Primitive {
     ParenthesisBlock(~[Primitive]),  // (…)
     SquareBraketBlock(~[Primitive]),  // […]
     CurlyBraketBlock(~[Primitive]),  // {…}
+
+    // These are alwas invalid
+    BadURL,
+    BadString,
+    CDO,  // <!--
+    CDC,  // -->
+    CloseParenthesis, // )
+    CloseSquareBraket, // ]
+    CloseCurlyBraket, // }
 }
 
 
