@@ -259,12 +259,21 @@ fn consume_declaration_important(parser: &Parser, is_nested: bool,
             token => { parser.reconsume_token(token); break }
         }
     }
-    if important {
-        Some(Declaration {name: name, value: value, important: true})
-    } else {
+    if !important {
         consume_declaration_error(parser, is_nested);
-        None
+        return None
     }
+    // 5.3.9. Declaration-end mode
+    for parser.each_token |token| {
+        match token {
+            tokens::WhiteSpace => (),
+            tokens::CloseCurlyBraket if is_nested
+                => { parser.reconsume_token(token); break }
+            tokens::Semicolon => break,
+            _ => { consume_declaration_error(parser, is_nested); return None }
+        }
+    }
+    Some(Declaration {name: name, value: value, important: true})
 }
 
 
@@ -537,6 +546,10 @@ fn test_declarations() {
     // !important
     assert_declarations("a:!important /**/; b:c!IMPORTant", false,
         [important(~"a", ~[]), important(~"b", ~[Ident(~"c")])], []);
+    assert_declarations("a:!important b:c", false,
+        [], [~"Invalid declaration"]);
+    assert_declarations("a:!important} b:c", false,
+        [], [~"Invalid declaration"]);
     assert_declarations("a:!stuff; a:!!;a:!", false, [], [
         ~"Invalid declaration", ~"Invalid declaration", ~"Invalid declaration"
     ]);
