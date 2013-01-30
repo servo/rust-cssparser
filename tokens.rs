@@ -18,6 +18,10 @@
 // Unicode-range tokens have a range of characters.
 
 
+use utils::*;
+use tree::{NumericValue,Float,Integer,ParseError};
+
+
 impl Tokenizer {
     static fn from_str(input: &str, transform_function_whitespace: bool)
             -> ~Tokenizer {
@@ -76,6 +80,27 @@ pub enum Token {
 
 
 //  ***********  End of public API  ***********
+
+
+const MAX_UNICODE: char = '\U0010FFFF';
+
+
+// 3.2.1. Preprocessing the input stream
+pure fn preprocess(input: &str) -> ~str {
+    // TODO: Is this faster if done in one pass?
+    str::replace(str::replace(str::replace(input,
+    "\r\n", "\n"),
+    "\r", "\n"),
+    "\x00", "\uFFFD")
+}
+
+
+#[test]
+fn test_preprocess() {
+    assert preprocess("") == ~"";
+    assert preprocess("Lorem\r\n\t\x00ipusm\ndoror\uFFFD\r")
+        == ~"Lorem\n\t\uFFFDipusm\ndoror\uFFFD\n";
+}
 
 
 #[inline(always)]
@@ -731,7 +756,7 @@ fn test_tokenizer() {
                 token => tokens.push(token),
             }
         }
-        tests::check_results(tokens, expected_tokens, errors, expected_errors)
+        check_results(tokens, expected_tokens, errors, expected_errors)
     }
 
     assert_tokens("", [], []);

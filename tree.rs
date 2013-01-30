@@ -7,6 +7,36 @@
 
 
 use tokens;
+use utils::*;
+
+
+// When reporting these errors to the user, the application is expected
+// to show the source filename/URL/location in addition to line and column.
+pub struct ParseError {
+    message: ~str,
+    // TODO: add these:
+//    source_line: uint,
+//    source_column: uint,
+}
+
+
+#[deriving_eq]
+pub enum NumericValue {
+    Integer(int),
+    // The spec calls this "number".
+    // Use "float" instead to reduce term overloading with "number token".
+    Float(float),
+}
+
+
+impl NumericValue {
+    pure fn to_float(&self) -> float {
+        match *self {
+            Integer(value) => value as float,
+            Float(value) => value,
+        }
+    }
+}
 
 
 #[deriving_eq]
@@ -603,7 +633,7 @@ fn test_primitives() {
             input: &str, quirks_mode: bool,
             expected_primitives: &[Primitive], expected_errors: &[~str]) {
         let parser = Parser::from_str(input, false, quirks_mode);
-        tests::check_results(
+        check_results(
             parser.parse_primitives(), expected_primitives,
             parser.errors, expected_errors);
     }
@@ -651,7 +681,7 @@ fn test_declarations() {
             expected_declarations: &[DeclarationBlockItem],
             expected_errors: &[~str]) {
         let parser = Parser::from_str(input, false, quirks_mode);
-        tests::check_results(
+        check_results(
             parser.parse_declarations(), expected_declarations,
             parser.errors, expected_errors);
     }
