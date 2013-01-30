@@ -7,9 +7,3 @@ extern mod std;
 mod tokens;
 mod tree;
 mod utils;
-
-
-// TODO http://dev.w3.org/csswg/css3-syntax/#the-input-byte-stream
-// fn decode(input: &[u8], protocol_encoding: &str, link_encoding: &str,
-//           document_encoding: &str) -> ~str
-// Use empty strings for “no such encoding information”?

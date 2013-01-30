@@ -13,6 +13,7 @@ TODO
   - [x] Declarations
   - [ ] Style rules
   - [ ] At-rules
+* [ ] Detect character encoding & decode from bytes
 * [ ] Packaging on cargo-central
 * [ ] Track line/column number for errors & tokens.
 * [ ] Figure out float and integer overflow
