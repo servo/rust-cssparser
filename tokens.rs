@@ -177,7 +177,7 @@ fn is_namestart_or_escape(tokenizer: &Tokenizer) -> bool {
     match current_char(tokenizer) {
         'a'..'z' | 'A'..'Z' | '_' => true,
         '\\' => !is_invalid_escape(tokenizer),
-        c => c >= '\xA0',  // Non-ASCII
+        c => c >= '\x80',  // Non-ASCII
     }
 }
 
@@ -232,7 +232,7 @@ fn consume_token(tokenizer: &Tokenizer) -> (Token, Option<ParseError>) {
         '0'..'9' | '.' | '+' => consume_numeric(tokenizer),
         'u' | 'U' => consume_unicode_range(tokenizer),
         'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(tokenizer),
-        _ if c >= '\xA0' => consume_ident(tokenizer),  // Non-ASCII
+        _ if c >= '\x80' => consume_ident(tokenizer),  // Non-ASCII
         _ => {
             match consume_char(tokenizer) {
                 '\t' | '\n' | '\x0C' | ' ' => {
@@ -377,7 +377,7 @@ fn consume_ident_string_rest(tokenizer: &Tokenizer) -> ~str {
         let next_char = match c {
             'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-'  => {
                 tokenizer.position += 1; c },
-            _ if c >= '\xA0' => consume_char(tokenizer),  // Non-ASCII
+            _ if c >= '\x80' => consume_char(tokenizer),  // Non-ASCII
             '\\' => {
                 if is_invalid_escape(tokenizer) { break }
                 tokenizer.position += 1;
@@ -800,6 +800,8 @@ fn test_tokenizer() {
     assert_tokens("\\\nLipsum", [Delim('\\'), WhiteSpace, Ident(~"Lipsum")],
         [~"Invalid escape"]);
     assert_tokens("\\", [Delim('\\')], [~"Invalid escape"]);
+    assert_tokens("\x7f\x80\x81", [Delim('\x7F'), Ident(~"\x80\x81")], []);
+
     assert_tokens("func()", [Function(~"func"), CloseParenthesis], []);
     assert_tokens("func ()",
         [Ident(~"func"), WhiteSpace, OpenParenthesis, CloseParenthesis], []);
