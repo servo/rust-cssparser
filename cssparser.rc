@@ -4,6 +4,6 @@
 #[cfg(test)]
 extern mod std;
 
-mod tokens;
-mod tree;
-mod utils;
+pub mod tokens;
+pub mod tree;
+pub mod utils;

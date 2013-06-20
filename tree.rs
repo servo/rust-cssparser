@@ -6,8 +6,12 @@
 // and all other nodes being at-rules, style rules, or declarations.
 
 
-use tokens;
-use utils::*;
+extern mod core;
+use core::util::{swap, replace};
+use super::utils::*;
+use super::tokens;
+//mod tokens;
+//mod utils;
 
 
 // When reporting these errors to the user, the application is expected
@@ -20,7 +24,7 @@ pub struct ParseError {
 }
 
 
-#[deriving_eq]
+#[deriving(Eq)]
 pub enum NumericValue {
     Integer(int),
     // The spec calls this "number".
@@ -30,7 +34,7 @@ pub enum NumericValue {
 
 
 impl NumericValue {
-    pure fn to_float(&self) -> float {
+    fn to_float(&self) -> float {
         match *self {
             Integer(value) => value as float,
             Float(value) => value,
@@ -39,7 +43,7 @@ impl NumericValue {
 }
 
 
-#[deriving_eq]
+#[deriving(Eq)]
 pub enum Primitive {
     // Preserved tokens. Same as in the tokenizer.
     Ident(~str),
@@ -76,20 +80,20 @@ pub enum Primitive {
 }
 
 
-#[deriving_eq]
+#[deriving(Eq)]
 pub struct Declaration {
     name: ~str,
     value: ~[Primitive],
     important: bool,
 }
 
-#[deriving_eq]
+#[deriving(Eq)]
 pub struct StyleRule {
     selector: ~[Primitive],
     value: ~[DeclarationBlockItem],
 }
 
-#[deriving_eq]
+#[deriving(Eq)]
 pub struct AtRule {
     name: ~str,
     prelude: ~[Primitive],
@@ -97,7 +101,7 @@ pub struct AtRule {
 }
 
 
-#[deriving_eq]
+#[deriving(Eq)]
 pub enum AtRuleValue {
     NotFilled,  // @foo…;
     DeclarationFilled(~[DeclarationBlockItem]),
@@ -105,14 +109,14 @@ pub enum AtRuleValue {
 }
 
 
-#[deriving_eq]
+#[deriving(Eq)]
 pub enum DeclarationBlockItem {
     Declaration(Declaration),
     // A better idea for a name that means "at-rule" but is not "AtRule"?
     Decl_AtRule(AtRule),
 }
 
-#[deriving_eq]
+#[deriving(Eq)]
 pub enum Rule {
     StyleRule(StyleRule),
     AtRule(AtRule),
@@ -122,15 +126,15 @@ pub enum Rule {
 pub struct Parser {
     priv tokenizer: ~tokens::Tokenizer,
     priv quirks_mode: bool,
-    priv mut current_token: Option<tokens::Token>,
-    priv mut errors: ~[~str],
+    priv current_token: Option<tokens::Token>,
+    priv errors: ~[~str],
     priv rule_filled_at_rules: ~[~str],
     priv declaration_filled_at_rules: ~[~str],
 }
 
 
 impl Parser {
-    static fn from_tokenizer(
+    fn from_tokenizer(
             tokenizer: ~tokens::Tokenizer, quirks_mode: bool) -> ~Parser {
         ~Parser {
             tokenizer: tokenizer,
@@ -141,7 +145,7 @@ impl Parser {
             declaration_filled_at_rules: ~[~"page"],
         }
     }
-    static fn from_str(input: &str, transform_function_whitespace: bool,
+    fn from_str(input: &str, transform_function_whitespace: bool,
                       quirks_mode: bool) -> ~Parser {
         Parser::from_tokenizer(
             tokens::Tokenizer::from_str(input, transform_function_whitespace),
@@ -151,19 +155,19 @@ impl Parser {
     // Consume the whole input and return a list of primitives.
     // Could be used for parsing eg. a stand-alone media query.
     // This is similar to consume_simple_block(), but there is no ending token.
-    fn parse_primitives(&self) -> ~[Primitive] {
+    fn parse_primitives(&mut self) -> ~[Primitive] {
         let mut primitives: ~[Primitive] = ~[];
-        for self.each_token |token| {
-            primitives.push(consume_primitive(self, token))
+        for self.each_token |parser, token| {
+            primitives.push(consume_primitive(parser, token))
         }
         primitives
     }
 
-    fn parse_declarations(&self) -> ~[DeclarationBlockItem] {
+    fn parse_declarations(&mut self) -> ~[DeclarationBlockItem] {
         consume_declaration_block(self, /* is_nested= */false)
     }
 
-    fn parse_stylesheet(&self) -> ~[Rule] {
+    fn parse_stylesheet(&mut self) -> ~[Rule] {
         consume_top_level_rules(self)
     }
 }
@@ -173,9 +177,9 @@ impl Parser {
 
 
 impl Parser {
-    priv fn consume_token(&self) -> tokens::Token {
+    priv fn consume_token(&mut self) -> tokens::Token {
         let mut current_token = None;
-        current_token <-> self.current_token;
+        swap(&mut current_token, &mut self.current_token);
         match current_token {
             Some(token) => token,
             None => {
@@ -191,36 +195,39 @@ impl Parser {
         }
     }
 
-    priv fn each_token(&self, it: fn(token: tokens::Token) -> bool) {
+    priv fn each_token(
+        &mut self,
+        it: &fn(parser: &mut Parser, token: tokens::Token) -> bool
+    ) -> bool {
         loop {
             match self.consume_token() {
-                tokens::EOF => break,
-                token => if !it(token) { break },
+                tokens::EOF => return true,
+                token => if !it(self, token) { return false },
             }
         }
     }
 
     // Fail if the is already a "current token".
     // Call it at most once per iteration of .each_token()
-    priv fn reconsume_token(&self, token: tokens::Token) {
-        assert self.current_token.is_none();
+    priv fn reconsume_token(&mut self, token: tokens::Token) {
+        assert!(self.current_token.is_none());
         self.current_token = Some(token)
     }
 
-    priv fn is_rule_filled(&self, name: &(~str)) -> bool {
+    priv fn is_rule_filled(&mut self, name: &(~str)) -> bool {
         vec::contains(self.rule_filled_at_rules, name)
     }
 
-    priv fn is_declaration_filled(&self, name: &(~str)) -> bool {
+    priv fn is_declaration_filled(&mut self, name: &(~str)) -> bool {
         vec::contains(self.declaration_filled_at_rules, name)
     }
 }
 
 
 // 5.3.1. Top-level mode
-fn consume_top_level_rules(parser: &Parser) -> ~[Rule] {
+fn consume_top_level_rules(parser: &mut Parser) -> ~[Rule] {
     let mut rules: ~[Rule] = ~[];
-    for parser.each_token |token| {
+    for parser.each_token |parser, token| {
         match token {
             tokens::WhiteSpace | tokens::CDO | tokens::CDC => (),
             tokens::AtKeyword(name)
@@ -242,11 +249,11 @@ fn consume_top_level_rules(parser: &Parser) -> ~[Rule] {
 
 
 // 5.3.2. At-rule-prelude mode
-fn consume_at_rule(parser: &Parser, is_nested: bool, name: ~str)
+fn consume_at_rule(parser: &mut Parser, is_nested: bool, name: ~str)
         -> Option<AtRule> {
     let mut prelude: ~[Primitive] = ~[];
     let mut value: AtRuleValue = NotFilled;
-    for parser.each_token |token| {
+    for parser.each_token |parser, token| {
         match token {
             tokens::OpenCurlyBraket => {
                 value = if parser.is_rule_filled(&name) {
@@ -288,9 +295,9 @@ fn consume_at_rule(parser: &Parser, is_nested: bool, name: ~str)
 
 
 // 5.3.3. Rule-block mode
-fn consume_rule_block(parser: &Parser) -> ~[Rule] {
+fn consume_rule_block(parser: &mut Parser) -> ~[Rule] {
     let mut rules: ~[Rule] = ~[];
-    for parser.each_token |token| {
+    for parser.each_token |parser, token| {
         match token {
             tokens::WhiteSpace => (),
             tokens::CloseCurlyBraket => break,
@@ -313,15 +320,14 @@ fn consume_rule_block(parser: &Parser) -> ~[Rule] {
 
 
 // 5.3.4. Selector mode
-fn consume_style_rule(parser: &Parser, is_nested: bool) -> Option<StyleRule> {
+fn consume_style_rule(parser: &mut Parser, is_nested: bool) -> Option<StyleRule> {
     let mut selector: ~[Primitive] = ~[];
-    for parser.each_token |token| {
+    for parser.each_token |parser, token| {
         match token {
             tokens::OpenCurlyBraket => {
-                let mut selector_: ~[Primitive] = ~[];
-                selector_ <-> selector;
-                return Some(StyleRule{selector: selector_, value:
-                    consume_declaration_block(parser, true)})
+                return Some(StyleRule{
+                    selector: replace(&mut selector, ~[]),
+                    value: consume_declaration_block(parser, true)})
             },
             tokens::CloseCurlyBraket if is_nested
                 => { parser.reconsume_token(token); break }
@@ -334,10 +340,10 @@ fn consume_style_rule(parser: &Parser, is_nested: bool) -> Option<StyleRule> {
 
 
 // 5.3.5. Declaration-block mode
-fn consume_declaration_block(parser: &Parser, is_nested: bool)
+fn consume_declaration_block(parser: &mut Parser, is_nested: bool)
         -> ~[DeclarationBlockItem] {
     let mut items: ~[DeclarationBlockItem] = ~[];
-    for parser.each_token |token| {
+    for parser.each_token |parser, token| {
         match token {
             tokens::WhiteSpace | tokens::Semicolon => (),
             tokens::CloseCurlyBraket if is_nested => break,
@@ -362,17 +368,15 @@ fn consume_declaration_block(parser: &Parser, is_nested: bool)
 
 
 // 5.3.6. After-declaration-name mode
-fn consume_declaration(parser: &Parser, is_nested: bool, name: ~str)
+fn consume_declaration(parser: &mut Parser, is_nested: bool, name: ~str)
         -> Option<Declaration> {
-    let mut name = name;  // XXX see <-> below
-    for parser.each_token |token| {
+    let mut name = name;  // XXX see replace() below
+    for parser.each_token |parser, token| {
         match token {
             tokens::WhiteSpace => (),
             tokens::Colon => {
-                // XXX https://github.com/mozilla/rust/issues/4654
-                let mut name_ = ~"";
-                name_ <-> name;
-                return consume_declaration_value(parser, is_nested, name_)
+                return consume_declaration_value(
+                    parser, is_nested, replace(&mut name, ~""))
             }
             _ => { parser.reconsume_token(token); break }
         }
@@ -383,23 +387,19 @@ fn consume_declaration(parser: &Parser, is_nested: bool, name: ~str)
 
 
 // 5.3.7. Declaration-value mode
-fn consume_declaration_value(parser: &Parser, is_nested: bool, name: ~str)
+fn consume_declaration_value(parser: &mut Parser, is_nested: bool, name: ~str)
         -> Option<Declaration> {
     let mut name = name;  // XXX see <-> below
     let mut value: ~[Primitive] = ~[];
-    for parser.each_token |token| {
+    for parser.each_token |parser, token| {
         match token {
             tokens::CloseCurlyBraket if is_nested
                 => { parser.reconsume_token(token); break }
             tokens::Semicolon => break,
             tokens::Delim('!') => {
-                // XXX https://github.com/mozilla/rust/issues/4654
-                let mut name_ = ~"";
-                let mut value_: ~[Primitive] = ~[];
-                name_ <-> name;
-                value_ <-> value;
                 return consume_declaration_important(
-                    parser, is_nested, name_, value_)
+                    parser, is_nested, replace(&mut name, ~""),
+                    replace(&mut value, ~[]))
             },
             _ => value.push(consume_value_primitive(parser, name, token)),
         }
@@ -409,11 +409,11 @@ fn consume_declaration_value(parser: &Parser, is_nested: bool, name: ~str)
 
 
 // 5.3.8. Declaration-important mode
-fn consume_declaration_important(parser: &Parser, is_nested: bool,
+fn consume_declaration_important(parser: &mut Parser, is_nested: bool,
                                  name: ~str, value: ~[Primitive])
         -> Option<Declaration> {
     let mut important = false;
-    for parser.each_token |token| {
+    for parser.each_token |parser, token| {
         match token {
             tokens::WhiteSpace => (),
             tokens::Ident(priority) => {
@@ -428,7 +428,7 @@ fn consume_declaration_important(parser: &Parser, is_nested: bool,
         return None
     }
     // 5.3.9. Declaration-end mode
-    for parser.each_token |token| {
+    for parser.each_token |parser, token| {
         match token {
             tokens::WhiteSpace => (),
             tokens::CloseCurlyBraket if is_nested
@@ -442,9 +442,9 @@ fn consume_declaration_important(parser: &Parser, is_nested: bool,
 
 
 // 5.3.11. Next-declaration error mode
-fn consume_declaration_error(parser: &Parser, is_nested: bool) {
+fn consume_declaration_error(parser: &mut Parser, is_nested: bool) {
     parser.errors.push(~"Invalid declaration");
-    for parser.each_token |token| {
+    for parser.each_token |parser, token| {
         match token {
             tokens::Semicolon => break,
             tokens::CloseCurlyBraket if is_nested
@@ -456,7 +456,7 @@ fn consume_declaration_error(parser: &Parser, is_nested: bool) {
 
 
 // 5.4. Consume a primitive
-fn consume_primitive(parser: &Parser, first_token: tokens::Token)
+fn consume_primitive(parser: &mut Parser, first_token: tokens::Token)
         -> Primitive {
     match first_token {
         // Preserved tokens
@@ -492,13 +492,13 @@ fn consume_primitive(parser: &Parser, first_token: tokens::Token)
         tokens::Function(string) => consume_function(parser, string),
 
         // Getting here is a  programming error.
-        tokens::EOF => fail,
+        tokens::EOF => fail!(),
     }
 }
 
 
 // 5.5. Consume a primitive with the hashless color quirk
-const HASHLESS_COLOR_QUIRK: &[&str] = &[
+static HASHLESS_COLOR_QUIRK: &'static[&'static str] = &[
     &"background-color",
     &"border-color",
     &"border-top-color",
@@ -509,7 +509,7 @@ const HASHLESS_COLOR_QUIRK: &[&str] = &[
 ];
 
 // 5.6. Consume a primitive with the unitless length quirk
-const UNITLESS_LENGTH_QUIRK: &[&str] = &[
+static UNITLESS_LENGTH_QUIRK: &'static[&'static str] = &[
     &"border-top-width",
     &"border-right-width",
     &"border-bottom-width",
@@ -536,7 +536,7 @@ const UNITLESS_LENGTH_QUIRK: &[&str] = &[
     &"word-spacing",
 ];
 
-fn consume_value_primitive(parser: &Parser, name: &str, token: tokens::Token)
+fn consume_value_primitive(parser: &mut Parser, name: &str, token: tokens::Token)
         -> Primitive {
     if !parser.quirks_mode {
         return consume_primitive(parser, token)
@@ -552,7 +552,7 @@ fn consume_value_primitive(parser: &Parser, name: &str, token: tokens::Token)
             3 | 6 => (),
             _ => return false
         }
-        for value.each_char |ch| {
+        for str::each_char(value) |ch| {
             match ch {
                 '0'..'9' | 'a'..'f' | 'A'..'F' => (),
                 _ => return false
@@ -585,10 +585,10 @@ fn consume_value_primitive(parser: &Parser, name: &str, token: tokens::Token)
 }
 
 // 5.7. Consume a simple block  (kind of)
-fn consume_simple_block(parser: &Parser, ending_token: tokens::Token)
+fn consume_simple_block(parser: &mut Parser, ending_token: tokens::Token)
         -> ~[Primitive] {
     let mut value: ~[Primitive] = ~[];
-    for parser.each_token |token| {
+    for parser.each_token |parser, token| {
         if token == ending_token { break }
         else { value.push(consume_primitive(parser, token)) }
     }
@@ -597,18 +597,15 @@ fn consume_simple_block(parser: &Parser, ending_token: tokens::Token)
 
 
 // 5.8. Consume a function
-fn consume_function(parser: &Parser, name: ~str)
+fn consume_function(parser: &mut Parser, name: ~str)
         -> Primitive {
     let mut current_argument: ~[Primitive] = ~[];
     let mut arguments: ~[~[Primitive]] = ~[];
-    for parser.each_token |token| {
+    for parser.each_token |parser, token| {
         match token {
             tokens::CloseParenthesis => break,
             tokens::Delim(',') => {
-                // XXX https://github.com/mozilla/rust/issues/4654
-                let mut arg: ~[Primitive] = ~[];
-                arg <-> current_argument;
-                arguments.push(arg);
+                arguments.push(replace(&mut current_argument, ~[]));
             },
             tokens::Number(value, repr) => current_argument.push(
                 if parser.quirks_mode && ascii_lower(name) == ~"rect" {
@@ -632,7 +629,7 @@ fn test_primitives() {
     fn assert_primitives(
             input: &str, quirks_mode: bool,
             expected_primitives: &[Primitive], expected_errors: &[~str]) {
-        let parser = Parser::from_str(input, false, quirks_mode);
+        let mut parser = Parser::from_str(input, false, quirks_mode);
         check_results(
             parser.parse_primitives(), expected_primitives,
             parser.errors, expected_errors);
@@ -680,7 +677,7 @@ fn test_declarations() {
             input: &str, quirks_mode: bool,
             expected_declarations: &[DeclarationBlockItem],
             expected_errors: &[~str]) {
-        let parser = Parser::from_str(input, false, quirks_mode);
+        let mut parser = Parser::from_str(input, false, quirks_mode);
         check_results(
             parser.parse_declarations(), expected_declarations,
             parser.errors, expected_errors);
