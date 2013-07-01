@@ -19,7 +19,7 @@
 
 
 use super::utils::*;
-use super::tree::{NumericValue,Float,Integer,ParseError};
+use super::parser::{NumericValue,Float,Integer,ParseError};
 
 
 pub impl Tokenizer {

@@ -9,7 +9,7 @@
 extern mod core;
 use core::util::{swap, replace};
 use super::utils::*;
-use super::tokens;
+use tokens = super::tokenizer;
 //mod tokens;
 //mod utils;
 
