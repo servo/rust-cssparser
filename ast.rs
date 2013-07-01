@@ -1,21 +1,27 @@
 #[deriving(Eq)]
-pub enum NumericValue {
-    Integer(int),
-    // The spec calls this "number".
-    // Use "float" instead to reduce term overloading with "number token".
-    Float(float),
+pub struct NumericValue {
+    representation: ~str,
+    value: f64,
+    int_value: Option<i32>,
 }
 
-
-impl NumericValue {
-    fn to_float(&self) -> float {
-        match *self {
-            Integer(value) => value as float,
-            Float(value) => value,
+pub impl NumericValue {
+    fn new(representation: ~str, is_integer: bool) -> NumericValue {
+        NumericValue {
+            int_value: if is_integer { Some(
+                // Remove any + sign as int::from_str() does not parse them.
+                if representation[0] != '+' as u8 {
+                    i32::from_str(representation)
+                } else {
+                    i32::from_str(str::slice(
+                        representation, 1, representation.len()))
+                }.get()
+            )} else { None },
+            value: f64::from_str(representation).get(),
+            representation: representation,
         }
     }
 }
-
 
 #[deriving(Eq)]
 pub enum Primitive {
@@ -26,9 +32,9 @@ pub enum Primitive {
     String(~str),
     URL(~str),
     Delim(char),
-    Number(NumericValue, ~str),  // value, representation
-    Percentage(NumericValue, ~str),  // value, representation
-    Dimension(NumericValue, ~str, ~str),  // value, representation, unit
+    Number(NumericValue),
+    Percentage(NumericValue),
+    Dimension(NumericValue, ~str),
     UnicodeRange {start: char, end: char},
     EmptyUnicodeRange,
     WhiteSpace,

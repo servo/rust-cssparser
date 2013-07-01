@@ -21,8 +21,7 @@ pub struct Parser {
 
 
 impl Parser {
-    fn from_tokenizer(
-            tokenizer: ~tokens::Tokenizer) -> ~Parser {
+    fn from_tokenizer(tokenizer: ~tokens::Tokenizer) -> ~Parser {
         ~Parser {
             tokenizer: tokenizer,
             current_token: None,
@@ -97,7 +96,6 @@ impl Parser {
 }
 
 
-// 5.3.1. Top-level mode
 fn consume_top_level_rules(parser: &mut Parser) -> ~[Rule] {
     let mut rules: ~[Rule] = ~[];
     for parser.each_token |parser, token| {
@@ -118,7 +116,6 @@ fn consume_top_level_rules(parser: &mut Parser) -> ~[Rule] {
 }
 
 
-// 5.3.2. At-rule-prelude mode
 fn consume_at_rule(parser: &mut Parser, is_nested: bool, name: ~str) -> AtRule {
     let mut prelude: ~[Primitive] = ~[];
     let mut block: Option<~[Primitive]> = None;
@@ -136,7 +133,6 @@ fn consume_at_rule(parser: &mut Parser, is_nested: bool, name: ~str) -> AtRule {
 }
 
 
-// 5.3.3. Rule-block mode
 fn consume_rule_block(parser: &mut Parser) -> ~[Rule] {
     let mut rules: ~[Rule] = ~[];
     for parser.each_token |parser, token| {
@@ -158,7 +154,6 @@ fn consume_rule_block(parser: &mut Parser) -> ~[Rule] {
 }
 
 
-// 5.3.4. Selector mode
 fn consume_style_rule(parser: &mut Parser, is_nested: bool) -> Option<QualifiedRule> {
     let mut prelude: ~[Primitive] = ~[];
     for parser.each_token |parser, token| {
@@ -178,7 +173,6 @@ fn consume_style_rule(parser: &mut Parser, is_nested: bool) -> Option<QualifiedR
 }
 
 
-// 5.3.5. Declaration-block mode
 fn consume_declaration_block(parser: &mut Parser, is_nested: bool)
         -> ~[DeclarationBlockItem] {
     let mut items: ~[DeclarationBlockItem] = ~[];
@@ -202,7 +196,6 @@ fn consume_declaration_block(parser: &mut Parser, is_nested: bool)
 }
 
 
-// 5.3.6. After-declaration-name mode
 fn consume_declaration(parser: &mut Parser, is_nested: bool, name: ~str)
         -> Option<Declaration> {
     let mut name = name;  // XXX see replace() below
@@ -221,10 +214,9 @@ fn consume_declaration(parser: &mut Parser, is_nested: bool, name: ~str)
 }
 
 
-// 5.3.7. Declaration-value mode
 fn consume_declaration_value(parser: &mut Parser, is_nested: bool, name: ~str)
         -> Option<Declaration> {
-    let mut name = name;  // XXX see <-> below
+    let mut name = name;  // XXX see replace() below
     let mut value: ~[Primitive] = ~[];
     for parser.each_token |parser, token| {
         match token {
@@ -243,7 +235,6 @@ fn consume_declaration_value(parser: &mut Parser, is_nested: bool, name: ~str)
 }
 
 
-// 5.3.8. Declaration-important mode
 fn consume_declaration_important(parser: &mut Parser, is_nested: bool,
                                  name: ~str, value: ~[Primitive])
         -> Option<Declaration> {
@@ -262,7 +253,6 @@ fn consume_declaration_important(parser: &mut Parser, is_nested: bool,
         consume_declaration_error(parser, is_nested);
         return None
     }
-    // 5.3.9. Declaration-end mode
     for parser.each_token |parser, token| {
         match token {
             tokens::WhiteSpace => (),
@@ -276,7 +266,6 @@ fn consume_declaration_important(parser: &mut Parser, is_nested: bool,
 }
 
 
-// 5.3.11. Next-declaration error mode
 fn consume_declaration_error(parser: &mut Parser, is_nested: bool) {
     parser.errors.push(~"Invalid declaration");
     for parser.each_token |parser, token| {
@@ -290,7 +279,6 @@ fn consume_declaration_error(parser: &mut Parser, is_nested: bool) {
 }
 
 
-// 5.4. Consume a primitive
 fn consume_primitive(parser: &mut Parser, first_token: tokens::Token)
         -> Primitive {
     match first_token {
@@ -303,9 +291,9 @@ fn consume_primitive(parser: &mut Parser, first_token: tokens::Token)
         tokens::URL(string) => URL(string),
         tokens::BadURL => BadURL,
         tokens::Delim(ch) => Delim(ch),
-        tokens::Number(value, repr) => Number(value, repr),
-        tokens::Percentage(value, repr) => Percentage(value, repr),
-        tokens::Dimension(value, repr, unit) => Dimension(value, repr, unit),
+        tokens::Number(value) => Number(value),
+        tokens::Percentage(value) => Percentage(value),
+        tokens::Dimension(value, unit) => Dimension(value, unit),
         tokens::UnicodeRange{start: s, end: e} => UnicodeRange {start: s, end: e},
         tokens::EmptyUnicodeRange => EmptyUnicodeRange,
         tokens::WhiteSpace => WhiteSpace,
@@ -332,7 +320,6 @@ fn consume_primitive(parser: &mut Parser, first_token: tokens::Token)
 }
 
 
-// 5.7. Consume a simple block  (kind of)
 fn consume_simple_block(parser: &mut Parser, ending_token: tokens::Token)
         -> ~[Primitive] {
     let mut value: ~[Primitive] = ~[];
@@ -344,7 +331,6 @@ fn consume_simple_block(parser: &mut Parser, ending_token: tokens::Token)
 }
 
 
-// 5.8. Consume a function
 fn consume_function(parser: &mut Parser, name: ~str)
         -> Primitive {
     let mut current_argument: ~[Primitive] = ~[];
@@ -355,9 +341,6 @@ fn consume_function(parser: &mut Parser, name: ~str)
             tokens::Delim(',') => {
                 arguments.push(replace(&mut current_argument, ~[]));
             },
-            tokens::Number(value, repr) => current_argument.push(
-                Number(value, repr)
-            ),
             token => current_argument.push(consume_primitive(parser, token)),
         }
     }
@@ -378,7 +361,9 @@ fn test_primitives() {
 
     assert_primitives("", [], []);
     assert_primitives("42 foo([aa ()b], -){\n  }", [
-        Number(Integer(42), ~"42"), WhiteSpace,
+        Number(NumericValue{representation: ~"42", value: 42f64,
+                            int_value: Some(42)}),
+        WhiteSpace,
         Function(~"foo", ~[
             ~[SquareBraketBlock(~[
                 Ident(~"aa"), WhiteSpace, ParenthesisBlock(~[]), Ident(~"b")])],
