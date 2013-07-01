@@ -17,8 +17,6 @@ pub struct Parser {
     priv tokenizer: ~tokens::Tokenizer,
     priv current_token: Option<tokens::Token>,
     priv errors: ~[~str],
-    priv rule_filled_at_rules: ~[~str],
-    priv declaration_filled_at_rules: ~[~str],
 }
 
 
@@ -29,8 +27,6 @@ impl Parser {
             tokenizer: tokenizer,
             current_token: None,
             errors: ~[],
-            rule_filled_at_rules: ~[~"media"],
-            declaration_filled_at_rules: ~[~"page"],
         }
     }
     fn from_str(input: &str) -> ~Parser {
@@ -98,14 +94,6 @@ impl Parser {
         assert!(self.current_token.is_none());
         self.current_token = Some(token)
     }
-
-    priv fn is_rule_filled(&mut self, name: &(~str)) -> bool {
-        vec::contains(self.rule_filled_at_rules, name)
-    }
-
-    priv fn is_declaration_filled(&mut self, name: &(~str)) -> bool {
-        vec::contains(self.declaration_filled_at_rules, name)
-    }
 }
 
 
@@ -115,11 +103,8 @@ fn consume_top_level_rules(parser: &mut Parser) -> ~[Rule] {
     for parser.each_token |parser, token| {
         match token {
             tokens::WhiteSpace | tokens::CDO | tokens::CDC => (),
-            tokens::AtKeyword(name)
-            => match consume_at_rule(parser, true, name) {
-                Some(at_rule) => rules.push(AtRule(at_rule)),
-                None => ()
-            },
+            tokens::AtKeyword(name) => rules.push(
+                AtRule(consume_at_rule(parser, true, name))),
             token => {
                 parser.reconsume_token(token);
                 match consume_style_rule(parser, true) {
@@ -134,22 +119,15 @@ fn consume_top_level_rules(parser: &mut Parser) -> ~[Rule] {
 
 
 // 5.3.2. At-rule-prelude mode
-fn consume_at_rule(parser: &mut Parser, is_nested: bool, name: ~str)
-        -> Option<AtRule> {
+fn consume_at_rule(parser: &mut Parser, is_nested: bool, name: ~str) -> AtRule {
     let mut prelude: ~[Primitive] = ~[];
-    let mut value: AtRuleValue = NotFilled;
+    let mut block: Option<~[Primitive]> = None;
     for parser.each_token |parser, token| {
         match token {
             tokens::OpenCurlyBraket => {
-                value = if parser.is_rule_filled(&name) {
-                    RuleFilled(~[])
-                } else if parser.is_declaration_filled(&name) {
-                    DeclarationFilled(~[])
-                } else {
-                    parser.errors.push(
-                        fmt!("Unexpected {} block for @%s rule", name));
-                    consume_primitive(parser, token);  // Ignore the block.
-                    return None
+                match consume_primitive(parser, token) {
+                    CurlyBraketBlock(content) => block = Some(content),
+                    _ => fail!()
                 }
             },
             tokens::Semicolon => break,
@@ -158,24 +136,7 @@ fn consume_at_rule(parser: &mut Parser, is_nested: bool, name: ~str)
             _ => prelude.push(consume_primitive(parser, token)),
         }
     }
-    match value {
-        NotFilled => {
-            if parser.is_rule_filled(&name) ||
-                    !parser.is_declaration_filled(&name)  {
-                parser.errors.push(
-                    fmt!("Missing {} block for @%s rule", name));
-                None
-            } else {
-                Some(AtRule {name: name, prelude: prelude, value: NotFilled})
-            }
-        }
-        RuleFilled(_) => Some(AtRule {
-            name: name, prelude: prelude, value: RuleFilled(
-                consume_rule_block(parser))}),
-        DeclarationFilled(_) => Some(AtRule {
-            name: name, prelude: prelude, value: DeclarationFilled(
-                consume_declaration_block(parser, true))}),
-    }
+    AtRule {name: name, prelude: prelude, block: block}
 }
 
 
@@ -186,11 +147,8 @@ fn consume_rule_block(parser: &mut Parser) -> ~[Rule] {
         match token {
             tokens::WhiteSpace => (),
             tokens::CloseCurlyBraket => break,
-            tokens::AtKeyword(name)
-            => match consume_at_rule(parser, true, name) {
-                Some(at_rule) => rules.push(AtRule(at_rule)),
-                None => ()
-            },
+            tokens::AtKeyword(name) => rules.push(
+                AtRule(consume_at_rule(parser, true, name))),
             token => {
                 parser.reconsume_token(token);
                 match consume_style_rule(parser, true) {
@@ -232,11 +190,7 @@ fn consume_declaration_block(parser: &mut Parser, is_nested: bool)
         match token {
             tokens::WhiteSpace | tokens::Semicolon => (),
             tokens::CloseCurlyBraket if is_nested => break,
-            tokens::AtKeyword(name)
-            => match consume_at_rule(parser, true, name) {
-                Some(at_rule) => items.push(Decl_AtRule(at_rule)),
-                None => ()
-            },
+            tokens::AtKeyword(name) => items.push(Decl_AtRule(consume_at_rule(parser, true, name))),
             tokens::Ident(name)
             => match consume_declaration(parser, is_nested, name) {
                 Some(declaration) => items.push(Declaration(declaration)),

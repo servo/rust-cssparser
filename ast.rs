@@ -71,17 +71,8 @@ pub struct StyleRule {
 pub struct AtRule {
     name: ~str,
     prelude: ~[Primitive],
-    value: AtRuleValue,
+    block: Option<~[Primitive]>,
 }
-
-
-#[deriving(Eq)]
-pub enum AtRuleValue {
-    NotFilled,  // @foo…;
-    DeclarationFilled(~[DeclarationBlockItem]),
-    RuleFilled(~[Rule]),
-}
-
 
 #[deriving(Eq)]
 pub enum DeclarationBlockItem {
