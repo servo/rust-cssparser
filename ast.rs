@@ -7,6 +7,7 @@ pub struct NumericValue {
 
 pub impl NumericValue {
     fn new(representation: ~str, is_integer: bool) -> NumericValue {
+        // TODO: handle overflow
         NumericValue {
             int_value: if is_integer { Some(
                 // Remove any + sign as int::from_str() does not parse them.

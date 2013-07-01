@@ -439,15 +439,7 @@ fn consume_numeric_rest(tokenizer: &mut Tokenizer, initial_char: char)
             }
         }
     }
-    // TODO: handle overflow
-    let value = NumericValue {
-        // Remove any + sign as int::from_str() does not parse them.
-        int_value: if string[0] != '+' as u8 { i32::from_str(string) }
-                   else { i32::from_str(str::slice(string, 1, string.len())) },
-        value: f64::from_str(string).get(),
-        representation: string,
-    };
-    consume_numeric_end(tokenizer, value)
+    consume_numeric_end(tokenizer, NumericValue::new(string, true))
 }
 
 
@@ -463,13 +455,7 @@ fn consume_numeric_fraction(tokenizer: &mut Tokenizer, string: ~str)
             }
         }
     }
-    // TODO: handle overflow
-    let value = NumericValue {
-        value: f64::from_str(string).get(),
-        representation: string,
-        int_value: None,
-    };
-    consume_numeric_end(tokenizer, value)
+    consume_numeric_end(tokenizer, NumericValue::new(string, false))
 }
 
 
@@ -515,12 +501,7 @@ fn consume_scientific_number(tokenizer: &mut Tokenizer, string: ~str)
     while !is_eof(tokenizer) && is_match!(current_char(tokenizer), '0'..'9') {
         push_char!(string, consume_char(tokenizer))
     }
-    let value = NumericValue {
-        value: f64::from_str(string).get(),
-        representation: string,
-        int_value: None,
-    };
-    Ok(Number(value))
+    Ok(Number(NumericValue::new(string, false)))
 }
 
 
@@ -696,139 +677,4 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
 
 fn char_from_hex(hex: &[char]) -> char {
     uint::from_str_radix(str::from_chars(hex), 16).get() as char
-}
-
-
-#[test]
-fn test_tokenizer() {
-    fn assert_tokens(input: &str, expected_tokens: &[Token],
-                     expected_errors: &[~str]) {
-        let mut tokenizer = Tokenizer::from_str(input);
-        let mut tokens: ~[Token] = ~[];
-        let mut errors: ~[~str] = ~[];
-        loop {
-            let (token, err) = tokenizer.next_token();
-            match err {
-                Some(ParseError{message: message}) => errors.push(message),
-                None => (),
-            }
-            match token {
-                EOF => break,
-                token => tokens.push(token),
-            }
-        }
-        check_results(tokens, expected_tokens, errors, expected_errors)
-    }
-
-    assert_tokens("", [], []);
-    assert_tokens("?/", [Delim('?'), Delim('/')], []);
-    assert_tokens("?/* Li/*psum… */", [Delim('?')], []);
-    assert_tokens("?/* Li/*psum… *//", [Delim('?'), Delim('/')], []);
-    assert_tokens("?/* Lipsum", [Delim('?')], [~"Unclosed comment"]);
-    assert_tokens("?/*", [Delim('?')], [~"Unclosed comment"]);
-    assert_tokens("?/*/", [Delim('?')], [~"Unclosed comment"]);
-    assert_tokens("?/**/!", [Delim('?'), Delim('!')], []);
-    assert_tokens("?/**/", [Delim('?')], []);
-    assert_tokens("[?}{)", [
-        OpenSquareBraket, Delim('?'), CloseCurlyBraket,
-        OpenCurlyBraket, CloseParenthesis
-    ], []);
-
-    assert_tokens("(\n \t'Lore\\6d \"ipsu\\6D'",
-        [OpenParenthesis, WhiteSpace, String(~"Lorem\"ipsum")], []);
-    assert_tokens("'\\''", [String(~"'")], []);
-    assert_tokens("\"\\\"\"", [String(~"\"")], []);
-    assert_tokens("\"\\\"", [String(~"\"")], [~"EOF in quoted string"]);
-    assert_tokens("'\\", [BadString], [~"EOF in quoted string"]);
-    assert_tokens("\"0\\0000000\"", [String(~"0\uFFFD0")], []);
-    assert_tokens("\"0\\000000 0\"", [String(~"0\uFFFD0")], []);
-    assert_tokens("'z\n'a", [BadString, String(~"a")],
-        [~"Newline in quoted string", ~"EOF in quoted string"]);
-
-    assert_tokens("Lorem\\ ipsu\\6D dolor \\sit",
-        [Ident(~"Lorem ipsumdolor"), WhiteSpace, Ident(~"sit")], []);
-    assert_tokens("foo\\", [Ident(~"foo"), Delim('\\')], [~"Invalid escape"]);
-    assert_tokens("foo\\\nbar",
-        [Ident(~"foo"), Delim('\\'), WhiteSpace, Ident(~"bar")],
-        [~"Invalid escape"]);
-    assert_tokens("-Lipsum", [Ident(~"-Lipsum")], []);
-    assert_tokens("-L\\ïpsum", [Ident(~"-Lïpsum")], []);
-    assert_tokens("-\\Lipsum", [Ident(~"-Lipsum")], []);
-    assert_tokens("-", [Delim('-')], []);
-    assert_tokens("--Lipsum", [Delim('-'), Ident(~"-Lipsum")], []);
-    assert_tokens("-\\-Lipsum", [Ident(~"--Lipsum")], []);
-    assert_tokens("\\Lipsum", [Ident(~"Lipsum")], []);
-    assert_tokens("\\\nLipsum", [Delim('\\'), WhiteSpace, Ident(~"Lipsum")],
-        [~"Invalid escape"]);
-    assert_tokens("\\", [Delim('\\')], [~"Invalid escape"]);
-    assert_tokens("\x7f\x80\x81", [Delim('\x7F'), Ident(~"\x80\x81")], []);
-
-    assert_tokens("func()", [Function(~"func"), CloseParenthesis], []);
-    assert_tokens("func ()",
-        [Ident(~"func"), WhiteSpace, OpenParenthesis, CloseParenthesis], []);
-
-    assert_tokens("##00(#\\##\\\n#\\",
-        [Delim('#'), Hash(~"00"), OpenParenthesis, Hash(~"#"), Delim('#'),
-         Delim('\\'), WhiteSpace, Delim('#'), Delim('\\')],
-        [~"Invalid escape", ~"Invalid escape"]);
-
-    assert_tokens("@@page(@\\x@-x@-\\x@--@\\\n@\\", [
-        Delim('@'), AtKeyword(~"page"), OpenParenthesis, AtKeyword(~"x"),
-        AtKeyword(~"-x"), AtKeyword(~"-x"), Delim('@'), Delim('-'), Delim('-'),
-        Delim('@'), Delim('\\'), WhiteSpace, Delim('@'), Delim('\\')
-    ], [~"Invalid escape", ~"Invalid escape"]);
-
-    assert_tokens("<!-<!-----><",
-        [Delim('<'), Delim('!'), Delim('-'), CDO, Delim('-'), CDC, Delim('<')],
-        []);
-    assert_tokens("u+g u+fU+4?U+030-000039f U+FFFFF?U+42-42U+42-41U+42-110000",
-        [Ident(~"u"), Delim('+'), Ident(~"g"), WhiteSpace,
-         UnicodeRange {start: '\x0F', end: '\x0F'}, UnicodeRange {start: '\x40', end: '\x4F'},
-         UnicodeRange {start: '0', end: '9'}, Ident(~"f"), WhiteSpace, EmptyUnicodeRange,
-         UnicodeRange {start: 'B', end: 'B'}, EmptyUnicodeRange,
-         UnicodeRange {start: 'B', end: '\U0010FFFF'}],
-        []);
-
-    assert_tokens("url()URL()uRl()Ürl()",
-        [URL(~""), URL(~""), URL(~""), Function(~"Ürl"), CloseParenthesis],
-        []);
-    assert_tokens("url(  )url(\ta\n)url(\t'a'\n)url(\t'a'z)url(  ",
-        [URL(~""), URL(~"a"), URL(~"a"), BadURL, BadURL],
-        [~"Invalid URL syntax", ~"EOF in URL"]);
-    assert_tokens("url('a\nb')url('a", [BadURL, BadURL],
-        [~"Newline in quoted string", ~"EOF in quoted string"]);
-    assert_tokens("url(a'b)url(\x08z)url('a'", [BadURL, BadURL, BadURL],
-        [~"Invalid URL syntax", ~"Invalid URL syntax", ~"EOF in URL"]);
-    assert_tokens("url(Lorem\\ ipsu\\6D dolo\\r)url(a\nb)url(a\\\nb)",
-        [URL(~"Lorem ipsumdolor"), BadURL, BadURL],
-        [~"Invalid URL syntax", ~"Invalid URL syntax"]);
-
-//    assert_tokens("42+42-42. 1.5+1.5-1.5.5+.5-.5+-.", [
-//        Number(Integer(42), ~"42"),
-//        Number(Integer(42), ~"+42"),
-//        Number(Integer(-42), ~"-42"), Delim('.'), WhiteSpace,
-//        Number(Float(1.5), ~"1.5"),
-//        Number(Float(1.5), ~"+1.5"),
-//        Number(Float(-1.5), ~"-1.5"),
-//        Number(Float(0.5), ~".5"),
-//        Number(Float(0.5), ~"+.5"),
-//        Number(Float(-0.5), ~"-.5"), Delim('+'), Delim('-'), Delim('.')
-//    ], []);
-//    assert_tokens("42e2px 42e+2 42e-2.", [
-//        Number(Float(4200.), ~"42e2"), Ident(~"px"), WhiteSpace,
-//        Number(Float(4200.), ~"42e+2"), WhiteSpace,
-//        Number(Float(0.42), ~"42e-2"), Delim('.')
-//    ], []);
-//    assert_tokens("42%+.5%-1%", [
-//        Percentage(Integer(42), ~"42"),
-//        Percentage(Float(0.5), ~"+.5"),
-//        Percentage(Integer(-1), ~"-1"),
-//    ], []);
-//    assert_tokens("42-Px+.5\\u -1url(7-0\\", [
-//        Dimension(Integer(42), ~"42", ~"-Px"),
-//        Dimension(Float(0.5), ~"+.5", ~"u"), WhiteSpace,
-//        Dimension(Integer(-1), ~"-1", ~"url"), OpenParenthesis,
-//        Number(Integer(7), ~"7"),
-//        Number(Integer(0), ~"-0"), Delim('\\'),
-//    ], [~"Invalid escape"]);
 }

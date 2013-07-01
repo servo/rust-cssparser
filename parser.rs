@@ -354,15 +354,141 @@ fn test_primitives() {
     fn assert_primitives(input: &str, expected_primitives: &[Primitive],
                          expected_errors: &[~str]) {
         let mut parser = Parser::from_str(input);
-        check_results(
-            parser.parse_primitives(), expected_primitives,
-            parser.errors, expected_errors);
+        let result: &[Primitive] = parser.parse_primitives();
+//        assert_eq!(result, expected_primitives);
+        check_results(input, result, expected_primitives,
+                      parser.errors, expected_errors);
     }
+
+
+    assert_primitives("", [], []);
+    assert_primitives("?/", [Delim('?'), Delim('/')], []);
+    assert_primitives("?/* Li/*psum… */", [Delim('?')], []);
+    assert_primitives("?/* Li/*psum… *//", [Delim('?'), Delim('/')], []);
+    assert_primitives("?/* Lipsum", [Delim('?')], [~"Unclosed comment"]);
+    assert_primitives("?/*", [Delim('?')], [~"Unclosed comment"]);
+    assert_primitives("?/*/", [Delim('?')], [~"Unclosed comment"]);
+    assert_primitives("?/**/!", [Delim('?'), Delim('!')], []);
+    assert_primitives("?/**/", [Delim('?')], []);
+    assert_primitives("[?}{)", [
+        SquareBraketBlock(~[Delim('?'), CloseCurlyBraket,
+            CurlyBraketBlock(~[CloseParenthesis])])
+    ], []);
+
+    assert_primitives("(\n \t'Lore\\6d \"ipsu\\6D'",
+        [ParenthesisBlock(~[WhiteSpace, String(~"Lorem\"ipsum")])], []);
+    assert_primitives("'\\''", [String(~"'")], []);
+    assert_primitives("\"\\\"\"", [String(~"\"")], []);
+    assert_primitives("\"\\\"", [String(~"\"")], [~"EOF in quoted string"]);
+    assert_primitives("'\\", [BadString], [~"EOF in quoted string"]);
+    assert_primitives("\"0\\0000000\"", [String(~"0\uFFFD0")], []);
+    assert_primitives("\"0\\000000 0\"", [String(~"0\uFFFD0")], []);
+    assert_primitives("'z\n'a", [BadString, String(~"a")],
+        [~"Newline in quoted string", ~"EOF in quoted string"]);
+
+    assert_primitives("Lorem\\ ipsu\\6D dolor \\sit",
+        [Ident(~"Lorem ipsumdolor"), WhiteSpace, Ident(~"sit")], []);
+    assert_primitives("foo\\", [Ident(~"foo"), Delim('\\')], [~"Invalid escape"]);
+    assert_primitives("foo\\\nbar",
+        [Ident(~"foo"), Delim('\\'), WhiteSpace, Ident(~"bar")],
+        [~"Invalid escape"]);
+    assert_primitives("-Lipsum", [Ident(~"-Lipsum")], []);
+    assert_primitives("-L\\ïpsum", [Ident(~"-Lïpsum")], []);
+    assert_primitives("-\\Lipsum", [Ident(~"-Lipsum")], []);
+    assert_primitives("-", [Delim('-')], []);
+    assert_primitives("--Lipsum", [Delim('-'), Ident(~"-Lipsum")], []);
+    assert_primitives("-\\-Lipsum", [Ident(~"--Lipsum")], []);
+    assert_primitives("\\Lipsum", [Ident(~"Lipsum")], []);
+    assert_primitives("\\\nLipsum", [Delim('\\'), WhiteSpace, Ident(~"Lipsum")],
+        [~"Invalid escape"]);
+    assert_primitives("\\", [Delim('\\')], [~"Invalid escape"]);
+    assert_primitives("\x7f\x80\x81", [Delim('\x7F'), Ident(~"\x80\x81")], []);
+
+    assert_primitives("func()", [Function(~"func", ~[~[]])], []);
+    assert_primitives("func ()",
+        [Ident(~"func"), WhiteSpace, ParenthesisBlock(~[])], []);
+
+    assert_primitives("##00(#\\##\\\n#\\",
+        [Delim('#'), Hash(~"00"), ParenthesisBlock(~[
+            Hash(~"#"), Delim('#'),
+            Delim('\\'), WhiteSpace, Delim('#'), Delim('\\')])],
+        [~"Invalid escape", ~"Invalid escape"]);
+
+    assert_primitives("@@page(@\\x@-x@-\\x@--@\\\n@\\", [
+        Delim('@'), AtKeyword(~"page"), ParenthesisBlock(~[
+            AtKeyword(~"x"), AtKeyword(~"-x"), AtKeyword(~"-x"),
+            Delim('@'), Delim('-'), Delim('-'),
+            Delim('@'), Delim('\\'), WhiteSpace, Delim('@'), Delim('\\')])
+    ], [~"Invalid escape", ~"Invalid escape"]);
+
+    assert_primitives("<!-<!-----><",
+        [Delim('<'), Delim('!'), Delim('-'), CDO, Delim('-'), CDC, Delim('<')],
+        []);
+    assert_primitives("u+g u+fU+4?U+030-000039f U+FFFFF?U+42-42U+42-41U+42-110000",
+        [Ident(~"u"), Delim('+'), Ident(~"g"), WhiteSpace,
+         UnicodeRange {start: '\x0F', end: '\x0F'}, UnicodeRange {start: '\x40', end: '\x4F'},
+         UnicodeRange {start: '0', end: '9'}, Ident(~"f"), WhiteSpace, EmptyUnicodeRange,
+         UnicodeRange {start: 'B', end: 'B'}, EmptyUnicodeRange,
+         UnicodeRange {start: 'B', end: '\U0010FFFF'}],
+        []);
+
+    assert_primitives("url()URL()uRl()Ürl()",
+        [URL(~""), URL(~""), URL(~""), Function(~"Ürl", ~[~[]])],
+        []);
+    assert_primitives("url(  )url(\ta\n)url(\t'a'\n)url(\t'a'z)url(  ",
+        [URL(~""), URL(~"a"), URL(~"a"), BadURL, BadURL],
+        [~"Invalid URL syntax", ~"EOF in URL"]);
+    assert_primitives("url('a\nb')url('a", [BadURL, BadURL],
+        [~"Newline in quoted string", ~"EOF in quoted string"]);
+    assert_primitives("url(a'b)url(\x08z)url('a'", [BadURL, BadURL, BadURL],
+        [~"Invalid URL syntax", ~"Invalid URL syntax", ~"EOF in URL"]);
+    assert_primitives("url(Lorem\\ ipsu\\6D dolo\\r)url(a\nb)url(a\\\nb)",
+        [URL(~"Lorem ipsumdolor"), BadURL, BadURL],
+        [~"Invalid URL syntax", ~"Invalid URL syntax"]);
+
+    macro_rules! Integer(
+        ($value:expr, $repr:expr) => (NumericValue {
+            value: $value as f64, int_value: Some($value), representation: $repr });
+    )
+
+    macro_rules! Float(
+        ($value:expr, $repr:expr) => (NumericValue {
+            value: $value, int_value: None, representation: $repr });
+    )
+
+    assert_primitives("42+42-42. 1.5+1.5-1.5.5+.5-.5+-.", [
+        Number(Integer!(42, ~"42")),
+        Number(Integer!(42, ~"+42")),
+        Number(Integer!(-42, ~"-42")), Delim('.'), WhiteSpace,
+        Number(Float!(1.5, ~"1.5")),
+        Number(Float!(1.5, ~"+1.5")),
+        Number(Float!(-1.5, ~"-1.5")),
+        Number(Float!(0.5, ~".5")),
+        Number(Float!(0.5, ~"+.5")),
+        Number(Float!(-0.5, ~"-.5")), Delim('+'), Delim('-'), Delim('.')
+    ], []);
+    assert_primitives("42e2px 42e+2 42e-2.", [
+        Number(Float!(4200., ~"42e2")), Ident(~"px"), WhiteSpace,
+        Number(Float!(4200., ~"42e+2")), WhiteSpace,
+        Number(Float!(0.42, ~"42e-2")), Delim('.')
+    ], []);
+    assert_primitives("42%+.5%-1%", [
+        Percentage(Integer!(42, ~"42")),
+        Percentage(Float!(0.5, ~"+.5")),
+        Percentage(Integer!(-1, ~"-1")),
+    ], []);
+    assert_primitives("42-Px+.5\\u -1url(7-0\\", [
+        Dimension(Integer!(42, ~"42"), ~"-Px"),
+        Dimension(Float!(0.5, ~"+.5"), ~"u"), WhiteSpace,
+        Dimension(Integer!(-1, ~"-1"), ~"url"), ParenthesisBlock(~[
+            Number(Integer!(7, ~"7")),
+            Number(Integer!(0, ~"-0")), Delim('\\'),
+        ]),
+    ], [~"Invalid escape"]);
 
     assert_primitives("", [], []);
     assert_primitives("42 foo([aa ()b], -){\n  }", [
-        Number(NumericValue{representation: ~"42", value: 42f64,
-                            int_value: Some(42)}),
+        Number(Integer!(42, ~"42")),
         WhiteSpace,
         Function(~"foo", ~[
             ~[SquareBraketBlock(~[
@@ -381,7 +507,7 @@ fn test_declarations() {
             expected_errors: &[~str]) {
         let mut parser = Parser::from_str(input);
         check_results(
-            parser.parse_declarations(), expected_declarations,
+            input, parser.parse_declarations(), expected_declarations,
             parser.errors, expected_errors);
     }
     fn decl(name: ~str, value: ~[Primitive]) -> DeclarationBlockItem {
