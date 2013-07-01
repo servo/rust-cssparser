@@ -108,7 +108,7 @@ fn consume_top_level_rules(parser: &mut Parser) -> ~[Rule] {
             token => {
                 parser.reconsume_token(token);
                 match consume_style_rule(parser, true) {
-                    Some(style_rule) => rules.push(StyleRule(style_rule)),
+                    Some(style_rule) => rules.push(QualifiedRule(style_rule)),
                     None => (),
                 }
             }
@@ -124,12 +124,8 @@ fn consume_at_rule(parser: &mut Parser, is_nested: bool, name: ~str) -> AtRule {
     let mut block: Option<~[Primitive]> = None;
     for parser.each_token |parser, token| {
         match token {
-            tokens::OpenCurlyBraket => {
-                match consume_primitive(parser, token) {
-                    CurlyBraketBlock(content) => block = Some(content),
-                    _ => fail!()
-                }
-            },
+            tokens::OpenCurlyBraket => block = Some(
+                consume_simple_block(parser, tokens::CloseCurlyBraket)),
             tokens::Semicolon => break,
             tokens::CloseCurlyBraket if is_nested
                 => { parser.reconsume_token(token); break }
@@ -152,7 +148,7 @@ fn consume_rule_block(parser: &mut Parser) -> ~[Rule] {
             token => {
                 parser.reconsume_token(token);
                 match consume_style_rule(parser, true) {
-                    Some(style_rule) => rules.push(StyleRule(style_rule)),
+                    Some(style_rule) => rules.push(QualifiedRule(style_rule)),
                     None => (),
                 }
             }
@@ -163,18 +159,18 @@ fn consume_rule_block(parser: &mut Parser) -> ~[Rule] {
 
 
 // 5.3.4. Selector mode
-fn consume_style_rule(parser: &mut Parser, is_nested: bool) -> Option<StyleRule> {
-    let mut selector: ~[Primitive] = ~[];
+fn consume_style_rule(parser: &mut Parser, is_nested: bool) -> Option<QualifiedRule> {
+    let mut prelude: ~[Primitive] = ~[];
     for parser.each_token |parser, token| {
         match token {
             tokens::OpenCurlyBraket => {
-                return Some(StyleRule{
-                    selector: replace(&mut selector, ~[]),
-                    value: consume_declaration_block(parser, true)})
+                return Some(QualifiedRule{
+                    prelude: replace(&mut prelude, ~[]),
+                    block: consume_simple_block(parser, tokens::CloseCurlyBraket)})
             },
             tokens::CloseCurlyBraket if is_nested
                 => { parser.reconsume_token(token); break }
-            _ => selector.push(consume_primitive(parser, token)),
+            _ => prelude.push(consume_primitive(parser, token)),
         }
     }
     parser.errors.push(~"Missing {} block for style rule");

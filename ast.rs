@@ -62,9 +62,9 @@ pub struct Declaration {
 }
 
 #[deriving(Eq)]
-pub struct StyleRule {
-    selector: ~[Primitive],
-    value: ~[DeclarationBlockItem],
+pub struct QualifiedRule {
+    prelude: ~[Primitive],
+    block: ~[Primitive],
 }
 
 #[deriving(Eq)]
@@ -83,6 +83,6 @@ pub enum DeclarationBlockItem {
 
 #[deriving(Eq)]
 pub enum Rule {
-    StyleRule(StyleRule),
+    QualifiedRule(QualifiedRule),
     AtRule(AtRule),
 }
