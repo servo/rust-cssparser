@@ -306,7 +306,7 @@ fn consume_primitive(parser: &mut Parser, first_token: tokens::Token)
         tokens::Number(value, repr) => Number(value, repr),
         tokens::Percentage(value, repr) => Percentage(value, repr),
         tokens::Dimension(value, repr, unit) => Dimension(value, repr, unit),
-        tokens::UnicodeRange(start, end) => UnicodeRange(start, end),
+        tokens::UnicodeRange{start: s, end: e} => UnicodeRange {start: s, end: e},
         tokens::EmptyUnicodeRange => EmptyUnicodeRange,
         tokens::WhiteSpace => WhiteSpace,
         tokens::Colon => Colon,

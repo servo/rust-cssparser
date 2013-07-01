@@ -29,11 +29,13 @@ pub enum Primitive {
     Number(NumericValue, ~str),  // value, representation
     Percentage(NumericValue, ~str),  // value, representation
     Dimension(NumericValue, ~str, ~str),  // value, representation, unit
-    UnicodeRange(char, char),  // start, end
+    UnicodeRange {start: char, end: char},
     EmptyUnicodeRange,
     WhiteSpace,
     Colon,  // :
     Semicolon,  // ;
+    CDO,  // <!--
+    CDC,  // -->
 
     // Function
     Function(~str, ~[~[Primitive]]),  // name, arguments
@@ -46,8 +48,6 @@ pub enum Primitive {
     // These are alwas invalid
     BadURL,
     BadString,
-    CDO,  // <!--
-    CDC,  // -->
     CloseParenthesis, // )
     CloseSquareBraket, // ]
     CloseCurlyBraket, // }

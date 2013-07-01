@@ -49,7 +49,6 @@ pub struct Tokenizer {
 #[deriving(Eq)]
 pub enum Token {
     Ident(~str),
-    Function(~str),
     AtKeyword(~str),
     Hash(~str),
     String(~str),
@@ -60,19 +59,22 @@ pub enum Token {
     Number(NumericValue, ~str),  // value, representation
     Percentage(NumericValue, ~str),  // value, representation
     Dimension(NumericValue, ~str, ~str),  // value, representation, unit
-    UnicodeRange(char, char),  // start, end
+    UnicodeRange {start: char, end: char},
     EmptyUnicodeRange,
     WhiteSpace,
     CDO,  // <!--
     CDC,  // -->
     Colon,  // :
     Semicolon,  // ;
-    OpenParenthesis, // (
-    OpenSquareBraket, // [
-    OpenCurlyBraket, // {
     CloseParenthesis, // )
     CloseSquareBraket, // ]
     CloseCurlyBraket, // }
+
+    // Non-preserved tokens
+    Function(~str),
+    OpenParenthesis, // (
+    OpenSquareBraket, // [
+    OpenCurlyBraket, // {
     EOF,
 }
 
@@ -666,7 +668,7 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer)
         EmptyUnicodeRange
     } else {
         let end = if end <= MAX_UNICODE { end } else { MAX_UNICODE };
-        UnicodeRange(start, end)
+        UnicodeRange {start: start, end: end}
     }, None)
 }
 
@@ -792,10 +794,10 @@ fn test_tokenizer() {
         []);
     assert_tokens("u+g u+fU+4?U+030-000039f U+FFFFF?U+42-42U+42-41U+42-110000",
         [Ident(~"u"), Delim('+'), Ident(~"g"), WhiteSpace,
-         UnicodeRange('\x0F', '\x0F'), UnicodeRange('\x40', '\x4F'),
-         UnicodeRange('0', '9'), Ident(~"f"), WhiteSpace, EmptyUnicodeRange,
-         UnicodeRange('B', 'B'), EmptyUnicodeRange,
-         UnicodeRange('B', '\U0010FFFF')],
+         UnicodeRange {start: '\x0F', end: '\x0F'}, UnicodeRange {start: '\x40', end: '\x4F'},
+         UnicodeRange {start: '0', end: '9'}, Ident(~"f"), WhiteSpace, EmptyUnicodeRange,
+         UnicodeRange {start: 'B', end: 'B'}, EmptyUnicodeRange,
+         UnicodeRange {start: 'B', end: '\U0010FFFF'}],
         []);
 
     assert_tokens("url()URL()uRl()Ürl()",
