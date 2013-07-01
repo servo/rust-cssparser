@@ -125,7 +125,6 @@ pub enum Rule {
 
 pub struct Parser {
     priv tokenizer: ~tokens::Tokenizer,
-    priv quirks_mode: bool,
     priv current_token: Option<tokens::Token>,
     priv errors: ~[~str],
     priv rule_filled_at_rules: ~[~str],
@@ -135,21 +134,17 @@ pub struct Parser {
 
 impl Parser {
     fn from_tokenizer(
-            tokenizer: ~tokens::Tokenizer, quirks_mode: bool) -> ~Parser {
+            tokenizer: ~tokens::Tokenizer) -> ~Parser {
         ~Parser {
             tokenizer: tokenizer,
-            quirks_mode: quirks_mode,
             current_token: None,
             errors: ~[],
             rule_filled_at_rules: ~[~"media"],
             declaration_filled_at_rules: ~[~"page"],
         }
     }
-    fn from_str(input: &str, transform_function_whitespace: bool,
-                      quirks_mode: bool) -> ~Parser {
-        Parser::from_tokenizer(
-            tokens::Tokenizer::from_str(input, transform_function_whitespace),
-            quirks_mode)
+    fn from_str(input: &str) -> ~Parser {
+        Parser::from_tokenizer(tokens::Tokenizer::from_str(input))
     }
 
     // Consume the whole input and return a list of primitives.
@@ -401,7 +396,7 @@ fn consume_declaration_value(parser: &mut Parser, is_nested: bool, name: ~str)
                     parser, is_nested, replace(&mut name, ~""),
                     replace(&mut value, ~[]))
             },
-            _ => value.push(consume_value_primitive(parser, name, token)),
+            _ => value.push(consume_primitive(parser, token)),
         }
     }
     Some(Declaration{name: name, value: value, important: false})
@@ -497,93 +492,6 @@ fn consume_primitive(parser: &mut Parser, first_token: tokens::Token)
 }
 
 
-// 5.5. Consume a primitive with the hashless color quirk
-static HASHLESS_COLOR_QUIRK: &'static[&'static str] = &[
-    &"background-color",
-    &"border-color",
-    &"border-top-color",
-    &"border-right-color",
-    &"border-bottom-color",
-    &"border-left-color",
-    &"color",
-];
-
-// 5.6. Consume a primitive with the unitless length quirk
-static UNITLESS_LENGTH_QUIRK: &'static[&'static str] = &[
-    &"border-top-width",
-    &"border-right-width",
-    &"border-bottom-width",
-    &"border-left-width",
-    &"border-width",
-    &"bottom",
-    &"font-size",
-    &"height",
-    &"left",
-    &"letter-spacing",
-    &"margin",
-    &"margin-right",
-    &"margin-left",
-    &"margin-top",
-    &"margin-bottom",
-    &"padding",
-    &"padding-top",
-    &"padding-right",
-    &"padding-bottom",
-    &"padding-left",
-    &"right",
-    &"top",
-    &"width",
-    &"word-spacing",
-];
-
-fn consume_value_primitive(parser: &mut Parser, name: &str, token: tokens::Token)
-        -> Primitive {
-    if !parser.quirks_mode {
-        return consume_primitive(parser, token)
-    }
-    #[inline(always)]
-    fn contains(haystack: &[&str], needle: &(&str)) -> bool {
-        // TODO: This is a O(n) linear search. We can probably do better.
-        vec::contains(haystack, needle)
-    }
-    #[inline(always)]
-    fn is_hex_color(value: &str) -> bool {
-        match value.len() {
-            3 | 6 => (),
-            _ => return false
-        }
-        for str::each_char(value) |ch| {
-            match ch {
-                '0'..'9' | 'a'..'f' | 'A'..'F' => (),
-                _ => return false
-            }
-        }
-        true
-    }
-    match token {
-        tokens::Number(value, repr) => {
-            let name: &str = ascii_lower(name);
-            if is_hex_color(repr) && contains(HASHLESS_COLOR_QUIRK, &name) {
-                Hash(repr)
-            } else if contains(UNITLESS_LENGTH_QUIRK, &name) {
-                Dimension(value, repr, ~"px")
-            } else {
-                Number(value, repr)
-            }
-        }
-        tokens::Dimension(value, repr, unit) => {
-            let name: &str = ascii_lower(name);
-            let color = repr + unit;
-            if is_hex_color(color) && contains(HASHLESS_COLOR_QUIRK, &name) {
-                Hash(color)
-            } else {
-                Dimension(value, repr, unit)
-            }
-        }
-        token => consume_primitive(parser, token)
-    }
-}
-
 // 5.7. Consume a simple block  (kind of)
 fn consume_simple_block(parser: &mut Parser, ending_token: tokens::Token)
         -> ~[Primitive] {
@@ -608,13 +516,7 @@ fn consume_function(parser: &mut Parser, name: ~str)
                 arguments.push(replace(&mut current_argument, ~[]));
             },
             tokens::Number(value, repr) => current_argument.push(
-                if parser.quirks_mode && ascii_lower(name) == ~"rect" {
-                    // 5.6. Consume a primitive
-                    // with the unitless length quirk
-                    Dimension(value, repr, ~"px")
-                } else {
-                    Number(value, repr)
-                }
+                Number(value, repr)
             ),
             token => current_argument.push(consume_primitive(parser, token)),
         }
@@ -626,17 +528,16 @@ fn consume_function(parser: &mut Parser, name: ~str)
 
 #[test]
 fn test_primitives() {
-    fn assert_primitives(
-            input: &str, quirks_mode: bool,
-            expected_primitives: &[Primitive], expected_errors: &[~str]) {
-        let mut parser = Parser::from_str(input, false, quirks_mode);
+    fn assert_primitives(input: &str, expected_primitives: &[Primitive],
+                         expected_errors: &[~str]) {
+        let mut parser = Parser::from_str(input);
         check_results(
             parser.parse_primitives(), expected_primitives,
             parser.errors, expected_errors);
     }
 
-    assert_primitives("", false, [], []);
-    assert_primitives("42 foo([aa ()b], -){\n  }", false, [
+    assert_primitives("", [], []);
+    assert_primitives("42 foo([aa ()b], -){\n  }", [
         Number(Integer(42), ~"42"), WhiteSpace,
         Function(~"foo", ~[
             ~[SquareBraketBlock(~[
@@ -644,40 +545,16 @@ fn test_primitives() {
             ~[WhiteSpace, Delim('-')]]),
         CurlyBraketBlock(~[
             WhiteSpace])], []);
-    assert_primitives(
-        "'foo", false, [String(~"foo")], [~"EOF in quoted string"]);
-    // Without quirks mode, for reference
-    assert_primitives("rgba(1,2%)rect(1,2%)Rect(1,2%)Réct(1,2%)", false, [
-        Function(~"rgba", ~[~[Number(Integer(1), ~"1")],
-                            ~[Percentage(Integer(2), ~"2")]]),
-        Function(~"rect", ~[~[Number(Integer(1), ~"1")],
-                            ~[Percentage(Integer(2), ~"2")]]),
-        Function(~"Rect", ~[~[Number(Integer(1), ~"1")],
-                            ~[Percentage(Integer(2), ~"2")]]),
-        Function(~"Réct", ~[~[Number(Integer(1), ~"1")],
-                            ~[Percentage(Integer(2), ~"2")]]),
-    ], []);
-    // With quirks mode
-    assert_primitives("rgba(1,2%)rect(1,2%)Rect(1,2%)Réct(1,2%)", true, [
-        Function(~"rgba", ~[~[Number(Integer(1), ~"1")],
-                            ~[Percentage(Integer(2), ~"2")]]),
-        Function(~"rect", ~[~[Dimension(Integer(1), ~"1", ~"px")],
-                            ~[Percentage(Integer(2), ~"2")]]),
-        Function(~"Rect", ~[~[Dimension(Integer(1), ~"1", ~"px")],
-                            ~[Percentage(Integer(2), ~"2")]]),
-        Function(~"Réct", ~[~[Number(Integer(1), ~"1")],
-                            ~[Percentage(Integer(2), ~"2")]]),
-    ], []);
+    assert_primitives("'foo", [String(~"foo")], [~"EOF in quoted string"]);
 }
 
 
 #[test]
 fn test_declarations() {
     fn assert_declarations(
-            input: &str, quirks_mode: bool,
-            expected_declarations: &[DeclarationBlockItem],
+            input: &str, expected_declarations: &[DeclarationBlockItem],
             expected_errors: &[~str]) {
-        let mut parser = Parser::from_str(input, false, quirks_mode);
+        let mut parser = Parser::from_str(input);
         check_results(
             parser.parse_declarations(), expected_declarations,
             parser.errors, expected_errors);
@@ -689,67 +566,31 @@ fn test_declarations() {
         Declaration(Declaration{name: name, value: value, important: true})
     }
 
-    assert_declarations("", false, [], []);
-    assert_declarations("", true, [], []);
-    assert_declarations(" \n  ;; ", false, [], []);
-    assert_declarations("color", false, [], [~"Invalid declaration"]);
-    assert_declarations("color/ red", false, [], [~"Invalid declaration"]);
-    assert_declarations("/**/ color:", false, [decl(~"color", ~[])], []);
-    assert_declarations("a /{(;);}b; c:d", false,
+    assert_declarations("", [], []);
+    assert_declarations(" \n  ;; ", [], []);
+    assert_declarations("color", [], [~"Invalid declaration"]);
+    assert_declarations("color/ red", [], [~"Invalid declaration"]);
+    assert_declarations("/**/ color:", [decl(~"color", ~[])], []);
+    assert_declarations("a /{(;);}b; c:d",
         [decl(~"c", ~[Ident(~"d")])], [~"Invalid declaration"]);
-    assert_declarations("color /**/: black,red; ;", false,
+    assert_declarations("color /**/: black,red; ;",
         [decl(~"color", ~[
             WhiteSpace, Ident(~"black"), Delim(','), Ident(~"red")
         ])], []);
 
     // !important
-    assert_declarations("a:!important /**/; b:c!IMPORTant", false,
+    assert_declarations("a:!important /**/; b:c!IMPORTant",
         [important(~"a", ~[]), important(~"b", ~[Ident(~"c")])], []);
-    assert_declarations("a:!important b:c", false,
+    assert_declarations("a:!important b:c",
         [], [~"Invalid declaration"]);
-    assert_declarations("a:!important} b:c", false,
+    assert_declarations("a:!important} b:c",
         [], [~"Invalid declaration"]);
-    assert_declarations("a:!stuff; a:!!;a:!", false, [], [
+    assert_declarations("a:!stuff; a:!!;a:!", [], [
         ~"Invalid declaration", ~"Invalid declaration", ~"Invalid declaration"
     ]);
     // XXX See http://lists.w3.org/Archives/Public/www-style/2013Jan/0491.html
     assert_declarations(
-        "a:! important; a:!/**/important;a:!/**/ important", false,
+        "a:! important; a:!/**/important;a:!/**/ important",
         [important(~"a", ~[]), important(~"a", ~[]), important(~"a", ~[])],
         []);
-
-    // Without quirks mode, for reference
-    assert_declarations("TOP:12; bottom:1.5; size:42", false, [
-        decl(~"TOP", ~[Number(Integer(12), ~"12")]),
-        decl(~"bottom", ~[Number(Float(1.5), ~"1.5")]),
-        decl(~"size", ~[Number(Integer(42), ~"42")]),
-    ], []);
-    assert_declarations("color:012;Color:0f2;bORDER-color:123456", false, [
-        decl(~"color", ~[Number(Integer(12), ~"012")]),
-        decl(~"Color", ~[Dimension(Integer(0), ~"0", ~"f2")]),
-        decl(~"bORDER-color", ~[Number(Integer(123456), ~"123456")]),
-    ], []);
-    assert_declarations("color:0123;color:0g2", false, [  // Not 3 or 6 hex
-        decl(~"color", ~[Number(Integer(123), ~"0123")]),
-        decl(~"color", ~[Dimension(Integer(0), ~"0", ~"g2")]),
-    ], []);
-    assert_declarations("fill:123", false,  // Not in the list
-        [decl(~"fill", ~[Number(Integer(123), ~"123")])], []);
-    // Quirks mode
-    assert_declarations("TOP:12; bottom:1.5; size:42", true, [
-        decl(~"TOP", ~[Dimension(Integer(12), ~"12", ~"px")]),
-        decl(~"bottom", ~[Dimension(Float(1.5), ~"1.5", ~"px")]),
-        decl(~"size", ~[Number(Integer(42), ~"42")]),
-    ], []);
-    assert_declarations("color:012;Color:0f2;bORDER-color:123456", true, [
-        decl(~"color", ~[Hash(~"012")]),
-        decl(~"Color", ~[Hash(~"0f2")]),
-        decl(~"bORDER-color", ~[Hash(~"123456")]),
-    ], []);
-    assert_declarations("color:0123;color:0g2", true, [  // Not 3 or 6 hex
-        decl(~"color", ~[Number(Integer(123), ~"0123")]),
-        decl(~"color", ~[Dimension(Integer(0), ~"0", ~"g2")]),
-    ], []);
-    assert_declarations("fill:123", true,  // Not in the list
-        [decl(~"fill", ~[Number(Integer(123), ~"123")])], []);
 }

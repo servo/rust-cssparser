@@ -23,14 +23,13 @@ use super::parser::{NumericValue,Float,Integer,ParseError};
 
 
 pub impl Tokenizer {
-    fn from_str(input: &str, transform_function_whitespace: bool)
+    fn from_str(input: &str)
             -> ~Tokenizer {
         let input = preprocess(input);
         ~Tokenizer {
             length: input.len(),
             input: input,
             position: 0,
-            transform_function_whitespace: transform_function_whitespace
         }
     }
 
@@ -41,7 +40,6 @@ pub impl Tokenizer {
 
 
 pub struct Tokenizer {
-    priv transform_function_whitespace: bool,
     priv input: ~str,
     priv length: uint,  // Counted in bytes, not characters
     priv position: uint,  // Counted in bytes, not characters
@@ -331,11 +329,6 @@ fn consume_ident(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>) {
         Some(string) => {
             if is_eof(tokenizer) { return (Ident(string), None) }
             match current_char(tokenizer) {
-                '\t' | '\n' | '\x0C' | ' '
-                        if tokenizer.transform_function_whitespace => {
-                    tokenizer.position += 1;
-                    handle_transform_function_whitespace(tokenizer, string)
-                }
                 '(' => {
                     tokenizer.position += 1;
                     if ascii_lower(string) == ~"url" { consume_url(tokenizer) }
@@ -388,22 +381,6 @@ fn consume_ident_string_rest(tokenizer: &mut Tokenizer) -> ~str {
         push_char!(string, next_char)
     }
     string
-}
-
-
-// 4.4.11. Transform-function-whitespace state
-fn handle_transform_function_whitespace(tokenizer: &mut Tokenizer, string: ~str)
-        -> (Token, Option<ParseError>) {
-    while !is_eof(tokenizer) {
-        match current_char(tokenizer) {
-            '\t' | '\n' | '\x0C' | ' ' => tokenizer.position += 1,
-            '(' => { tokenizer.position += 1; return (Function(string), None) }
-            _ => break,
-        }
-    }
-    // Go back for one whitespace character.
-    tokenizer.position -= 1;
-    (Ident(string), None)
 }
 
 
@@ -734,15 +711,7 @@ fn char_from_hex(hex: &[char]) -> char {
 fn test_tokenizer() {
     fn assert_tokens(input: &str, expected_tokens: &[Token],
                      expected_errors: &[~str]) {
-        assert_tokens_flags(
-            input, false, expected_tokens, expected_errors)
-    }
-
-    fn assert_tokens_flags(
-            input: &str, transform_function_whitespace: bool,
-            expected_tokens: &[Token], expected_errors: &[~str]) {
-        let mut tokenizer = Tokenizer::from_str(
-            input, transform_function_whitespace);
+        let mut tokenizer = Tokenizer::from_str(input);
         let mut tokens: ~[Token] = ~[];
         let mut errors: ~[~str] = ~[];
         loop {
@@ -805,8 +774,6 @@ fn test_tokenizer() {
     assert_tokens("func()", [Function(~"func"), CloseParenthesis], []);
     assert_tokens("func ()",
         [Ident(~"func"), WhiteSpace, OpenParenthesis, CloseParenthesis], []);
-    assert_tokens_flags("func ()", true,
-        [Function(~"func"), CloseParenthesis], []);
 
     assert_tokens("##00(#\\##\\\n#\\",
         [Delim('#'), Hash(~"00"), OpenParenthesis, Hash(~"#"), Delim('#'),
