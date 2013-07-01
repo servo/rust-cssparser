@@ -19,7 +19,7 @@
 
 
 use super::utils::*;
-use super::parser::{NumericValue,Float,Integer,ParseError};
+use super::ast::{NumericValue,Float,Integer};
 
 
 pub impl Tokenizer {

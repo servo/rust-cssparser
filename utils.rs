@@ -1,3 +1,13 @@
+// When reporting these errors to the user, the application is expected
+// to show the source filename/URL/location in addition to line and column.
+pub struct ParseError {
+    message: ~str,
+    // TODO: add these:
+//    source_line: uint,
+//    source_column: uint,
+}
+
+
 pub fn ascii_lower(string: &str) -> ~str {
     // Warning: premature optimization ahead ;)
     // TODO: would it be more efficient to work on bytes,
