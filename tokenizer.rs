@@ -86,9 +86,10 @@ static MAX_UNICODE: char = '\U0010FFFF';
 // 3.2.1. Preprocessing the input stream
 fn preprocess(input: &str) -> ~str {
     // TODO: Is this faster if done in one pass?
-    str::replace(str::replace(str::replace(input,
+    str::replace(str::replace(str::replace(str::replace(input,
     "\r\n", "\n"),
     "\r", "\n"),
+    "\x0C", "\n"),
     "\x00", "\uFFFD")
 }
 
@@ -164,7 +165,7 @@ macro_rules! is_match(
 #[inline(always)]
 fn is_invalid_escape(tokenizer: &mut Tokenizer) -> bool {
     match next_n_chars(tokenizer, 2) {
-        ['\\', '\n'] | ['\\', '\x0C'] | ['\\'] => true,
+        ['\\', '\n'] | ['\\'] => true,
         _ => false,
     }
 }
@@ -233,10 +234,10 @@ fn consume_token(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>) {
         _ if c >= '\x80' => consume_ident(tokenizer),  // Non-ASCII
         _ => {
             match consume_char(tokenizer) {
-                '\t' | '\n' | '\x0C' | ' ' => {
+                '\t' | '\n' | ' ' => {
                     while !is_eof(tokenizer) {
                         match current_char(tokenizer) {
-                            '\t' | '\n' | '\x0C' | ' '
+                            '\t' | '\n' | ' '
                                 => tokenizer.position += 1,
                             _ => break,
                         }
@@ -271,13 +272,13 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool)
         match consume_char(tokenizer) {
             '"' if !single_quote => return (String(string), None),
             '\'' if single_quote => return (String(string), None),
-            '\n' | '\x0C' => {
+            '\n' => {
                 return error_token(BadString, ~"Newline in quoted string");
             },
             '\\' => {
                 match next_n_chars(tokenizer, 1) {
                     // Quoted newline
-                    ['\n'] | ['\x0C'] => tokenizer.position += 1,
+                    ['\n'] => tokenizer.position += 1,
                     [] =>
                         return error_token(BadString, ~"EOF in quoted string"),
                     _ => push_char!(string, consume_escape(tokenizer))
@@ -527,7 +528,7 @@ fn consume_scientific_number(tokenizer: &mut Tokenizer, string: ~str)
 fn consume_url(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>) {
     while !is_eof(tokenizer) {
         match current_char(tokenizer) {
-            '\t' | '\n' | '\x0C' | ' ' => tokenizer.position += 1,
+            '\t' | '\n' | ' ' => tokenizer.position += 1,
             '"' => return consume_quoted_url(tokenizer, false),
             '\'' => return consume_quoted_url(tokenizer, true),
             ')' => { tokenizer.position += 1; return (URL(~""), None) },
@@ -564,7 +565,7 @@ fn consume_url_end(tokenizer: &mut Tokenizer, string: ~str)
         -> (Token, Option<ParseError>) {
     while !is_eof(tokenizer) {
         match consume_char(tokenizer) {
-            '\t' | '\n' | '\x0C' | ' ' => (),
+            '\t' | '\n' | ' ' => (),
             ')' => return (URL(string), None),
             _ => return consume_bad_url(tokenizer)
         }
@@ -578,13 +579,13 @@ fn consume_unquoted_url(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>
     let mut string = ~"";
     while !is_eof(tokenizer) {
         let next_char = match consume_char(tokenizer) {
-            '\t' | '\n' | '\x0C' | ' '
+            '\t' | '\n' | ' '
                 => return consume_url_end(tokenizer, string),
             ')' => return (URL(string), None),
             '\x00'..'\x08' | '\x0E'..'\x1F' | '\x7F'..'\x9F'  // non-printable
                 | '"' | '\'' | '(' => return consume_bad_url(tokenizer),
             '\\' => match next_n_chars(tokenizer, 1) {
-                ['\n'] | ['\x0C'] | [] => return consume_bad_url(tokenizer),
+                ['\n'] | [] => return consume_bad_url(tokenizer),
                 _ => consume_escape(tokenizer)
             },
             c => c
@@ -689,7 +690,7 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
             }
             if !is_eof(tokenizer) {
                 match current_char(tokenizer) {
-                    '\t' | '\n' | '\x0C' | ' ' => tokenizer.position += 1,
+                    '\t' | '\n' | ' ' => tokenizer.position += 1,
                     _ => ()
                 }
             }
