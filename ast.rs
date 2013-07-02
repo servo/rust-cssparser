@@ -1,3 +1,6 @@
+use std::{f64, i32};
+
+
 #[deriving(Eq)]
 pub struct NumericValue {
     representation: ~str,
@@ -5,8 +8,8 @@ pub struct NumericValue {
     int_value: Option<i32>,
 }
 
-pub impl NumericValue {
-    fn new(representation: ~str, is_integer: bool) -> NumericValue {
+impl NumericValue {
+    pub fn new(representation: ~str, is_integer: bool) -> NumericValue {
         // TODO: handle overflow
         NumericValue {
             int_value: if is_integer { Some(
@@ -14,8 +17,7 @@ pub impl NumericValue {
                 if representation[0] != '+' as u8 {
                     i32::from_str(representation)
                 } else {
-                    i32::from_str(str::slice(
-                        representation, 1, representation.len()))
+                    i32::from_str(representation.slice_from(1))
                 }.get()
             )} else { None },
             value: f64::from_str(representation).get(),

@@ -12,7 +12,7 @@ pub fn ascii_lower(string: &str) -> ~str {
     // Warning: premature optimization ahead ;)
     // TODO: would it be more efficient to work on bytes,
     // without decoding/re-encoding UTF-8?
-    do str::map(string) |c| {
+    do string.map_chars |c| {
         match c {
             'A'..'Z' => c + ASCII_LOWER_OFFSET,
             _ => c,
@@ -21,13 +21,13 @@ pub fn ascii_lower(string: &str) -> ~str {
 }
 
 #[cfg(test)]
-pub fn check_results<T: cmp::Eq, E: cmp::Eq>(
+pub fn check_results<T: Eq, E: Eq>(
         input: &str, results: &[T], expected: &[T],
         errors: &[E], expected_errors: &[E]) {
     assert_vec_equals("Results", results, expected, input);
     assert_vec_equals("Errors", errors, expected_errors, input);
 
-    fn assert_vec_equals<T: cmp::Eq>(
+    fn assert_vec_equals<T: Eq>(
             message: &str, results: &[T], expected: &[T], input: &str) {
         let len_r = results.len();
         let len_e = expected.len();
@@ -40,7 +40,7 @@ pub fn check_results<T: cmp::Eq, E: cmp::Eq>(
                 input))
         }
         let mut i = 0u;
-        for vec::each2(results, expected) |a, b| {
+        for results.iter().zip(expected.iter()).advance |(a, b)| {
             if a != b {
                 fail!(fmt!("\n%s at index %u:\n%?\n!=\n%?\nInput:\n%?\n",
                            message, i, a, b, input))

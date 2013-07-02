@@ -17,7 +17,8 @@
 // composed of one or more characters.
 // Unicode-range tokens have a range of characters.
 
-extern mod core;
+extern mod extra;
+use std::{str, u32, vec};
 use super::utils::*;
 use super::ast::*;
 
@@ -40,8 +41,8 @@ pub struct Parser {
 }
 
 
-pub impl Parser {
-    fn from_str(input: &str) -> ~Parser {
+impl Parser {
+    pub fn from_str(input: &str) -> ~Parser {
         let input = preprocess(input);
         ~Parser {
             length: input.len(),
@@ -131,11 +132,7 @@ pub fn consume_component_value(parser: &mut Parser) -> Option<ComponentValue> {
 #[inline]
 fn preprocess(input: &str) -> ~str {
     // TODO: Is this faster if done in one pass?
-    str::replace(str::replace(str::replace(str::replace(input,
-    "\r\n", "\n"),
-    "\r", "\n"),
-    "\x0C", "\n"),
-    "\x00", "\uFFFD")
+    input.replace("\r\n", "\n").replace("\r", "\n").replace("\x0C", "\n").replace("\x00", "\uFFFD")
 }
 
 
@@ -158,11 +155,11 @@ impl Parser {
 
     // Assumes non-EOF
     #[inline]
-    fn current_char(&self) -> char { str::char_at(self.input, self.position) }
+    fn current_char(&self) -> char { self.input.char_at(self.position) }
 
     #[inline]
     fn consume_char(&mut self) -> char {
-        let range = str::char_range_at(self.input, self.position);
+        let range = self.input.char_range_at(self.position);
         self.position = range.next;
         range.ch
     }
@@ -174,7 +171,7 @@ impl Parser {
         let mut position = self.position;
         for n.times {
             if position >= self.length { break }
-            let range = str::char_range_at(self.input, position);
+            let range = self.input.char_range_at(position);
             position = range.next;
             chars.push(range.ch);
         }
@@ -187,7 +184,7 @@ impl Parser {
         let mut i = self.position;
         if i + needle.len() > self.length { return false }
         let haystack: &str = self.input;
-        for needle.each |c| { if haystack[i] != c { return false; } i += 1u; }
+        for needle.bytes_iter().advance |c| { if haystack[i] != c { return false; } i += 1u; }
         return true;
     }
 }
@@ -197,9 +194,9 @@ impl Parser {
 fn consume_comments(parser: &mut Parser) {
     while parser.starts_with(~"/*") {
         parser.position += 2;  // +2 to consume "/*"
-        match str::find_str_from(parser.input, "*/", parser.position) {
+        match parser.input.slice_from(parser.position).find_str("*/") {
             // +2 to consume "*/"
-            Some(end_position) => parser.position = end_position + 2,
+            Some(offset) => parser.position += offset + 2,
             None => parser.position = parser.length  // EOF
         }
     }
@@ -378,7 +375,7 @@ fn consume_numeric_sign(parser: &mut Parser, sign: char)
             parser.position += 1;
             if !parser.is_eof()
                     && is_match!(parser.current_char(), '0'..'9') {
-                consume_numeric_fraction(parser, str::from_char(sign) + ~".")
+                consume_numeric_fraction(parser, str::from_char(sign) + ".")
             } else {
                 parser.position -= 1;
                 Delim(sign)
@@ -583,7 +580,8 @@ fn consume_unicode_range(parser: &mut Parser)
         question_marks += 1;
         parser.position += 1
     }
-    let start: char, end: char;
+    let start: char;
+    let end: char;
     if question_marks > 0 {
         start = char_from_hex(hex + vec::from_elem(question_marks, '0'));
         end = char_from_hex(hex + vec::from_elem(question_marks, 'F'));
@@ -649,7 +647,7 @@ fn consume_escape(parser: &mut Parser) -> char {
 
 #[inline]
 fn char_from_hex(hex: &[char]) -> char {
-    uint::from_str_radix(str::from_chars(hex), 16).get() as char
+    u32::from_str_radix(str::from_chars(hex), 16).get() as char
 }
 
 
