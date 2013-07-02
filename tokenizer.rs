@@ -17,74 +17,108 @@
 // composed of one or more characters.
 // Unicode-range tokens have a range of characters.
 
-
+extern mod core;
 use super::utils::*;
-use super::ast::NumericValue;
+use super::ast::*;
 
 
-pub impl Tokenizer {
-    fn from_str(input: &str)
-            -> ~Tokenizer {
-        let input = preprocess(input);
-        ~Tokenizer {
-            length: input.len(),
-            input: input,
+pub struct SyntaxError {
+    message: ~str,
+//    source_location: ~str,
+    source_line: uint,
+    source_column: uint,
+}
+
+
+pub struct InputStream {
+    priv data: ~str,
+    priv length: uint,  // All counted in bytes, not characters
+    priv position: uint,  // All counted in bytes, not characters
+    priv line: uint,
+    priv column: uint,  // All counted in bytes, not characters
+    priv errors: ~[SyntaxError],
+}
+
+
+pub impl InputStream {
+    fn from_str(input: &str) -> ~InputStream {
+        let data = preprocess(input);
+        ~InputStream {
+            length: data.len(),
+            data: data,
             position: 0,
+            line: 1,
+            column: 1,
+            errors: ~[],
         }
     }
-
-    fn next_token(&mut self) -> (Token, Option<ParseError>) {
-        if is_eof(self) { (EOF, None) } else { consume_token(self) }
-    }
 }
 
 
-pub struct Tokenizer {
-    priv input: ~str,
-    priv length: uint,  // Counted in bytes, not characters
-    priv position: uint,  // Counted in bytes, not characters
-}
-
-
-#[deriving(Eq)]
-pub enum Token {
-    Ident(~str),
-    AtKeyword(~str),
-    Hash(~str),
-    String(~str),
-    BadString,
-    URL(~str),
-    BadURL,
-    Delim(char),
-    Number(NumericValue),
-    Percentage(NumericValue),
-    Dimension(NumericValue, ~str),
-    UnicodeRange {start: char, end: char},
-    EmptyUnicodeRange,
-    WhiteSpace,
-    CDO,  // <!--
-    CDC,  // -->
-    Colon,  // :
-    Semicolon,  // ;
-    CloseParenthesis, // )
-    CloseSquareBraket, // ]
-    CloseCurlyBraket, // }
-
-    // Non-preserved tokens
-    Function(~str),
-    OpenParenthesis, // (
-    OpenSquareBraket, // [
-    OpenCurlyBraket, // {
-    EOF,
+pub fn consume_component_value(input: &mut InputStream) -> Option<ComponentValue> {
+    consume_comments(input);
+    if input.is_eof() { return None }
+    let c = input.current_char();
+    Some(match c {
+        '-' => {
+            if input.starts_with(~"-->") {
+                input.position += 3;
+                CDC
+            }
+            else if next_is_namestart_or_escape(input) {
+                consume_ident(input)
+            } else {
+                consume_numeric(input)
+            }
+        },
+        '<' => {
+            if input.starts_with(~"<!--") {
+                input.position += 4;
+                CDO
+            } else {
+                input.position += 1;
+                Delim('<')
+            }
+        },
+        '0'..'9' | '.' | '+' => consume_numeric(input),
+        'u' | 'U' => consume_unicode_range(input),
+        'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(input),
+        _ if c >= '\x80' => consume_ident(input),  // Non-ASCII
+        _ => {
+            match input.consume_char() {
+                '\t' | '\n' | ' ' => {
+                    while !input.is_eof() {
+                        match input.current_char() {
+                            '\t' | '\n' | ' '
+                                => input.position += 1,
+                            _ => break,
+                        }
+                    }
+                    WhiteSpace
+                },
+                '"' => consume_quoted_string(input, false),
+                '#' => consume_hash(input),
+                '\'' => consume_quoted_string(input, true),
+                '(' => ParenthesisBlock(consume_block(input, CloseParenthesis)),
+                ')' => CloseParenthesis,
+                ':' => Colon,
+                ';' => Semicolon,
+                '@' => consume_at_keyword(input),
+                '[' => SquareBraketBlock(consume_block(input, CloseSquareBraket)),
+                ']' => CloseSquareBraket,
+                '{' => CurlyBraketBlock(consume_block(input, CloseCurlyBraket)),
+                '}' => CloseCurlyBraket,
+                _ => Delim(c)
+            }
+        }
+    })
 }
 
 
 //  ***********  End of public API  ***********
 
 
-static MAX_UNICODE: char = '\U0010FFFF';
-
-
+#[inline]
 fn preprocess(input: &str) -> ~str {
     // TODO: Is this faster if done in one pass?
     str::replace(str::replace(str::replace(str::replace(input,
@@ -99,60 +133,80 @@ fn preprocess(input: &str) -> ~str {
 fn test_preprocess() {
     assert!(preprocess("") == ~"");
     assert!(preprocess("Lorem\r\n\t\x00ipusm\ndoror\uFFFD\r")
-        == ~"Lorem\n\t\uFFFDipusm\ndoror\uFFFD\n");
+            == ~"Lorem\n\t\uFFFDipusm\ndoror\uFFFD\n");
 }
 
 
-#[inline(always)]
-fn error_token(t: Token, message: ~str) -> (Token, Option<ParseError>) {
-    (t, Some(ParseError{message: message}))
-}
-
-
-#[inline(always)]
-fn is_eof(tokenizer: &mut Tokenizer) -> bool {
-    tokenizer.position >= tokenizer.length
-}
-
-
-#[inline(always)]
-fn current_char(tokenizer: &mut Tokenizer) -> char {
-    str::char_at(tokenizer.input, tokenizer.position)
-}
-
-
-// Return value may be smaller than n if we’re near the end of the input.
-#[inline(always)]
-fn match_here(tokenizer: &mut Tokenizer, needle: ~str) -> bool {
-    // XXX Duplicate str::match_at which is not public.
-    let mut i = tokenizer.position;
-    if i + needle.len() > tokenizer.length { return false }
-    let haystack: &str = tokenizer.input;
-    for needle.each |c| { if haystack[i] != c { return false; } i += 1u; }
-    return true;
-}
-
-
-// Return value may be smaller than n if we’re near the end of the input.
-#[inline(always)]
-fn next_n_chars(tokenizer: &mut Tokenizer, n: uint) -> ~[char] {
-    let mut chars: ~[char] = ~[];
-    let mut position = tokenizer.position;
-    for n.times {
-        if position >= tokenizer.length { break }
-        let range = str::char_range_at(tokenizer.input, position);
-        position = range.next;
-        chars.push(range.ch);
+impl InputStream {
+    fn error(&mut self, message: ~str) {
+        self.errors.push(SyntaxError{
+            message: message, source_line: self.line, source_column: self.column })
     }
-    chars
+
+    #[inline]
+    fn is_eof(&self) -> bool { self.position >= self.length }
+
+    // Assumes non-EOF
+    #[inline]
+    fn current_char(&self) -> char { str::char_at(self.data, self.position) }
+
+    #[inline]
+    fn consume_char(&mut self) -> char {
+        let range = str::char_range_at(self.data, self.position);
+        self.position = range.next;
+        range.ch
+    }
+
+    // Return value may be smaller than n if we’re near the end of the input.
+    #[inline]
+    fn next_n_chars(&mut self, n: uint) -> ~[char] {
+        let mut chars: ~[char] = ~[];
+        let mut position = self.position;
+        for n.times {
+            if position >= self.length { break }
+            let range = str::char_range_at(self.data, position);
+            position = range.next;
+            chars.push(range.ch);
+        }
+        chars
+    }
+
+    #[inline]
+    fn starts_with(&self, needle: ~str) -> bool {
+        // XXX Duplicate str::match_at which is not public.
+        let mut i = self.position;
+        if i + needle.len() > self.length { return false }
+        let haystack: &str = self.data;
+        for needle.each |c| { if haystack[i] != c { return false; } i += 1u; }
+        return true;
+    }
 }
 
 
-#[inline(always)]
-fn consume_char(tokenizer: &mut Tokenizer) -> char {
-    let range = str::char_range_at(tokenizer.input, tokenizer.position);
-    tokenizer.position = range.next;
-    range.ch
+#[inline]
+fn consume_comments(input: &mut InputStream) {
+    while input.starts_with(~"/*") {
+        input.position += 2;  // +2 to consume "/*"
+        match str::find_str_from(input.data, "*/", input.position) {
+            // +2 to consume "*/"
+            Some(end_position) => input.position = end_position + 2,
+            None => input.position = input.length  // EOF
+        }
+    }
+}
+
+
+fn consume_block(input: &mut InputStream, ending_token: ComponentValue) -> ~[ComponentValue] {
+    let mut content = ~[];
+    loop {
+        match consume_component_value(input) {
+            Some(component_value) => {
+                if component_value == ending_token { return content }
+                content.push(component_value)
+            }
+            None => return content
+        }
+    }
 }
 
 
@@ -163,457 +217,366 @@ macro_rules! is_match(
 )
 
 
-#[inline(always)]
-fn is_invalid_escape(tokenizer: &mut Tokenizer) -> bool {
-    match next_n_chars(tokenizer, 2) {
+#[inline]
+fn is_invalid_escape(input: &mut InputStream) -> bool {
+    match input.next_n_chars(2) {
         ['\\', '\n'] | ['\\'] => true,
         _ => false,
     }
 }
 
 
-#[inline(always)]
-fn is_namestart_or_escape(tokenizer: &mut Tokenizer) -> bool {
-    match current_char(tokenizer) {
+#[inline]
+fn is_namestart_or_escape(input: &mut InputStream) -> bool {
+    match input.current_char() {
         'a'..'z' | 'A'..'Z' | '_' => true,
-        '\\' => !is_invalid_escape(tokenizer),
+        '\\' => !is_invalid_escape(input),
         c => c >= '\x80',  // Non-ASCII
     }
 }
 
 
-#[inline(always)]
-fn next_is_namestart_or_escape(tokenizer: &mut Tokenizer) -> bool {
-    tokenizer.position += 1;
-    let result = !is_eof(tokenizer) && is_namestart_or_escape(tokenizer);
-    tokenizer.position -= 1;
+#[inline]
+fn next_is_namestart_or_escape(input: &mut InputStream) -> bool {
+    input.position += 1;
+    let result = !input.is_eof() && is_namestart_or_escape(input);
+    input.position -= 1;
     result
 }
 
 
-macro_rules! push_char(
-    ($string:ident, $c:expr) => (
-        str::push_char(&mut $string, $c)
-    );
-)
-
-
-fn consume_token(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>) {
-    // Comments are special because they do not even emit a token,
-    // unless they reach EOF which is an error.
-    match consume_comments(tokenizer) {
-        Some(result) => return result,
-        None => ()
-    }
-    if is_eof(tokenizer) { return (EOF, None) }
-    let c = current_char(tokenizer);
-    match c {
-        '-' => {
-            if match_here(tokenizer, ~"-->") {
-                tokenizer.position += 3;
-                (CDC, None)
-            }
-            else if next_is_namestart_or_escape(tokenizer) {
-                consume_ident(tokenizer)
-            } else {
-                consume_numeric(tokenizer)
-            }
-        },
-        '<' => {
-            if match_here(tokenizer, ~"<!--") {
-                tokenizer.position += 4;
-                (CDO, None)
-            } else {
-                tokenizer.position += 1;
-                (Delim('<'), None)
-            }
-        },
-        '0'..'9' | '.' | '+' => consume_numeric(tokenizer),
-        'u' | 'U' => consume_unicode_range(tokenizer),
-        'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(tokenizer),
-        _ if c >= '\x80' => consume_ident(tokenizer),  // Non-ASCII
-        _ => {
-            match consume_char(tokenizer) {
-                '\t' | '\n' | ' ' => {
-                    while !is_eof(tokenizer) {
-                        match current_char(tokenizer) {
-                            '\t' | '\n' | ' '
-                                => tokenizer.position += 1,
-                            _ => break,
-                        }
-                    }
-                    (WhiteSpace, None)
-                },
-                '"' => consume_quoted_string(tokenizer, false),
-                '#' => consume_hash(tokenizer),
-                '\'' => consume_quoted_string(tokenizer, true),
-                '(' => (OpenParenthesis, None),
-                ')' => (CloseParenthesis, None),
-                ':' => (Colon, None),
-                ';' => (Semicolon, None),
-                '@' => consume_at_keyword(tokenizer),
-                '[' => (OpenSquareBraket, None),
-                ']' => (CloseSquareBraket, None),
-                '{' => (OpenCurlyBraket, None),
-                '}' => (CloseCurlyBraket, None),
-                _ => (Delim(c), None)
-            }
-        }
-    }
-}
-
-
-fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool)
-        -> (Token, Option<ParseError>) {
+fn consume_quoted_string(input: &mut InputStream, single_quote: bool) -> ComponentValue {
     let mut string: ~str = ~"";
-    while !is_eof(tokenizer) {
-        match consume_char(tokenizer) {
-            '"' if !single_quote => return (String(string), None),
-            '\'' if single_quote => return (String(string), None),
+    while !input.is_eof() {
+        match input.consume_char() {
+            '"' if !single_quote => break,
+            '\'' if single_quote => break,
             '\n' => {
-                return error_token(BadString, ~"Newline in quoted string");
+                input.error(~"Newline in quoted string");
+                return BadString;
             },
             '\\' => {
-                match next_n_chars(tokenizer, 1) {
+                match input.next_n_chars(1) {
                     // Quoted newline
-                    ['\n'] => tokenizer.position += 1,
-                    [] =>
-                        return error_token(BadString, ~"EOF in quoted string"),
-                    _ => push_char!(string, consume_escape(tokenizer))
+                    ['\n'] => input.position += 1,
+                    [] => {
+                        input.error(~"Escaped EOF");
+                        return BadString
+                    },
+                    _ => string.push_char(consume_escape(input))
                 }
             }
-            c => push_char!(string, c),
+            c => string.push_char(c),
         }
     }
-    error_token(String(string), ~"EOF in quoted string")
+    String(string)
 }
 
 
-fn consume_hash(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>) {
-    let string = consume_ident_string_rest(tokenizer);
-    (if string == ~"" { Delim('#') } else { Hash(string) }, None)
+fn consume_hash(input: &mut InputStream) -> ComponentValue {
+    let string = consume_ident_string_rest(input);
+    if string == ~"" { Delim('#') } else { Hash(string) }
 }
 
 
-fn consume_comments(tokenizer: &mut Tokenizer)
-        -> Option<(Token, Option<ParseError>)> {
-    while match_here(tokenizer, ~"/*") {
-        tokenizer.position += 2;  // consume /*
-        match str::find_str_from(tokenizer.input, "*/", tokenizer.position) {
-            Some(end_position) => tokenizer.position = end_position + 2,
-            None => {
-                tokenizer.position = tokenizer.length;
-                return Some(error_token(EOF, ~"Unclosed comment"))
-            }
-        }
-    }
-    None
-}
-
-
-fn consume_at_keyword(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>) {
-    (match consume_ident_string(tokenizer) {
+fn consume_at_keyword(input: &mut InputStream) -> ComponentValue {
+    match consume_ident_string(input) {
         Some(string) => AtKeyword(string),
         None => Delim('@')
-    }, None)
+    }
 }
 
 
-fn consume_ident(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>) {
-    match consume_ident_string(tokenizer) {
+fn consume_ident(input: &mut InputStream) -> ComponentValue {
+    match consume_ident_string(input) {
         Some(string) => {
-            if is_eof(tokenizer) { return (Ident(string), None) }
-            match current_char(tokenizer) {
+            if input.is_eof() { return Ident(string) }
+            match input.current_char() {
                 '(' => {
-                    tokenizer.position += 1;
-                    if ascii_lower(string) == ~"url" { consume_url(tokenizer) }
-                    else { (Function(string), None) }
+                    input.position += 1;
+                    if ascii_lower(string) == ~"url" { consume_url(input) }
+                    else { Function(string, consume_block(input, CloseParenthesis)) }
                 },
-                _ => (Ident(string), None)
+                _ => Ident(string)
             }
         },
-        None => match current_char(tokenizer) {
+        None => match input.current_char() {
             '-' => {
-                tokenizer.position += 1;
-                (Delim('-'), None)
+                input.position += 1;
+                Delim('-')
             },
             '\\' => {
-                tokenizer.position += 1;
-                error_token(Delim('\\'), ~"Invalid escape")
+                input.position += 1;
+                input.error(~"Invalid escape");
+                Delim('\\')
             },
             _ => fail!(),  // Should not have called consume_ident() here.
         }
     }
 }
 
-fn consume_ident_string(tokenizer: &mut Tokenizer) -> Option<~str> {
-    match current_char(tokenizer) {
-        '-' => if !next_is_namestart_or_escape(tokenizer) { None }
-               else { Some(consume_ident_string_rest(tokenizer)) },
-        '\\' if is_invalid_escape(tokenizer) => return None,
-        _ if !is_namestart_or_escape(tokenizer) => return None,
-        _ => Some(consume_ident_string_rest(tokenizer))
+fn consume_ident_string(input: &mut InputStream) -> Option<~str> {
+    match input.current_char() {
+        '-' => if !next_is_namestart_or_escape(input) { None }
+               else { Some(consume_ident_string_rest(input)) },
+        '\\' if is_invalid_escape(input) => return None,
+        _ if !is_namestart_or_escape(input) => return None,
+        _ => Some(consume_ident_string_rest(input))
     }
 }
 
 
-fn consume_ident_string_rest(tokenizer: &mut Tokenizer) -> ~str {
+fn consume_ident_string_rest(input: &mut InputStream) -> ~str {
     let mut string = ~"";
-    while !is_eof(tokenizer) {
-        let c = current_char(tokenizer);
+    while !input.is_eof() {
+        let c = input.current_char();
         let next_char = match c {
             'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-'  => {
-                tokenizer.position += 1; c },
-            _ if c >= '\x80' => consume_char(tokenizer),  // Non-ASCII
+                input.position += 1; c },
+            _ if c >= '\x80' => input.consume_char(),  // Non-ASCII
             '\\' => {
-                if is_invalid_escape(tokenizer) { break }
-                tokenizer.position += 1;
-                consume_escape(tokenizer)
+                if is_invalid_escape(input) { break }
+                input.position += 1;
+                consume_escape(input)
             },
             _ => break
         };
-        push_char!(string, next_char)
+        string.push_char(next_char)
     }
     string
 }
 
 
-fn consume_numeric(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>) {
-    let c = consume_char(tokenizer);
+fn consume_numeric(input: &mut InputStream) -> ComponentValue {
+    let c = input.consume_char();
     match c {
-        '-' | '+' => consume_numeric_sign(tokenizer, c),
+        '-' | '+' => consume_numeric_sign(input, c),
         '.' => {
-            if is_eof(tokenizer) { return (Delim('.'), None) }
-            match current_char(tokenizer) {
-                '0'..'9' => consume_numeric_fraction(tokenizer, ~"."),
-                _ => (Delim('.'), None),
+            if input.is_eof() { return Delim('.') }
+            match input.current_char() {
+                '0'..'9' => consume_numeric_fraction(input, ~"."),
+                _ => Delim('.'),
             }
         },
-        '0'..'9' => consume_numeric_rest(tokenizer, c),
+        '0'..'9' => consume_numeric_rest(input, c),
         _ => fail!(),  // consume_numeric() should not have been called here.
     }
 }
 
 
-fn consume_numeric_sign(tokenizer: &mut Tokenizer, sign: char)
-        -> (Token, Option<ParseError>) {
-    if is_eof(tokenizer) { return (Delim(sign), None) }
-    match current_char(tokenizer) {
+fn consume_numeric_sign(input: &mut InputStream, sign: char)
+        -> ComponentValue {
+    if input.is_eof() { return Delim(sign) }
+    match input.current_char() {
         '.' => {
-            tokenizer.position += 1;
-            if !is_eof(tokenizer)
-                    && is_match!(current_char(tokenizer), '0'..'9') {
+            input.position += 1;
+            if !input.is_eof()
+                    && is_match!(input.current_char(), '0'..'9') {
                 consume_numeric_fraction(
-                    tokenizer, str::from_char(sign) + ~".")
+                    input, str::from_char(sign) + ~".")
             } else {
-                tokenizer.position -= 1;
-                (Delim(sign), None)
+                input.position -= 1;
+                Delim(sign)
             }
         },
-        '0'..'9' => consume_numeric_rest(tokenizer, sign),
-        _ => (Delim(sign), None)
+        '0'..'9' => consume_numeric_rest(input, sign),
+        _ => Delim(sign)
     }
 }
 
 
-fn consume_numeric_rest(tokenizer: &mut Tokenizer, initial_char: char)
-        -> (Token, Option<ParseError>) {
+fn consume_numeric_rest(input: &mut InputStream, initial_char: char)
+        -> ComponentValue {
     let mut string = str::from_char(initial_char);
-    while !is_eof(tokenizer) {
-        let c = current_char(tokenizer);
+    while !input.is_eof() {
+        let c = input.current_char();
         match c {
-            '0'..'9' => { push_char!(string, c); tokenizer.position += 1 },
+            '0'..'9' => { string.push_char(c); input.position += 1 },
             '.' => {
-                tokenizer.position += 1;
-                if !is_eof(tokenizer)
-                        && is_match!(current_char(tokenizer), '0'..'9') {
-                    push_char!(string, '.');
-                    return consume_numeric_fraction(tokenizer, string);
+                input.position += 1;
+                if !input.is_eof()
+                        && is_match!(input.current_char(), '0'..'9') {
+                    string.push_char('.');
+                    return consume_numeric_fraction(input, string);
                 } else {
-                    tokenizer.position -= 1; break
+                    input.position -= 1; break
                 }
             },
-            _ => match consume_scientific_number(tokenizer, string) {
-                Ok(token) => return (token, None),
+            _ => match consume_scientific_number(input, string) {
+                Ok(token) => return token,
                 Err(s) => { string = s; break }
             }
         }
     }
-    consume_numeric_end(tokenizer, NumericValue::new(string, true))
+    consume_numeric_end(input, NumericValue::new(string, true))
 }
 
 
-fn consume_numeric_fraction(tokenizer: &mut Tokenizer, string: ~str)
-        -> (Token, Option<ParseError>) {
+fn consume_numeric_fraction(input: &mut InputStream, string: ~str)
+        -> ComponentValue {
     let mut string: ~str = string;
-    while !is_eof(tokenizer) {
-        match current_char(tokenizer) {
-            '0'..'9' => push_char!(string, consume_char(tokenizer)),
-            _ => match consume_scientific_number(tokenizer, string) {
-                Ok(token) => return (token, None),
+    while !input.is_eof() {
+        match input.current_char() {
+            '0'..'9' => string.push_char(input.consume_char()),
+            _ => match consume_scientific_number(input, string) {
+                Ok(token) => return token,
                 Err(s) => { string = s; break }
             }
         }
     }
-    consume_numeric_end(tokenizer, NumericValue::new(string, false))
+    consume_numeric_end(input, NumericValue::new(string, false))
 }
 
 
-fn consume_numeric_end(tokenizer: &mut Tokenizer, value: NumericValue)
-        -> (Token, Option<ParseError>) {
-    if is_eof(tokenizer) { return (Number(value), None) }
-    (match current_char(tokenizer) {
-        '%' => { tokenizer.position += 1; Percentage(value) },
+fn consume_numeric_end(input: &mut InputStream, value: NumericValue)
+        -> ComponentValue {
+    if input.is_eof() { return Number(value) }
+    match input.current_char() {
+        '%' => { input.position += 1; Percentage(value) },
         _ => {
-            match consume_ident_string(tokenizer) {
+            match consume_ident_string(input) {
                 Some(unit) => Dimension(value, unit),
                 None => Number(value),
             }
         },
-    }, None)
+    }
 }
 
 
-fn consume_scientific_number(tokenizer: &mut Tokenizer, string: ~str)
-        -> Result<Token, ~str> {
-    let next_3 = next_n_chars(tokenizer, 3);
+fn consume_scientific_number(input: &mut InputStream, string: ~str)
+        -> Result<ComponentValue, ~str> {
+    let next_3 = input.next_n_chars(3);
     let mut string: ~str = string;
     if (next_3.len() >= 2
         && (next_3[0] == 'e' || next_3[0] == 'E')
         && (is_match!(next_3[1], '0'..'9'))
     ) {
-        push_char!(string, next_3[0]);
-        push_char!(string, next_3[1]);
-        tokenizer.position += 2;
+        string.push_char(next_3[0]);
+        string.push_char(next_3[1]);
+        input.position += 2;
     } else if (
         next_3.len() == 3
         && (next_3[0] == 'e' || next_3[0] == 'E')
         && (next_3[1] == '+' || next_3[1] == '-')
         && is_match!(next_3[2], '0'..'9')
     ) {
-        push_char!(string, next_3[0]);
-        push_char!(string, next_3[1]);
-        push_char!(string, next_3[2]);
-        tokenizer.position += 3;
+        string.push_char(next_3[0]);
+        string.push_char(next_3[1]);
+        string.push_char(next_3[2]);
+        input.position += 3;
     } else {
         return Err(string)
     }
-    while !is_eof(tokenizer) && is_match!(current_char(tokenizer), '0'..'9') {
-        push_char!(string, consume_char(tokenizer))
+    while !input.is_eof() && is_match!(input.current_char(), '0'..'9') {
+        string.push_char(input.consume_char())
     }
     Ok(Number(NumericValue::new(string, false)))
 }
 
 
-fn consume_url(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>) {
-    while !is_eof(tokenizer) {
-        match current_char(tokenizer) {
-            '\t' | '\n' | ' ' => tokenizer.position += 1,
-            '"' => return consume_quoted_url(tokenizer, false),
-            '\'' => return consume_quoted_url(tokenizer, true),
-            ')' => { tokenizer.position += 1; return (URL(~""), None) },
-            _ => return consume_unquoted_url(tokenizer),
+fn consume_url(input: &mut InputStream) -> ComponentValue {
+    while !input.is_eof() {
+        match input.current_char() {
+            '\t' | '\n' | ' ' => input.position += 1,
+            '"' => return consume_quoted_url(input, false),
+            '\'' => return consume_quoted_url(input, true),
+            ')' => { input.position += 1; break },
+            _ => return consume_unquoted_url(input),
         }
     }
-    error_token(BadURL, ~"EOF in URL")
+    URL(~"")
 }
 
 
-fn consume_quoted_url(tokenizer: &mut Tokenizer, single_quote: bool)
-        -> (Token, Option<ParseError>) {
-    tokenizer.position += 1;  // The initial quote
-    let (token, err) = consume_quoted_string(tokenizer, single_quote);
-    match err {
-        Some(_) => {
-            let (token, _) = consume_bad_url(tokenizer);
-            (token, err)
-        },
-        None => match token {
-            String(string) => consume_url_end(tokenizer, string),
-            // consume_quoted_string() never returns a non-String token
-            // without error:
-            _ => fail!(),
-        }
+fn consume_quoted_url(input: &mut InputStream, single_quote: bool)
+        -> ComponentValue {
+    input.position += 1;  // The initial quote
+    match consume_quoted_string(input, single_quote) {
+        String(string) => consume_url_end(input, string),
+        BadString => consume_bad_url(input),
+        // consume_quoted_string() only returns String or BadString
+        _ => fail!(),
     }
 }
 
 
-fn consume_url_end(tokenizer: &mut Tokenizer, string: ~str)
-        -> (Token, Option<ParseError>) {
-    while !is_eof(tokenizer) {
-        match consume_char(tokenizer) {
+fn consume_url_end(input: &mut InputStream, string: ~str)
+        -> ComponentValue {
+    while !input.is_eof() {
+        match input.consume_char() {
             '\t' | '\n' | ' ' => (),
-            ')' => return (URL(string), None),
-            _ => return consume_bad_url(tokenizer)
+            ')' => break,
+            _ => return consume_bad_url(input)
         }
     }
-    error_token(BadURL, ~"EOF in URL")
+    URL(string)
 }
 
 
-fn consume_unquoted_url(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>) {
+fn consume_unquoted_url(input: &mut InputStream) -> ComponentValue {
     let mut string = ~"";
-    while !is_eof(tokenizer) {
-        let next_char = match consume_char(tokenizer) {
+    while !input.is_eof() {
+        let next_char = match input.consume_char() {
             '\t' | '\n' | ' '
-                => return consume_url_end(tokenizer, string),
-            ')' => return (URL(string), None),
+                => return consume_url_end(input, string),
+            ')' => break,
             '\x00'..'\x08' | '\x0E'..'\x1F' | '\x7F'..'\x9F'  // non-printable
-                | '"' | '\'' | '(' => return consume_bad_url(tokenizer),
-            '\\' => match next_n_chars(tokenizer, 1) {
-                ['\n'] | [] => return consume_bad_url(tokenizer),
-                _ => consume_escape(tokenizer)
+                | '"' | '\'' | '(' => return consume_bad_url(input),
+            '\\' => match input.next_n_chars(1) {
+                ['\n'] | [] => return consume_bad_url(input),
+                _ => consume_escape(input)
             },
             c => c
         };
-        push_char!(string, next_char)
+        string.push_char(next_char)
     }
-    error_token(BadURL, ~"EOF in URL")
+    URL(string)
 }
 
 
-fn consume_bad_url(tokenizer: &mut Tokenizer) -> (Token, Option<ParseError>) {
+fn consume_bad_url(input: &mut InputStream) -> ComponentValue {
     // Consume up to the closing )
-    while !is_eof(tokenizer) {
-        match consume_char(tokenizer) {
+    while !input.is_eof() {
+        match input.consume_char() {
             ')' => break,
-            '\\' => tokenizer.position += 1, // Skip an escaped ) or \
+            '\\' => input.position += 1, // Skip an escaped ) or \
             _ => ()
         }
     }
-    error_token(BadURL, ~"Invalid URL syntax")
+    input.error(~"Invalid URL syntax");
+    BadURL
 }
 
 
-fn consume_unicode_range(tokenizer: &mut Tokenizer)
-        -> (Token, Option<ParseError>) {
-    let next_3 = next_n_chars(tokenizer, 3);
+fn consume_unicode_range(input: &mut InputStream)
+        -> ComponentValue {
+    let next_3 = input.next_n_chars(3);
     // We got here with U or u
     assert!(next_3[0] == 'u' || next_3[0] == 'U');
     // Check if this is indeed an unicode range. Fallback on ident.
     if next_3.len() == 3 && next_3[1] == '+' {
         match next_3[2] {
-            '0'..'9' | 'a'..'f' | 'A'..'F' => tokenizer.position += 2,
-            _ => { return consume_ident(tokenizer) }
+            '0'..'9' | 'a'..'f' | 'A'..'F' => input.position += 2,
+            _ => { return consume_ident(input) }
         }
-    } else { return consume_ident(tokenizer) }
+    } else { return consume_ident(input) }
 
     let mut hex = ~[];
-    while hex.len() < 6 && !is_eof(tokenizer) {
-        let c = current_char(tokenizer);
+    while hex.len() < 6 && !input.is_eof() {
+        let c = input.current_char();
         match c {
             '0'..'9' | 'A'..'F' | 'a'..'f' => {
-                hex.push(c); tokenizer.position += 1 },
+                hex.push(c); input.position += 1 },
             _ => break
         }
     }
     assert!(hex.len() > 0);
     let max_question_marks = 6u - hex.len();
     let mut question_marks = 0u;
-    while question_marks < max_question_marks && !is_eof(tokenizer)
-            && current_char(tokenizer) == '?' {
+    while question_marks < max_question_marks && !input.is_eof()
+            && input.current_char() == '?' {
         question_marks += 1;
-        tokenizer.position += 1
+        input.position += 1
     }
     let start: char, end: char;
     if question_marks > 0 {
@@ -622,47 +585,51 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer)
     } else {
         start = char_from_hex(hex);
         hex = ~[];
-        if !is_eof(tokenizer) && current_char(tokenizer) == '-' {
-            tokenizer.position += 1;
-            while hex.len() < 6 && !is_eof(tokenizer) {
-                let c = current_char(tokenizer);
+        if !input.is_eof() && input.current_char() == '-' {
+            input.position += 1;
+            while hex.len() < 6 && !input.is_eof() {
+                let c = input.current_char();
                 match c {
                     '0'..'9' | 'A'..'F' | 'a'..'f' => {
-                        hex.push(c); tokenizer.position += 1 },
+                        hex.push(c); input.position += 1 },
                     _ => break
                 }
             }
         }
         end = if hex.len() > 0 { char_from_hex(hex) } else { start }
     }
-    (if start > MAX_UNICODE || end < start {
+    if start > MAX_UNICODE || end < start {
         EmptyUnicodeRange
     } else {
         let end = if end <= MAX_UNICODE { end } else { MAX_UNICODE };
-        UnicodeRange {start: start, end: end}
-    }, None)
+//        UnicodeRange {start: start, end: end}
+        UnicodeRange(start, end)
+    }
 }
+
+
+static MAX_UNICODE: char = '\U0010FFFF';
 
 
 // Assumes that the U+005C REVERSE SOLIDUS (\) has already been consumed
 // and that the next input character has already been verified
 // to not be a newline or EOF.
-fn consume_escape(tokenizer: &mut Tokenizer) -> char {
-    let c = consume_char(tokenizer);
+fn consume_escape(input: &mut InputStream) -> char {
+    let c = input.consume_char();
     match c {
         '0'..'9' | 'A'..'F' | 'a'..'f' => {
             let mut hex = ~[c];
-            while hex.len() < 6 && !is_eof(tokenizer) {
-                let c = current_char(tokenizer);
+            while hex.len() < 6 && !input.is_eof() {
+                let c = input.current_char();
                 match c {
                     '0'..'9' | 'A'..'F' | 'a'..'f' => {
-                        hex.push(c); tokenizer.position += 1 },
+                        hex.push(c); input.position += 1 },
                     _ => break
                 }
             }
-            if !is_eof(tokenizer) {
-                match current_char(tokenizer) {
-                    '\t' | '\n' | ' ' => tokenizer.position += 1,
+            if !input.is_eof() {
+                match input.current_char() {
+                    '\t' | '\n' | ' ' => input.position += 1,
                     _ => ()
                 }
             }
@@ -677,4 +644,167 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
 
 fn char_from_hex(hex: &[char]) -> char {
     uint::from_str_radix(str::from_chars(hex), 16).get() as char
+}
+
+
+#[test]
+fn test_component_values() {
+    fn assert_component_values(input: &str, expected_component_values: &[ComponentValue],
+                               expected_errors: &[~str]) {
+        let mut stream = InputStream::from_str(input);
+        let mut result: ~[ComponentValue] = ~[];
+        loop {
+            match consume_component_value(stream) {
+                Some(component_value) => result.push(component_value),
+                None => break
+            }
+        }
+        let errors = vec::map_consume(
+            core::util::replace(&mut stream.errors, ~[]),
+            |SyntaxError{message: m, source_line: _, source_column: _}| m);
+        check_results(input, result, expected_component_values,
+                      errors, expected_errors);
+    }
+
+
+    assert_component_values("", [], []);
+    assert_component_values("?/", [Delim('?'), Delim('/')], []);
+    assert_component_values("?/* Li/*psum… */", [Delim('?')], []);
+    assert_component_values("?/* Li/*psum… *//", [Delim('?'), Delim('/')], []);
+    assert_component_values("?/* Lipsum", [Delim('?')], []);
+    assert_component_values("?/*", [Delim('?')], []);
+    assert_component_values("?/*/", [Delim('?')], []);
+    assert_component_values("?/**/!", [Delim('?'), Delim('!')], []);
+    assert_component_values("?/**/", [Delim('?')], []);
+    assert_component_values("[?}{)", [
+        SquareBraketBlock(~[Delim('?'), CloseCurlyBraket,
+            CurlyBraketBlock(~[CloseParenthesis])])
+    ], []);
+
+    assert_component_values("(\n \t'Lore\\6d \"ipsu\\6D'",
+        [ParenthesisBlock(~[WhiteSpace, String(~"Lorem\"ipsum")])], []);
+    assert_component_values("'\\''", [String(~"'")], []);
+    assert_component_values("\"\\\"\"", [String(~"\"")], []);
+    assert_component_values("\"\\\"", [String(~"\"")], []);
+    assert_component_values("'\\", [BadString], [~"Escaped EOF"]);
+    assert_component_values("\"0\\0000000\"", [String(~"0\uFFFD0")], []);
+    assert_component_values("\"0\\000000 0\"", [String(~"0\uFFFD0")], []);
+    assert_component_values("'z\n'a", [BadString, String(~"a")],
+        [~"Newline in quoted string"]);
+
+    assert_component_values("Lorem\\ ipsu\\6D dolor \\sit",
+        [Ident(~"Lorem ipsumdolor"), WhiteSpace, Ident(~"sit")], []);
+    assert_component_values("foo\\", [Ident(~"foo"), Delim('\\')], [~"Invalid escape"]);
+    assert_component_values("foo\\\nbar",
+        [Ident(~"foo"), Delim('\\'), WhiteSpace, Ident(~"bar")],
+        [~"Invalid escape"]);
+    assert_component_values("-Lipsum", [Ident(~"-Lipsum")], []);
+    assert_component_values("-L\\ïpsum", [Ident(~"-Lïpsum")], []);
+    assert_component_values("-\\Lipsum", [Ident(~"-Lipsum")], []);
+    assert_component_values("-", [Delim('-')], []);
+    assert_component_values("--Lipsum", [Delim('-'), Ident(~"-Lipsum")], []);
+    assert_component_values("-\\-Lipsum", [Ident(~"--Lipsum")], []);
+    assert_component_values("\\Lipsum", [Ident(~"Lipsum")], []);
+    assert_component_values("\\\nLipsum", [Delim('\\'), WhiteSpace, Ident(~"Lipsum")],
+        [~"Invalid escape"]);
+    assert_component_values("\\", [Delim('\\')], [~"Invalid escape"]);
+    assert_component_values("\x7f\x80\x81", [Delim('\x7F'), Ident(~"\x80\x81")], []);
+
+    assert_component_values("func()", [Function(~"func", ~[])], []);
+    assert_component_values("func ()",
+        [Ident(~"func"), WhiteSpace, ParenthesisBlock(~[])], []);
+
+    assert_component_values("##00(#\\##\\\n#\\",
+        [Delim('#'), Hash(~"00"), ParenthesisBlock(~[
+            Hash(~"#"), Delim('#'),
+            Delim('\\'), WhiteSpace, Delim('#'), Delim('\\')])],
+        [~"Invalid escape", ~"Invalid escape"]);
+
+    assert_component_values("@@page(@\\x@-x@-\\x@--@\\\n@\\", [
+        Delim('@'), AtKeyword(~"page"), ParenthesisBlock(~[
+            AtKeyword(~"x"), AtKeyword(~"-x"), AtKeyword(~"-x"),
+            Delim('@'), Delim('-'), Delim('-'),
+            Delim('@'), Delim('\\'), WhiteSpace, Delim('@'), Delim('\\')])
+    ], [~"Invalid escape", ~"Invalid escape"]);
+
+    assert_component_values("<!-<!-----><",
+        [Delim('<'), Delim('!'), Delim('-'), CDO, Delim('-'), CDC, Delim('<')],
+        []);
+    assert_component_values("u+g u+fU+4?U+030-000039f U+FFFFF?U+42-42U+42-41U+42-110000",
+        [Ident(~"u"), Delim('+'), Ident(~"g"), WhiteSpace,
+         UnicodeRange('\x0F', '\x0F'), UnicodeRange('\x40', '\x4F'),
+         UnicodeRange('0', '9'), Ident(~"f"), WhiteSpace, EmptyUnicodeRange,
+         UnicodeRange('B', 'B'), EmptyUnicodeRange,
+         UnicodeRange('B', '\U0010FFFF')],
+//         UnicodeRange {start: '\x0F', end: '\x0F'}, UnicodeRange {start: '\x40', end: '\x4F'},
+//         UnicodeRange {start: '0', end: '9'}, Ident(~"f"), WhiteSpace, EmptyUnicodeRange,
+//         UnicodeRange {start: 'B', end: 'B'}, EmptyUnicodeRange,
+//         UnicodeRange {start: 'B', end: '\U0010FFFF'}],
+        []);
+
+    assert_component_values("url()URL()uRl()Ürl()",
+        [URL(~""), URL(~""), URL(~""), Function(~"Ürl", ~[])],
+        []);
+    assert_component_values("url(  )url(\ta\n)url(\t'a'\n)url(\t'a'z)url(  ",
+        [URL(~""), URL(~"a"), URL(~"a"), BadURL, URL(~"")],
+        [~"Invalid URL syntax"]);
+    assert_component_values("url('a\nb')url('a", [BadURL, URL(~"a")],
+        [~"Newline in quoted string", ~"Invalid URL syntax"]);
+    assert_component_values("url(a'b)url(\x08z)url('a'", [BadURL, BadURL, URL(~"a")],
+        [~"Invalid URL syntax", ~"Invalid URL syntax"]);
+    assert_component_values("url(Lorem\\ ipsu\\6D dolo\\r)url(a\nb)url(a\\\nb)",
+        [URL(~"Lorem ipsumdolor"), BadURL, BadURL],
+        [~"Invalid URL syntax", ~"Invalid URL syntax"]);
+
+    macro_rules! Integer(
+        ($value:expr, $repr:expr) => (NumericValue {
+            value: $value as f64, int_value: Some($value), representation: $repr });
+    )
+
+    macro_rules! Float(
+        ($value:expr, $repr:expr) => (NumericValue {
+            value: $value, int_value: None, representation: $repr });
+    )
+
+    assert_component_values("42+42-42. 1.5+1.5-1.5.5+.5-.5+-.", [
+        Number(Integer!(42, ~"42")),
+        Number(Integer!(42, ~"+42")),
+        Number(Integer!(-42, ~"-42")), Delim('.'), WhiteSpace,
+        Number(Float!(1.5, ~"1.5")),
+        Number(Float!(1.5, ~"+1.5")),
+        Number(Float!(-1.5, ~"-1.5")),
+        Number(Float!(0.5, ~".5")),
+        Number(Float!(0.5, ~"+.5")),
+        Number(Float!(-0.5, ~"-.5")), Delim('+'), Delim('-'), Delim('.')
+    ], []);
+    assert_component_values("42e2px 42e+2 42e-2.", [
+        Number(Float!(4200., ~"42e2")), Ident(~"px"), WhiteSpace,
+        Number(Float!(4200., ~"42e+2")), WhiteSpace,
+        Number(Float!(0.42, ~"42e-2")), Delim('.')
+    ], []);
+    assert_component_values("42%+.5%-1%", [
+        Percentage(Integer!(42, ~"42")),
+        Percentage(Float!(0.5, ~"+.5")),
+        Percentage(Integer!(-1, ~"-1")),
+    ], []);
+    assert_component_values("42-Px+.5\\u -1url(7-0\\", [
+        Dimension(Integer!(42, ~"42"), ~"-Px"),
+        Dimension(Float!(0.5, ~"+.5"), ~"u"), WhiteSpace,
+        Dimension(Integer!(-1, ~"-1"), ~"url"), ParenthesisBlock(~[
+            Number(Integer!(7, ~"7")),
+            Number(Integer!(0, ~"-0")), Delim('\\'),
+        ]),
+    ], [~"Invalid escape"]);
+
+    assert_component_values("", [], []);
+    assert_component_values("42 foo([aa ()b], -){\n  }", [
+        Number(Integer!(42, ~"42")),
+        WhiteSpace,
+        Function(~"foo", ~[
+            SquareBraketBlock(~[
+                Ident(~"aa"), WhiteSpace, ParenthesisBlock(~[]), Ident(~"b")]),
+            Delim(','), WhiteSpace, Delim('-')]),
+        CurlyBraketBlock(~[
+            WhiteSpace])], []);
+    assert_component_values("'foo", [String(~"foo")], []);
 }

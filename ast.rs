@@ -24,8 +24,9 @@ pub impl NumericValue {
     }
 }
 
+
 #[deriving(Eq)]
-pub enum Primitive {
+pub enum ComponentValue {
     // Preserved tokens. Same as in the tokenizer.
     Ident(~str),
     AtKeyword(~str),
@@ -36,7 +37,7 @@ pub enum Primitive {
     Number(NumericValue),
     Percentage(NumericValue),
     Dimension(NumericValue, ~str),
-    UnicodeRange {start: char, end: char},
+    UnicodeRange(char, char), // UnicodeRange {start: char, end: char},
     EmptyUnicodeRange,
     WhiteSpace,
     Colon,  // :
@@ -45,12 +46,12 @@ pub enum Primitive {
     CDC,  // -->
 
     // Function
-    Function(~str, ~[~[Primitive]]),  // name, arguments
+    Function(~str, ~[ComponentValue]),  // name, arguments
 
     // Simple block
-    ParenthesisBlock(~[Primitive]),  // (…)
-    SquareBraketBlock(~[Primitive]),  // […]
-    CurlyBraketBlock(~[Primitive]),  // {…}
+    ParenthesisBlock(~[ComponentValue]),  // (…)
+    SquareBraketBlock(~[ComponentValue]),  // […]
+    CurlyBraketBlock(~[ComponentValue]),  // {…}
 
     // These are alwas invalid
     BadURL,
@@ -64,21 +65,21 @@ pub enum Primitive {
 #[deriving(Eq)]
 pub struct Declaration {
     name: ~str,
-    value: ~[Primitive],
+    value: ~[ComponentValue],
     important: bool,
 }
 
 #[deriving(Eq)]
 pub struct QualifiedRule {
-    prelude: ~[Primitive],
-    block: ~[Primitive],
+    prelude: ~[ComponentValue],
+    block: ~[ComponentValue],
 }
 
 #[deriving(Eq)]
 pub struct AtRule {
     name: ~str,
-    prelude: ~[Primitive],
-    block: Option<~[Primitive]>,
+    prelude: ~[ComponentValue],
+    block: Option<~[ComponentValue]>,
 }
 
 #[deriving(Eq)]
