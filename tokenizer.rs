@@ -30,8 +30,8 @@ pub struct SyntaxError {
 }
 
 
-pub struct InputStream {
-    priv data: ~str,
+pub struct Parser {
+    priv input: ~str,
     priv length: uint,  // All counted in bytes, not characters
     priv position: uint,  // All counted in bytes, not characters
     priv line: uint,
@@ -40,12 +40,12 @@ pub struct InputStream {
 }
 
 
-pub impl InputStream {
-    fn from_str(input: &str) -> ~InputStream {
-        let data = preprocess(input);
-        ~InputStream {
-            length: data.len(),
-            data: data,
+pub impl Parser {
+    fn from_str(input: &str) -> ~Parser {
+        let input = preprocess(input);
+        ~Parser {
+            length: input.len(),
+            input: input,
             position: 0,
             line: 1,
             column: 1,
@@ -55,58 +55,58 @@ pub impl InputStream {
 }
 
 
-pub fn consume_component_value(input: &mut InputStream) -> Option<ComponentValue> {
-    consume_comments(input);
-    if input.is_eof() { return None }
-    let c = input.current_char();
+pub fn consume_component_value(parser: &mut Parser) -> Option<ComponentValue> {
+    consume_comments(parser);
+    if parser.is_eof() { return None }
+    let c = parser.current_char();
     Some(match c {
         '-' => {
-            if input.starts_with(~"-->") {
-                input.position += 3;
+            if parser.starts_with(~"-->") {
+                parser.position += 3;
                 CDC
             }
-            else if next_is_namestart_or_escape(input) {
-                consume_ident(input)
+            else if next_is_namestart_or_escape(parser) {
+                consume_ident(parser)
             } else {
-                consume_numeric(input)
+                consume_numeric(parser)
             }
         },
         '<' => {
-            if input.starts_with(~"<!--") {
-                input.position += 4;
+            if parser.starts_with(~"<!--") {
+                parser.position += 4;
                 CDO
             } else {
-                input.position += 1;
+                parser.position += 1;
                 Delim('<')
             }
         },
-        '0'..'9' | '.' | '+' => consume_numeric(input),
-        'u' | 'U' => consume_unicode_range(input),
-        'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(input),
-        _ if c >= '\x80' => consume_ident(input),  // Non-ASCII
+        '0'..'9' | '.' | '+' => consume_numeric(parser),
+        'u' | 'U' => consume_unicode_range(parser),
+        'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(parser),
+        _ if c >= '\x80' => consume_ident(parser),  // Non-ASCII
         _ => {
-            match input.consume_char() {
+            match parser.consume_char() {
                 '\t' | '\n' | ' ' => {
-                    while !input.is_eof() {
-                        match input.current_char() {
+                    while !parser.is_eof() {
+                        match parser.current_char() {
                             '\t' | '\n' | ' '
-                                => input.position += 1,
+                                => parser.position += 1,
                             _ => break,
                         }
                     }
                     WhiteSpace
                 },
-                '"' => consume_quoted_string(input, false),
-                '#' => consume_hash(input),
-                '\'' => consume_quoted_string(input, true),
-                '(' => ParenthesisBlock(consume_block(input, CloseParenthesis)),
+                '"' => consume_quoted_string(parser, false),
+                '#' => consume_hash(parser),
+                '\'' => consume_quoted_string(parser, true),
+                '(' => ParenthesisBlock(consume_block(parser, CloseParenthesis)),
                 ')' => CloseParenthesis,
                 ':' => Colon,
                 ';' => Semicolon,
-                '@' => consume_at_keyword(input),
-                '[' => SquareBraketBlock(consume_block(input, CloseSquareBraket)),
+                '@' => consume_at_keyword(parser),
+                '[' => SquareBraketBlock(consume_block(parser, CloseSquareBraket)),
                 ']' => CloseSquareBraket,
-                '{' => CurlyBraketBlock(consume_block(input, CloseCurlyBraket)),
+                '{' => CurlyBraketBlock(consume_block(parser, CloseCurlyBraket)),
                 '}' => CloseCurlyBraket,
                 _ => Delim(c)
             }
@@ -137,7 +137,7 @@ fn test_preprocess() {
 }
 
 
-impl InputStream {
+impl Parser {
     fn error(&mut self, message: ~str) {
         self.errors.push(SyntaxError{
             message: message, source_line: self.line, source_column: self.column })
@@ -148,11 +148,11 @@ impl InputStream {
 
     // Assumes non-EOF
     #[inline]
-    fn current_char(&self) -> char { str::char_at(self.data, self.position) }
+    fn current_char(&self) -> char { str::char_at(self.input, self.position) }
 
     #[inline]
     fn consume_char(&mut self) -> char {
-        let range = str::char_range_at(self.data, self.position);
+        let range = str::char_range_at(self.input, self.position);
         self.position = range.next;
         range.ch
     }
@@ -164,7 +164,7 @@ impl InputStream {
         let mut position = self.position;
         for n.times {
             if position >= self.length { break }
-            let range = str::char_range_at(self.data, position);
+            let range = str::char_range_at(self.input, position);
             position = range.next;
             chars.push(range.ch);
         }
@@ -176,7 +176,7 @@ impl InputStream {
         // XXX Duplicate str::match_at which is not public.
         let mut i = self.position;
         if i + needle.len() > self.length { return false }
-        let haystack: &str = self.data;
+        let haystack: &str = self.input;
         for needle.each |c| { if haystack[i] != c { return false; } i += 1u; }
         return true;
     }
@@ -184,22 +184,22 @@ impl InputStream {
 
 
 #[inline]
-fn consume_comments(input: &mut InputStream) {
-    while input.starts_with(~"/*") {
-        input.position += 2;  // +2 to consume "/*"
-        match str::find_str_from(input.data, "*/", input.position) {
+fn consume_comments(parser: &mut Parser) {
+    while parser.starts_with(~"/*") {
+        parser.position += 2;  // +2 to consume "/*"
+        match str::find_str_from(parser.input, "*/", parser.position) {
             // +2 to consume "*/"
-            Some(end_position) => input.position = end_position + 2,
-            None => input.position = input.length  // EOF
+            Some(end_position) => parser.position = end_position + 2,
+            None => parser.position = parser.length  // EOF
         }
     }
 }
 
 
-fn consume_block(input: &mut InputStream, ending_token: ComponentValue) -> ~[ComponentValue] {
+fn consume_block(parser: &mut Parser, ending_token: ComponentValue) -> ~[ComponentValue] {
     let mut content = ~[];
     loop {
-        match consume_component_value(input) {
+        match consume_component_value(parser) {
             Some(component_value) => {
                 if component_value == ending_token { return content }
                 content.push(component_value)
@@ -218,8 +218,8 @@ macro_rules! is_match(
 
 
 #[inline]
-fn is_invalid_escape(input: &mut InputStream) -> bool {
-    match input.next_n_chars(2) {
+fn is_invalid_escape(parser: &mut Parser) -> bool {
+    match parser.next_n_chars(2) {
         ['\\', '\n'] | ['\\'] => true,
         _ => false,
     }
@@ -227,43 +227,43 @@ fn is_invalid_escape(input: &mut InputStream) -> bool {
 
 
 #[inline]
-fn is_namestart_or_escape(input: &mut InputStream) -> bool {
-    match input.current_char() {
+fn is_namestart_or_escape(parser: &mut Parser) -> bool {
+    match parser.current_char() {
         'a'..'z' | 'A'..'Z' | '_' => true,
-        '\\' => !is_invalid_escape(input),
+        '\\' => !is_invalid_escape(parser),
         c => c >= '\x80',  // Non-ASCII
     }
 }
 
 
 #[inline]
-fn next_is_namestart_or_escape(input: &mut InputStream) -> bool {
-    input.position += 1;
-    let result = !input.is_eof() && is_namestart_or_escape(input);
-    input.position -= 1;
+fn next_is_namestart_or_escape(parser: &mut Parser) -> bool {
+    parser.position += 1;
+    let result = !parser.is_eof() && is_namestart_or_escape(parser);
+    parser.position -= 1;
     result
 }
 
 
-fn consume_quoted_string(input: &mut InputStream, single_quote: bool) -> ComponentValue {
+fn consume_quoted_string(parser: &mut Parser, single_quote: bool) -> ComponentValue {
     let mut string: ~str = ~"";
-    while !input.is_eof() {
-        match input.consume_char() {
+    while !parser.is_eof() {
+        match parser.consume_char() {
             '"' if !single_quote => break,
             '\'' if single_quote => break,
             '\n' => {
-                input.error(~"Newline in quoted string");
+                parser.error(~"Newline in quoted string");
                 return BadString;
             },
             '\\' => {
-                match input.next_n_chars(1) {
+                match parser.next_n_chars(1) {
                     // Quoted newline
-                    ['\n'] => input.position += 1,
+                    ['\n'] => parser.position += 1,
                     [] => {
-                        input.error(~"Escaped EOF");
+                        parser.error(~"Escaped EOF");
                         return BadString
                     },
-                    _ => string.push_char(consume_escape(input))
+                    _ => string.push_char(consume_escape(parser))
                 }
             }
             c => string.push_char(c),
@@ -273,41 +273,41 @@ fn consume_quoted_string(input: &mut InputStream, single_quote: bool) -> Compone
 }
 
 
-fn consume_hash(input: &mut InputStream) -> ComponentValue {
-    let string = consume_ident_string_rest(input);
+fn consume_hash(parser: &mut Parser) -> ComponentValue {
+    let string = consume_ident_string_rest(parser);
     if string == ~"" { Delim('#') } else { Hash(string) }
 }
 
 
-fn consume_at_keyword(input: &mut InputStream) -> ComponentValue {
-    match consume_ident_string(input) {
+fn consume_at_keyword(parser: &mut Parser) -> ComponentValue {
+    match consume_ident_string(parser) {
         Some(string) => AtKeyword(string),
         None => Delim('@')
     }
 }
 
 
-fn consume_ident(input: &mut InputStream) -> ComponentValue {
-    match consume_ident_string(input) {
+fn consume_ident(parser: &mut Parser) -> ComponentValue {
+    match consume_ident_string(parser) {
         Some(string) => {
-            if input.is_eof() { return Ident(string) }
-            match input.current_char() {
+            if parser.is_eof() { return Ident(string) }
+            match parser.current_char() {
                 '(' => {
-                    input.position += 1;
-                    if ascii_lower(string) == ~"url" { consume_url(input) }
-                    else { Function(string, consume_block(input, CloseParenthesis)) }
+                    parser.position += 1;
+                    if ascii_lower(string) == ~"url" { consume_url(parser) }
+                    else { Function(string, consume_block(parser, CloseParenthesis)) }
                 },
                 _ => Ident(string)
             }
         },
-        None => match input.current_char() {
+        None => match parser.current_char() {
             '-' => {
-                input.position += 1;
+                parser.position += 1;
                 Delim('-')
             },
             '\\' => {
-                input.position += 1;
-                input.error(~"Invalid escape");
+                parser.position += 1;
+                parser.error(~"Invalid escape");
                 Delim('\\')
             },
             _ => fail!(),  // Should not have called consume_ident() here.
@@ -315,29 +315,29 @@ fn consume_ident(input: &mut InputStream) -> ComponentValue {
     }
 }
 
-fn consume_ident_string(input: &mut InputStream) -> Option<~str> {
-    match input.current_char() {
-        '-' => if !next_is_namestart_or_escape(input) { None }
-               else { Some(consume_ident_string_rest(input)) },
-        '\\' if is_invalid_escape(input) => return None,
-        _ if !is_namestart_or_escape(input) => return None,
-        _ => Some(consume_ident_string_rest(input))
+fn consume_ident_string(parser: &mut Parser) -> Option<~str> {
+    match parser.current_char() {
+        '-' => if !next_is_namestart_or_escape(parser) { None }
+               else { Some(consume_ident_string_rest(parser)) },
+        '\\' if is_invalid_escape(parser) => return None,
+        _ if !is_namestart_or_escape(parser) => return None,
+        _ => Some(consume_ident_string_rest(parser))
     }
 }
 
 
-fn consume_ident_string_rest(input: &mut InputStream) -> ~str {
+fn consume_ident_string_rest(parser: &mut Parser) -> ~str {
     let mut string = ~"";
-    while !input.is_eof() {
-        let c = input.current_char();
+    while !parser.is_eof() {
+        let c = parser.current_char();
         let next_char = match c {
             'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-'  => {
-                input.position += 1; c },
-            _ if c >= '\x80' => input.consume_char(),  // Non-ASCII
+                parser.position += 1; c },
+            _ if c >= '\x80' => parser.consume_char(),  // Non-ASCII
             '\\' => {
-                if is_invalid_escape(input) { break }
-                input.position += 1;
-                consume_escape(input)
+                if is_invalid_escape(parser) { break }
+                parser.position += 1;
+                consume_escape(parser)
             },
             _ => break
         };
@@ -347,94 +347,93 @@ fn consume_ident_string_rest(input: &mut InputStream) -> ~str {
 }
 
 
-fn consume_numeric(input: &mut InputStream) -> ComponentValue {
-    let c = input.consume_char();
+fn consume_numeric(parser: &mut Parser) -> ComponentValue {
+    let c = parser.consume_char();
     match c {
-        '-' | '+' => consume_numeric_sign(input, c),
+        '-' | '+' => consume_numeric_sign(parser, c),
         '.' => {
-            if input.is_eof() { return Delim('.') }
-            match input.current_char() {
-                '0'..'9' => consume_numeric_fraction(input, ~"."),
+            if parser.is_eof() { return Delim('.') }
+            match parser.current_char() {
+                '0'..'9' => consume_numeric_fraction(parser, ~"."),
                 _ => Delim('.'),
             }
         },
-        '0'..'9' => consume_numeric_rest(input, c),
+        '0'..'9' => consume_numeric_rest(parser, c),
         _ => fail!(),  // consume_numeric() should not have been called here.
     }
 }
 
 
-fn consume_numeric_sign(input: &mut InputStream, sign: char)
+fn consume_numeric_sign(parser: &mut Parser, sign: char)
         -> ComponentValue {
-    if input.is_eof() { return Delim(sign) }
-    match input.current_char() {
+    if parser.is_eof() { return Delim(sign) }
+    match parser.current_char() {
         '.' => {
-            input.position += 1;
-            if !input.is_eof()
-                    && is_match!(input.current_char(), '0'..'9') {
-                consume_numeric_fraction(
-                    input, str::from_char(sign) + ~".")
+            parser.position += 1;
+            if !parser.is_eof()
+                    && is_match!(parser.current_char(), '0'..'9') {
+                consume_numeric_fraction(parser, str::from_char(sign) + ~".")
             } else {
-                input.position -= 1;
+                parser.position -= 1;
                 Delim(sign)
             }
         },
-        '0'..'9' => consume_numeric_rest(input, sign),
+        '0'..'9' => consume_numeric_rest(parser, sign),
         _ => Delim(sign)
     }
 }
 
 
-fn consume_numeric_rest(input: &mut InputStream, initial_char: char)
+fn consume_numeric_rest(parser: &mut Parser, initial_char: char)
         -> ComponentValue {
     let mut string = str::from_char(initial_char);
-    while !input.is_eof() {
-        let c = input.current_char();
+    while !parser.is_eof() {
+        let c = parser.current_char();
         match c {
-            '0'..'9' => { string.push_char(c); input.position += 1 },
+            '0'..'9' => { string.push_char(c); parser.position += 1 },
             '.' => {
-                input.position += 1;
-                if !input.is_eof()
-                        && is_match!(input.current_char(), '0'..'9') {
+                parser.position += 1;
+                if !parser.is_eof()
+                        && is_match!(parser.current_char(), '0'..'9') {
                     string.push_char('.');
-                    return consume_numeric_fraction(input, string);
+                    return consume_numeric_fraction(parser, string);
                 } else {
-                    input.position -= 1; break
+                    parser.position -= 1; break
                 }
             },
-            _ => match consume_scientific_number(input, string) {
+            _ => match consume_scientific_number(parser, string) {
                 Ok(token) => return token,
                 Err(s) => { string = s; break }
             }
         }
     }
-    consume_numeric_end(input, NumericValue::new(string, true))
+    consume_numeric_end(parser, NumericValue::new(string, true))
 }
 
 
-fn consume_numeric_fraction(input: &mut InputStream, string: ~str)
+fn consume_numeric_fraction(parser: &mut Parser, string: ~str)
         -> ComponentValue {
     let mut string: ~str = string;
-    while !input.is_eof() {
-        match input.current_char() {
-            '0'..'9' => string.push_char(input.consume_char()),
-            _ => match consume_scientific_number(input, string) {
+    while !parser.is_eof() {
+        match parser.current_char() {
+            '0'..'9' => string.push_char(parser.consume_char()),
+            _ => match consume_scientific_number(parser, string) {
                 Ok(token) => return token,
                 Err(s) => { string = s; break }
             }
         }
     }
-    consume_numeric_end(input, NumericValue::new(string, false))
+    consume_numeric_end(parser, NumericValue::new(string, false))
 }
 
 
-fn consume_numeric_end(input: &mut InputStream, value: NumericValue)
+fn consume_numeric_end(parser: &mut Parser, value: NumericValue)
         -> ComponentValue {
-    if input.is_eof() { return Number(value) }
-    match input.current_char() {
-        '%' => { input.position += 1; Percentage(value) },
+    if parser.is_eof() { return Number(value) }
+    match parser.current_char() {
+        '%' => { parser.position += 1; Percentage(value) },
         _ => {
-            match consume_ident_string(input) {
+            match consume_ident_string(parser) {
                 Some(unit) => Dimension(value, unit),
                 None => Number(value),
             }
@@ -443,9 +442,9 @@ fn consume_numeric_end(input: &mut InputStream, value: NumericValue)
 }
 
 
-fn consume_scientific_number(input: &mut InputStream, string: ~str)
+fn consume_scientific_number(parser: &mut Parser, string: ~str)
         -> Result<ComponentValue, ~str> {
-    let next_3 = input.next_n_chars(3);
+    let next_3 = parser.next_n_chars(3);
     let mut string: ~str = string;
     if (next_3.len() >= 2
         && (next_3[0] == 'e' || next_3[0] == 'E')
@@ -453,7 +452,7 @@ fn consume_scientific_number(input: &mut InputStream, string: ~str)
     ) {
         string.push_char(next_3[0]);
         string.push_char(next_3[1]);
-        input.position += 2;
+        parser.position += 2;
     } else if (
         next_3.len() == 3
         && (next_3[0] == 'e' || next_3[0] == 'E')
@@ -463,68 +462,68 @@ fn consume_scientific_number(input: &mut InputStream, string: ~str)
         string.push_char(next_3[0]);
         string.push_char(next_3[1]);
         string.push_char(next_3[2]);
-        input.position += 3;
+        parser.position += 3;
     } else {
         return Err(string)
     }
-    while !input.is_eof() && is_match!(input.current_char(), '0'..'9') {
-        string.push_char(input.consume_char())
+    while !parser.is_eof() && is_match!(parser.current_char(), '0'..'9') {
+        string.push_char(parser.consume_char())
     }
     Ok(Number(NumericValue::new(string, false)))
 }
 
 
-fn consume_url(input: &mut InputStream) -> ComponentValue {
-    while !input.is_eof() {
-        match input.current_char() {
-            '\t' | '\n' | ' ' => input.position += 1,
-            '"' => return consume_quoted_url(input, false),
-            '\'' => return consume_quoted_url(input, true),
-            ')' => { input.position += 1; break },
-            _ => return consume_unquoted_url(input),
+fn consume_url(parser: &mut Parser) -> ComponentValue {
+    while !parser.is_eof() {
+        match parser.current_char() {
+            '\t' | '\n' | ' ' => parser.position += 1,
+            '"' => return consume_quoted_url(parser, false),
+            '\'' => return consume_quoted_url(parser, true),
+            ')' => { parser.position += 1; break },
+            _ => return consume_unquoted_url(parser),
         }
     }
     URL(~"")
 }
 
 
-fn consume_quoted_url(input: &mut InputStream, single_quote: bool)
+fn consume_quoted_url(parser: &mut Parser, single_quote: bool)
         -> ComponentValue {
-    input.position += 1;  // The initial quote
-    match consume_quoted_string(input, single_quote) {
-        String(string) => consume_url_end(input, string),
-        BadString => consume_bad_url(input),
+    parser.position += 1;  // The initial quote
+    match consume_quoted_string(parser, single_quote) {
+        String(string) => consume_url_end(parser, string),
+        BadString => consume_bad_url(parser),
         // consume_quoted_string() only returns String or BadString
         _ => fail!(),
     }
 }
 
 
-fn consume_url_end(input: &mut InputStream, string: ~str)
+fn consume_url_end(parser: &mut Parser, string: ~str)
         -> ComponentValue {
-    while !input.is_eof() {
-        match input.consume_char() {
+    while !parser.is_eof() {
+        match parser.consume_char() {
             '\t' | '\n' | ' ' => (),
             ')' => break,
-            _ => return consume_bad_url(input)
+            _ => return consume_bad_url(parser)
         }
     }
     URL(string)
 }
 
 
-fn consume_unquoted_url(input: &mut InputStream) -> ComponentValue {
+fn consume_unquoted_url(parser: &mut Parser) -> ComponentValue {
     let mut string = ~"";
-    while !input.is_eof() {
-        let next_char = match input.consume_char() {
+    while !parser.is_eof() {
+        let next_char = match parser.consume_char() {
             '\t' | '\n' | ' '
-                => return consume_url_end(input, string),
+                => return consume_url_end(parser, string),
             ')' => break,
             '\x00'..'\x08' | '\x0E'..'\x1F' | '\x7F'..'\x9F'  // non-printable
-                | '"' | '\'' | '(' => return consume_bad_url(input),
-            '\\' => match input.next_n_chars(1) {
-                ['\n'] | [] => return consume_bad_url(input),
-                _ => consume_escape(input)
+                | '"' | '\'' | '(' => return consume_bad_url(parser),
+            '\\' => match parser.next_n_chars(1) {
+                ['\n'] | [] => return consume_bad_url(parser),
+                _ => consume_escape(parser)
             },
             c => c
         };
@@ -534,49 +533,49 @@ fn consume_unquoted_url(input: &mut InputStream) -> ComponentValue {
 }
 
 
-fn consume_bad_url(input: &mut InputStream) -> ComponentValue {
+fn consume_bad_url(parser: &mut Parser) -> ComponentValue {
     // Consume up to the closing )
-    while !input.is_eof() {
-        match input.consume_char() {
+    while !parser.is_eof() {
+        match parser.consume_char() {
             ')' => break,
-            '\\' => input.position += 1, // Skip an escaped ) or \
+            '\\' => parser.position += 1, // Skip an escaped ) or \
             _ => ()
         }
     }
-    input.error(~"Invalid URL syntax");
+    parser.error(~"Invalid URL syntax");
     BadURL
 }
 
 
-fn consume_unicode_range(input: &mut InputStream)
+fn consume_unicode_range(parser: &mut Parser)
         -> ComponentValue {
-    let next_3 = input.next_n_chars(3);
+    let next_3 = parser.next_n_chars(3);
     // We got here with U or u
     assert!(next_3[0] == 'u' || next_3[0] == 'U');
     // Check if this is indeed an unicode range. Fallback on ident.
     if next_3.len() == 3 && next_3[1] == '+' {
         match next_3[2] {
-            '0'..'9' | 'a'..'f' | 'A'..'F' => input.position += 2,
-            _ => { return consume_ident(input) }
+            '0'..'9' | 'a'..'f' | 'A'..'F' => parser.position += 2,
+            _ => { return consume_ident(parser) }
         }
-    } else { return consume_ident(input) }
+    } else { return consume_ident(parser) }
 
     let mut hex = ~[];
-    while hex.len() < 6 && !input.is_eof() {
-        let c = input.current_char();
+    while hex.len() < 6 && !parser.is_eof() {
+        let c = parser.current_char();
         match c {
             '0'..'9' | 'A'..'F' | 'a'..'f' => {
-                hex.push(c); input.position += 1 },
+                hex.push(c); parser.position += 1 },
             _ => break
         }
     }
     assert!(hex.len() > 0);
     let max_question_marks = 6u - hex.len();
     let mut question_marks = 0u;
-    while question_marks < max_question_marks && !input.is_eof()
-            && input.current_char() == '?' {
+    while question_marks < max_question_marks && !parser.is_eof()
+            && parser.current_char() == '?' {
         question_marks += 1;
-        input.position += 1
+        parser.position += 1
     }
     let start: char, end: char;
     if question_marks > 0 {
@@ -585,13 +584,13 @@ fn consume_unicode_range(input: &mut InputStream)
     } else {
         start = char_from_hex(hex);
         hex = ~[];
-        if !input.is_eof() && input.current_char() == '-' {
-            input.position += 1;
-            while hex.len() < 6 && !input.is_eof() {
-                let c = input.current_char();
+        if !parser.is_eof() && parser.current_char() == '-' {
+            parser.position += 1;
+            while hex.len() < 6 && !parser.is_eof() {
+                let c = parser.current_char();
                 match c {
                     '0'..'9' | 'A'..'F' | 'a'..'f' => {
-                        hex.push(c); input.position += 1 },
+                        hex.push(c); parser.position += 1 },
                     _ => break
                 }
             }
@@ -614,22 +613,22 @@ static MAX_UNICODE: char = '\U0010FFFF';
 // Assumes that the U+005C REVERSE SOLIDUS (\) has already been consumed
 // and that the next input character has already been verified
 // to not be a newline or EOF.
-fn consume_escape(input: &mut InputStream) -> char {
-    let c = input.consume_char();
+fn consume_escape(parser: &mut Parser) -> char {
+    let c = parser.consume_char();
     match c {
         '0'..'9' | 'A'..'F' | 'a'..'f' => {
             let mut hex = ~[c];
-            while hex.len() < 6 && !input.is_eof() {
-                let c = input.current_char();
+            while hex.len() < 6 && !parser.is_eof() {
+                let c = parser.current_char();
                 match c {
                     '0'..'9' | 'A'..'F' | 'a'..'f' => {
-                        hex.push(c); input.position += 1 },
+                        hex.push(c); parser.position += 1 },
                     _ => break
                 }
             }
-            if !input.is_eof() {
-                match input.current_char() {
-                    '\t' | '\n' | ' ' => input.position += 1,
+            if !parser.is_eof() {
+                match parser.current_char() {
+                    '\t' | '\n' | ' ' => parser.position += 1,
                     _ => ()
                 }
             }
@@ -651,17 +650,16 @@ fn char_from_hex(hex: &[char]) -> char {
 fn test_component_values() {
     fn assert_component_values(input: &str, expected_component_values: &[ComponentValue],
                                expected_errors: &[~str]) {
-        let mut stream = InputStream::from_str(input);
+        let mut parser = Parser::from_str(input);
         let mut result: ~[ComponentValue] = ~[];
         loop {
-            match consume_component_value(stream) {
+            match consume_component_value(parser) {
                 Some(component_value) => result.push(component_value),
                 None => break
             }
         }
-        let errors = vec::map_consume(
-            core::util::replace(&mut stream.errors, ~[]),
-            |SyntaxError{message: m, source_line: _, source_column: _}| m);
+        let errors = vec::map_consume(match parser { ~Parser {errors: e, _} => e },
+                                      |SyntaxError {message: m, _}| m);
         check_results(input, result, expected_component_values,
                       errors, expected_errors);
     }
