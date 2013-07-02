@@ -55,6 +55,16 @@ pub impl Parser {
 }
 
 
+pub fn iter_component_values(parser: &mut Parser, it: &fn (v: ComponentValue) -> bool) -> bool {
+    loop {
+        match consume_component_value(parser) {
+            Some(component_value) => if !it(component_value) { return false },
+            None => return true,
+        }
+    }
+}
+
+
 pub fn consume_component_value(parser: &mut Parser) -> Option<ComponentValue> {
     consume_comments(parser);
     if parser.is_eof() { return None }
@@ -198,15 +208,11 @@ fn consume_comments(parser: &mut Parser) {
 
 fn consume_block(parser: &mut Parser, ending_token: ComponentValue) -> ~[ComponentValue] {
     let mut content = ~[];
-    loop {
-        match consume_component_value(parser) {
-            Some(component_value) => {
-                if component_value == ending_token { return content }
-                content.push(component_value)
-            }
-            None => return content
-        }
+    for iter_component_values(parser) |component_value| {
+        if component_value == ending_token { break }
+        content.push(component_value)
     }
+    content
 }
 
 
@@ -641,6 +647,7 @@ fn consume_escape(parser: &mut Parser) -> char {
 }
 
 
+#[inline]
 fn char_from_hex(hex: &[char]) -> char {
     uint::from_str_radix(str::from_chars(hex), 16).get() as char
 }
@@ -651,13 +658,8 @@ fn test_component_values() {
     fn assert_component_values(input: &str, expected_component_values: &[ComponentValue],
                                expected_errors: &[~str]) {
         let mut parser = Parser::from_str(input);
-        let mut result: ~[ComponentValue] = ~[];
-        loop {
-            match consume_component_value(parser) {
-                Some(component_value) => result.push(component_value),
-                None => break
-            }
-        }
+        let mut result = ~[];
+        for iter_component_values(parser) |v| { result.push(v) }
         let errors = vec::map_consume(match parser { ~Parser {errors: e, _} => e },
                                       |SyntaxError {message: m, _}| m);
         check_results(input, result, expected_component_values,
