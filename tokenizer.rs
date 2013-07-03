@@ -806,3 +806,151 @@ fn test_component_values() {
             WhiteSpace])], []);
     assert_component_values("'foo", [String(~"foo")], []);
 }
+
+
+#[cfg(test)]
+pub fn json_to_component_value_list(json_items: ~[extra::json::Json])
+                                    -> (~[ComponentValue], ~[~str]) {
+    fn numeric(representation: ~str, value: float, number_type: ~str) -> NumericValue {
+        let is_integer = match number_type {
+            ~"integer" => true,
+            ~"number" => false,
+            _ => fail!(),
+        };
+        let result = NumericValue::new(representation, is_integer);
+        assert_eq!(result.value as float, value);
+        result
+    }
+
+    let mut component_values = ~[];
+    let mut errors = ~[];
+
+    macro_rules! recurse(
+        ($nested_json:expr) => ({
+            let (content, nested_errors) = json_to_component_value_list($nested_json.to_owned());
+            errors += nested_errors;
+            content
+        });
+    )
+
+    do vec::consume(json_items) |_, item| {
+        match item {
+            extra::json::List([extra::json::String(~"ident"),
+                               extra::json::String(v)])
+            => component_values.push(Ident(v)),
+            extra::json::List([extra::json::String(~"at-keyword"),
+                               extra::json::String(v)])
+            => component_values.push(AtKeyword(v)),
+            extra::json::List([extra::json::String(~"url"),
+                               extra::json::String(v)])
+            => component_values.push(URL(v)),
+            extra::json::List([extra::json::String(~"string"),
+                               extra::json::String(v)])
+            => component_values.push(String(v)),
+
+            extra::json::List([extra::json::String(~"hash"),
+                               extra::json::String(v),
+                               extra::json::String(~"unrestricted")])
+            => component_values.push(Hash(v)),
+            extra::json::List([extra::json::String(~"hash"),
+                               extra::json::String(v),
+                               extra::json::String(~"id")])
+
+            => component_values.push(IDHash(v)),
+            extra::json::List([extra::json::String(~"number"),
+                               extra::json::String(representation),
+                               extra::json::Number(value),
+                               extra::json::String(number_type)])
+            => component_values.push(Number(numeric(representation, value, number_type))),
+            extra::json::List([extra::json::String(~"percentage"),
+                               extra::json::String(representation),
+                               extra::json::Number(value),
+                               extra::json::String(number_type)])
+            => component_values.push(Percentage(numeric(representation, value, number_type))),
+            extra::json::List([extra::json::String(~"dimension"),
+                               extra::json::String(representation),
+                               extra::json::Number(value),
+                               extra::json::String(number_type),
+                               extra::json::String(dimension)])
+            => component_values.push(Dimension(numeric(representation, value, number_type),
+                                               dimension)),
+            // XXX TODO: unicode ranges
+
+            extra::json::String(~" ") => component_values.push(WhiteSpace),
+            extra::json::String(~":") => component_values.push(Colon),
+            extra::json::String(~";") => component_values.push(Semicolon),
+            extra::json::String(~"<!--") => component_values.push(CDO),
+            extra::json::String(~"-->") => component_values.push(CDC),
+            extra::json::String(string) => {
+                assert_eq!(string.len(), 1);
+                component_values.push(Delim(string[0] as char))
+            },
+
+            extra::json::List([extra::json::String(~"{}"),
+                               .. content])
+            => component_values.push(CurlyBraketBlock(recurse!(content))),
+            extra::json::List([extra::json::String(~"[]"),
+                               .. content])
+            => component_values.push(SquareBraketBlock(recurse!(content))),
+            extra::json::List([extra::json::String(~"()"),
+                               .. content])
+            => component_values.push(CurlyBraketBlock(recurse!(content))),
+            extra::json::List([extra::json::String(~"function"),
+                               extra::json::String(name),
+                               .. content])
+            => component_values.push(Function(name, recurse!(content))),
+
+            extra::json::List([extra::json::String(~"error"),
+                               extra::json::String(~"}")])
+                => component_values.push(CloseCurlyBraket),
+            extra::json::List([extra::json::String(~"error"),
+                               extra::json::String(~"]")])
+                => component_values.push(CloseSquareBraket),
+            extra::json::List([extra::json::String(~"error"),
+                               extra::json::String(~")")])
+                => component_values.push(CloseSquareBraket),
+            extra::json::List([extra::json::String(~"error"),
+                               extra::json::String(~"bad-string")])
+                => component_values.push(BadString),
+            extra::json::List([extra::json::String(~"error"),
+                               extra::json::String(~"bad-url")])
+                => component_values.push(BadURL),
+            extra::json::List([extra::json::String(~"error"),
+                               extra::json::String(error)])
+                => errors.push(error),
+
+            _ => fail!(fmt!("%?", item))
+        }
+    }
+    (component_values, errors)
+}
+
+
+#[test]
+fn test_component_value_list_json() {
+    let items = match extra::json::from_str(include_str!(
+            // https://github.com/SimonSapin/tinycss2/tree/master/tinycss2/tests
+            // TODO: use git subtree or something to have the JSON files in this repository.
+            "../tinycss2/tinycss2/tests/component_value_list.json")) {
+        Ok(extra::json::List(items)) => items,
+        _ => fail!()
+    };
+    assert!(items.len() % 2 == 0);
+    let mut input: Option<~str> = None;
+    do vec::consume(items) |_, item| {
+        match (&input, item) {
+            (&None, extra::json::String(string)) => input = Some(string),
+            (&Some(_), extra::json::List(expected)) => {
+                let input = input.swap_unwrap();
+                let mut parser = Parser::from_str(input);
+                let mut results = ~[];
+                for iter_component_values(parser) |c| { results.push(c) }
+                let errors = vec::map_consume(match parser { ~Parser {errors: e, _} => e },
+                                              |SyntaxError {message: m, _}| m);
+                let (expected, expected_errors) = json_to_component_value_list(expected);
+                check_results(input, results, expected, errors, expected_errors);
+            }
+            _ => fail!()
+        };
+    }
+}

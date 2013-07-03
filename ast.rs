@@ -33,6 +33,7 @@ pub enum ComponentValue {
     Ident(~str),
     AtKeyword(~str),
     Hash(~str),
+    IDHash(~str),  // Hash token that is a valid ID selector.
     String(~str),
     URL(~str),
     Delim(char),
