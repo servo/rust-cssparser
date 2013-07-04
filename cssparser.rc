@@ -1,6 +1,8 @@
 #[link(name = "cssparser", vers = "0.1")];
 #[crate_type = "lib"];
 
+extern mod extra;
+
 pub mod tokenizer;
 pub mod parser;
 pub mod utils;
