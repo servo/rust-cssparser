@@ -222,10 +222,7 @@ macro_rules! is_match(
 
 #[inline]
 fn is_invalid_escape(parser: &mut Parser) -> bool {
-    match parser.next_n_chars(2) {
-        ['\\', '\n'] | ['\\'] => true,
-        _ => false,
-    }
+    parser.next_n_chars(2) == ~['\\', '\n']
 }
 
 
@@ -260,12 +257,8 @@ fn consume_quoted_string(parser: &mut Parser, single_quote: bool) -> ComponentVa
             },
             '\\' => {
                 match parser.next_n_chars(1) {
-                    // Quoted newline
-                    ['\n'] => parser.position += 1,
-                    [] => {
-                        parser.error(~"Escaped EOF");
-                        return BadString
-                    },
+                    ['\n'] => parser.position += 1,  // Escaped newline
+                    [] => (),  // Escaped EOF
                     _ => string.push_char(consume_escape(parser))
                 }
             }
@@ -277,8 +270,13 @@ fn consume_quoted_string(parser: &mut Parser, single_quote: bool) -> ComponentVa
 
 
 fn consume_hash(parser: &mut Parser) -> ComponentValue {
-    let string = consume_ident_string_rest(parser);
-    if string == ~"" { Delim('#') } else { Hash(string) }
+    match consume_ident_string(parser) {
+        Some(string) => IDHash(string),
+        None => match consume_ident_string_rest(parser) {
+            ~"" => Delim('#'),
+            string => Hash(string),
+        }
+    }
 }
 
 
@@ -616,8 +614,9 @@ static MAX_UNICODE: char = '\U0010FFFF';
 
 // Assumes that the U+005C REVERSE SOLIDUS (\) has already been consumed
 // and that the next input character has already been verified
-// to not be a newline or EOF.
+// to not be a newline.
 fn consume_escape(parser: &mut Parser) -> char {
+    if parser.is_eof() { return '\uFFFD' }  // Escaped EOF
     let c = parser.consume_char();
     match c {
         '0'..'9' | 'A'..'F' | 'a'..'f' => {
@@ -684,7 +683,7 @@ fn test_component_values() {
     assert_component_values("'\\''", [String(~"'")], []);
     assert_component_values("\"\\\"\"", [String(~"\"")], []);
     assert_component_values("\"\\\"", [String(~"\"")], []);
-    assert_component_values("'\\", [BadString], [~"Escaped EOF"]);
+    assert_component_values("'\\", [String(~"")], []);
     assert_component_values("\"0\\0000000\"", [String(~"0\uFFFD0")], []);
     assert_component_values("\"0\\000000 0\"", [String(~"0\uFFFD0")], []);
     assert_component_values("'z\n'a", [BadString, String(~"a")],
@@ -692,7 +691,7 @@ fn test_component_values() {
 
     assert_component_values("Lorem\\ ipsu\\6D dolor \\sit",
         [Ident(~"Lorem ipsumdolor"), WhiteSpace, Ident(~"sit")], []);
-    assert_component_values("foo\\", [Ident(~"foo"), Delim('\\')], [~"Invalid escape"]);
+    assert_component_values("foo\\", [Ident(~"foo\uFFFD")], []);
     assert_component_values("foo\\\nbar",
         [Ident(~"foo"), Delim('\\'), WhiteSpace, Ident(~"bar")],
         [~"Invalid escape"]);
@@ -705,7 +704,7 @@ fn test_component_values() {
     assert_component_values("\\Lipsum", [Ident(~"Lipsum")], []);
     assert_component_values("\\\nLipsum", [Delim('\\'), WhiteSpace, Ident(~"Lipsum")],
         [~"Invalid escape"]);
-    assert_component_values("\\", [Delim('\\')], [~"Invalid escape"]);
+    assert_component_values("\\", [Ident(~"\uFFFD")], []);
     assert_component_values("\x7f\x80\x81", [Delim('\x7F'), Ident(~"\x80\x81")], []);
 
     assert_component_values("func()", [Function(~"func", ~[])], []);
@@ -714,16 +713,16 @@ fn test_component_values() {
 
     assert_component_values("##00(#\\##\\\n#\\",
         [Delim('#'), Hash(~"00"), ParenthesisBlock(~[
-            Hash(~"#"), Delim('#'),
-            Delim('\\'), WhiteSpace, Delim('#'), Delim('\\')])],
-        [~"Invalid escape", ~"Invalid escape"]);
+            IDHash(~"#"), Delim('#'),
+            Delim('\\'), WhiteSpace, IDHash(~"\uFFFD")])],
+        [~"Invalid escape"]);
 
     assert_component_values("@@page(@\\x@-x@-\\x@--@\\\n@\\", [
         Delim('@'), AtKeyword(~"page"), ParenthesisBlock(~[
             AtKeyword(~"x"), AtKeyword(~"-x"), AtKeyword(~"-x"),
             Delim('@'), Delim('-'), Delim('-'),
-            Delim('@'), Delim('\\'), WhiteSpace, Delim('@'), Delim('\\')])
-    ], [~"Invalid escape", ~"Invalid escape"]);
+            Delim('@'), Delim('\\'), WhiteSpace, AtKeyword(~"\uFFFD")])
+    ], [~"Invalid escape"]);
 
     assert_component_values("<!-<!-----><",
         [Delim('<'), Delim('!'), Delim('-'), CDO, Delim('-'), CDC, Delim('<')],
@@ -790,9 +789,9 @@ fn test_component_values() {
         Dimension(Float!(0.5, ~"+.5"), ~"u"), WhiteSpace,
         Dimension(Integer!(-1, ~"-1"), ~"url"), ParenthesisBlock(~[
             Number(Integer!(7, ~"7")),
-            Number(Integer!(0, ~"-0")), Delim('\\'),
+            Dimension(Integer!(0, ~"-0"), ~"\uFFFD"),
         ]),
-    ], [~"Invalid escape"]);
+    ], []);
 
     assert_component_values("", [], []);
     assert_component_values("42 foo([aa ()b], -){\n  }", [
@@ -901,7 +900,7 @@ pub fn json_to_component_value_list(json_items: ~[json::Json])
             JList([JString(~"error"), JString(~"bad-escape")])
             => errors.push(~"Invalid escape"),
 
-            item => fail!(fmt!("%?", item))
+            item => fail!(fmt!("Unexpected JSON: %?", item))
         }
     }
     (component_values, errors)
