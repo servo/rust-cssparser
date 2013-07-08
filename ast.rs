@@ -45,6 +45,12 @@ pub enum ComponentValue {
     WhiteSpace,
     Colon,  // :
     Semicolon,  // ;
+    IncludeMath, // ~=
+    DashMatch, // |=
+    PrefixMatch, // ^=
+    SuffixMatch, // $=
+    SubstringMatch, // *=
+    Column, // ||
     CDO,  // <!--
     CDC,  // -->
 

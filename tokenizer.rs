@@ -1,26 +1,9 @@
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
-//
-// The output of the tokenization step is a series of zero or more
-// of the following tokens:
-// ident, function, at-keyword, hash, string, bad-string, url, bad-url,
-// delim, number, percentage, dimension, unicode-range, whitespace,
-// cdo, cdc, colon, semicolon, [, ], (, ), {, }.
-//
-// ident, function, at-keyword, hash, string, and url tokens
-// have a value composed of zero or more characters.
-// Delim tokens have a value composed of a single character.
-// Number, percentage, and dimension tokens have a representation
-// composed of 1 or more character, a numeric value,
-// and a type flag set to either "integer" or "number".
-// The type flag defaults to "integer" if not otherwise set.
-// Dimension tokens additionally have a unit
-// composed of one or more characters.
-// Unicode-range tokens have a range of characters.
 
 use std::{str, u32, vec};
 use extra::json;
-use super::utils::*;
-use super::ast::*;
+use utils::*;
+use ast::*;
 
 
 pub struct SyntaxError {
@@ -119,6 +102,18 @@ pub fn consume_component_value(parser: &mut Parser) -> Option<ComponentValue> {
                 ']' => CloseSquareBraket,
                 '{' => CurlyBraketBlock(consume_block(parser, CloseCurlyBraket)),
                 '}' => CloseCurlyBraket,
+                '~' if !parser.is_eof() && parser.current_char() == '='
+                => { parser.position += 1; IncludeMath }
+                '|' if !parser.is_eof() && parser.current_char() == '='
+                => { parser.position += 1; DashMatch }
+                '|' if !parser.is_eof() && parser.current_char() == '|'
+                => { parser.position += 1; Column }
+                '^' if !parser.is_eof() && parser.current_char() == '='
+                => { parser.position += 1; PrefixMatch }
+                '$' if !parser.is_eof() && parser.current_char() == '='
+                => { parser.position += 1; SuffixMatch }
+                '*' if !parser.is_eof() && parser.current_char() == '='
+                => { parser.position += 1; SubstringMatch }
                 _ => Delim(c)
             }
         }
@@ -253,6 +248,7 @@ fn consume_quoted_string(parser: &mut Parser, single_quote: bool) -> ComponentVa
             '\'' if single_quote => break,
             '\n' => {
                 parser.error(~"Newline in quoted string");
+                parser.position -= 1;
                 return BadString;
             },
             '\\' => {
@@ -470,7 +466,7 @@ fn consume_scientific_number(parser: &mut Parser, string: ~str)
     while !parser.is_eof() && is_match!(parser.current_char(), '0'..'9') {
         string.push_char(parser.consume_char())
     }
-    Ok(Number(NumericValue::new(string, false)))
+    Ok(consume_numeric_end(parser, NumericValue::new(string, false)))
 }
 
 
@@ -520,10 +516,10 @@ fn consume_unquoted_url(parser: &mut Parser) -> ComponentValue {
             '\t' | '\n' | ' '
                 => return consume_url_end(parser, string),
             ')' => break,
-            '\x00'..'\x08' | '\x0E'..'\x1F' | '\x7F'..'\x9F'  // non-printable
+            '\x00'..'\x08' | '\x0B' | '\x0E'..'\x1F' | '\x7F'  // non-printable
                 | '"' | '\'' | '(' => return consume_bad_url(parser),
             '\\' => match parser.next_n_chars(1) {
-                ['\n'] | [] => return consume_bad_url(parser),
+                ['\n'] => return consume_bad_url(parser),
                 _ => consume_escape(parser)
             },
             c => c
@@ -686,7 +682,7 @@ fn test_component_values() {
     assert_component_values("'\\", [String(~"")], []);
     assert_component_values("\"0\\0000000\"", [String(~"0\uFFFD0")], []);
     assert_component_values("\"0\\000000 0\"", [String(~"0\uFFFD0")], []);
-    assert_component_values("'z\n'a", [BadString, String(~"a")],
+    assert_component_values("'z\n'a", [BadString, WhiteSpace, String(~"a")],
         [~"Newline in quoted string"]);
 
     assert_component_values("Lorem\\ ipsu\\6D dolor \\sit",
@@ -775,7 +771,7 @@ fn test_component_values() {
         Number(Float!(-0.5, ~"-.5")), Delim('+'), Delim('-'), Delim('.')
     ], []);
     assert_component_values("42e2px 42e+2 42e-2.", [
-        Number(Float!(4200., ~"42e2")), Ident(~"px"), WhiteSpace,
+        Dimension(Float!(4200., ~"42e2"), ~"px"), WhiteSpace,
         Number(Float!(4200., ~"42e+2")), WhiteSpace,
         Number(Float!(0.42, ~"42e-2")), Delim('.')
     ], []);
@@ -895,7 +891,7 @@ fn test_component_value_list_json() {
                 let mut results = ~[];
                 for iter_component_values(parser) |c| { results.push(c) }
                 let results = component_value_list_to_json(results);
-                check_results(input, results, expected, [""], [""]);
+                assert_vec_equals(results, expected, input);
             }
             _ => fail!()
         };
