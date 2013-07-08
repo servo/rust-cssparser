@@ -6,6 +6,13 @@ use utils::*;
 use ast::*;
 
 
+pub fn consume_component_values_list(parser: &mut Parser) -> ~[ComponentValue] {
+    let mut result = ~[];
+    for each_component_values(parser) |component_value| { result.push(component_value) }
+    result
+}
+
+
 pub struct SyntaxError {
     message: ~str,
 //    source_location: ~str,
@@ -39,7 +46,8 @@ impl Parser {
 }
 
 
-pub fn iter_component_values(parser: &mut Parser, it: &fn (v: ComponentValue) -> bool) -> bool {
+// Old style for loop
+pub fn each_component_values(parser: &mut Parser, it: &fn (v: ComponentValue) -> bool) -> bool {
     loop {
         match consume_component_value(parser) {
             Some(component_value) => if !it(component_value) { return false },
@@ -200,7 +208,7 @@ fn consume_comments(parser: &mut Parser) {
 
 fn consume_block(parser: &mut Parser, ending_token: ComponentValue) -> ~[ComponentValue] {
     let mut content = ~[];
-    for iter_component_values(parser) |component_value| {
+    for each_component_values(parser) |component_value| {
         if component_value == ending_token { break }
         content.push(component_value)
     }
@@ -731,9 +739,7 @@ fn test_component_value_list_json() {
             (&Some(_), json::List(expected)) => {
                 let input = input.swap_unwrap();
                 let mut parser = Parser::from_str(input);
-                let mut results = ~[];
-                for iter_component_values(parser) |c| { results.push(c) }
-                let results = component_value_list_to_json(results);
+                let results = component_value_list_to_json(consume_component_values_list(parser));
                 assert_vec_equals(results, expected, input);
             }
             _ => fail!()
