@@ -2,15 +2,9 @@
 
 use std::{str, u32, vec};
 use extra::json;
+
 use utils::*;
 use ast::*;
-
-
-pub fn consume_component_values_list(parser: &mut Parser) -> ~[ComponentValue] {
-    let mut result = ~[];
-    for each_component_values(parser) |component_value| { result.push(component_value) }
-    result
-}
 
 
 pub struct Parser {
@@ -24,9 +18,9 @@ pub struct Parser {
 
 
 impl Parser {
-    pub fn from_str(input: &str) -> ~Parser {
+    pub fn from_str(input: &str) -> Parser {
         let input = preprocess(input);
-        ~Parser {
+        Parser {
             length: input.len(),
             input: input,
             position: 0,
@@ -705,27 +699,36 @@ pub fn component_value_list_to_json(values: ~[ComponentValue]) -> ~[json::Json] 
 }
 
 
-#[test]
-fn test_component_value_list_json() {
-    let items = match json::from_str(include_str!(
-            // https://github.com/SimonSapin/tinycss2/tree/master/tinycss2/tests
-            // TODO: use git subtree or something to have the JSON files in this repository.
-            "../tinycss2/tinycss2/tests/component_value_list.json")) {
+#[cfg(test)]
+fn each_json_test(json_data: &str, it: &fn (input: ~str, expected: ~[json::Json]) -> bool) -> bool {
+    let items = match json::from_str(json_data) {
         Ok(json::List(items)) => items,
-        _ => fail!("Invalid JSON in component_value_list.json")
+        _ => fail!("Invalid JSON")
     };
     assert!(items.len() % 2 == 0);
     let mut input: Option<~str> = None;
     do vec::consume(items) |_, item| {
         match (&input, item) {
             (&None, json::String(string)) => input = Some(string),
-            (&Some(_), json::List(expected)) => {
-                let input = input.swap_unwrap();
-                let mut parser = Parser::from_str(input);
-                let results = component_value_list_to_json(consume_component_values_list(parser));
-                assert_vec_equals(results, expected, input);
-            }
-            _ => fail!()
+            (&Some(_), json::List(expected)) => { it(input.swap_unwrap(), expected); },
+            _ => fail!("Unexpected JSON")
         };
+    }
+    true
+}
+
+
+#[test]
+fn test_component_value_list_json() {
+    for each_json_test(include_str!(
+            // https://github.com/SimonSapin/tinycss2/tree/master/tinycss2/tests
+            // TODO: use git subtree or something to have the JSON files in this repository.
+            "../tinycss2/tinycss2/tests/component_value_list.json"
+    )) |input, expected| {
+        let mut parser = Parser::from_str(input);
+        let mut results = ~[];
+        for each_component_values(&mut parser) |component_value| { results.push(component_value) }
+        let results = component_value_list_to_json(results);
+        assert_vec_equals(results, expected, input);
     }
 }
