@@ -62,7 +62,7 @@ pub enum ComponentValue {
     SquareBraketBlock(~[ComponentValue]),  // […]
     CurlyBraketBlock(~[ComponentValue]),  // {…}
 
-    // These are alwas invalid
+    // These are always invalid
     BadURL,
     BadString,
     CloseParenthesis, // )
@@ -92,7 +92,7 @@ pub struct AtRule {
 }
 
 #[deriving(Eq)]
-pub enum DeclarationBlockItem {
+pub enum DeclarationListItem {
     Declaration(Declaration),
     // A better idea for a name that means "at-rule" but is not "AtRule"?
     Decl_AtRule(AtRule),
