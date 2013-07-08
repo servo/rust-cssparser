@@ -13,21 +13,13 @@ pub fn consume_component_values_list(parser: &mut Parser) -> ~[ComponentValue] {
 }
 
 
-pub struct SyntaxError {
-    message: ~str,
-//    source_location: ~str,
-    source_line: uint,
-    source_column: uint,
-}
-
-
 pub struct Parser {
     priv input: ~str,
     priv length: uint,  // All counted in bytes, not characters
     priv position: uint,  // All counted in bytes, not characters
-    priv line: uint,
-    priv column: uint,  // All counted in bytes, not characters
-    priv errors: ~[SyntaxError],
+    // TODO: add these in tokens
+//    priv line: uint,
+//    priv column: uint,  // All counted in bytes, not characters
 }
 
 
@@ -38,9 +30,8 @@ impl Parser {
             length: input.len(),
             input: input,
             position: 0,
-            line: 1,
-            column: 1,
-            errors: ~[],
+//            line: 1,
+//            column: 1,
         }
     }
 }
@@ -148,11 +139,6 @@ fn test_preprocess() {
 
 
 impl Parser {
-    fn error(&mut self, message: ~str) {
-        self.errors.push(SyntaxError{
-            message: message, source_line: self.line, source_column: self.column })
-    }
-
     #[inline]
     fn is_eof(&self) -> bool { self.position >= self.length }
 
@@ -255,7 +241,6 @@ fn consume_quoted_string(parser: &mut Parser, single_quote: bool) -> ComponentVa
             '"' if !single_quote => break,
             '\'' if single_quote => break,
             '\n' => {
-                parser.error(~"Newline in quoted string");
                 parser.position -= 1;
                 return BadString;
             },
@@ -312,7 +297,6 @@ fn consume_ident(parser: &mut Parser) -> ComponentValue {
             },
             '\\' => {
                 parser.position += 1;
-                parser.error(~"Invalid escape");
                 Delim('\\')
             },
             _ => fail!(),  // Should not have called consume_ident() here.
@@ -547,7 +531,6 @@ fn consume_bad_url(parser: &mut Parser) -> ComponentValue {
             _ => ()
         }
     }
-    parser.error(~"Invalid URL syntax");
     BadURL
 }
 
