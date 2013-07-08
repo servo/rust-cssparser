@@ -808,102 +808,70 @@ fn test_component_values() {
 
 
 #[cfg(test)]
-pub fn json_to_component_value_list(json_items: ~[json::Json])
-                                    -> (~[ComponentValue], ~[~str]) {
+pub fn component_value_list_to_json(values: ~[ComponentValue]) -> ~[json::Json] {
     use JList = extra::json::List;
     use JString = extra::json::String;
+    use JNumber = extra::json::Number;
 
-    fn numeric(representation: ~str, value: float, number_type: ~str) -> NumericValue {
-        let is_integer = match number_type {
-            ~"integer" => true,
-            ~"number" => false,
-            _ => fail!(),
+    fn numeric(NumericValue{representation: r, value: v, int_value: i}: NumericValue)
+               -> ~[json::Json] {
+        ~[JString(r), JNumber(v as float), JString(
+            match i { Some(_) => ~"integer", _ => ~"number" })]
+    }
+
+    let mut results = ~[];
+    do vec::consume(values) |_, value| {
+        let json = match value {
+            Ident(value) => JList(~[JString(~"ident"), JString(value)]),
+            AtKeyword(value) => JList(~[JString(~"at-keyword"), JString(value)]),
+            Hash(value) => JList(~[JString(~"hash"), JString(value), JString(~"unrestricted")]),
+            IDHash(value) => JList(~[JString(~"hash"), JString(value), JString(~"id")]),
+            String(value) => JList(~[JString(~"string"), JString(value)]),
+            URL(value) => JList(~[JString(~"url"), JString(value)]),
+            Delim('\\') => { results.push(JList(~[JString(~"error"), JString(~"bad-escape")]));
+                             JString(~"\\") },
+            Delim(value) => JString(str::from_char(value)),
+
+            Number(value) => JList(~[JString(~"number")] + numeric(value)),
+            Percentage(value) => JList(~[JString(~"percentage")] + numeric(value)),
+            Dimension(value, unit)
+            => JList(~[JString(~"dimension")] + numeric(value) + [JString(unit)]),
+
+            // TODO:
+            UnicodeRange(_start, _end) => fail!(),
+            EmptyUnicodeRange => fail!(),
+
+            WhiteSpace => JString(~" "),
+            Colon => JString(~":"),
+            Semicolon => JString(~";"),
+            IncludeMath => JString(~"~="),
+            DashMatch => JString(~"|="),
+            PrefixMatch => JString(~"^="),
+            SuffixMatch => JString(~"$="),
+            SubstringMatch => JString(~"*="),
+            Column => JString(~"||"),
+            CDO => JString(~"<!--"),
+            CDC => JString(~"-->"),
+
+            Function(name, arguments)
+            => JList(~[JString(~"function"), JString(name)]
+                     + component_value_list_to_json(arguments)),
+            ParenthesisBlock(content)
+            => JList(~[JString(~"()")] + component_value_list_to_json(content)),
+            SquareBraketBlock(content)
+            => JList(~[JString(~"[]")] + component_value_list_to_json(content)),
+            CurlyBraketBlock(content)
+            => JList(~[JString(~"{}")] + component_value_list_to_json(content)),
+
+            BadURL => JList(~[JString(~"error"), JString(~"bad-url")]),
+            BadString => JList(~[JString(~"error"), JString(~"bad-string")]),
+            CloseParenthesis => JList(~[JString(~"error"), JString(~")")]),
+            CloseSquareBraket => JList(~[JString(~"error"), JString(~"]")]),
+            CloseCurlyBraket => JList(~[JString(~"error"), JString(~"}")]),
         };
-        let result = NumericValue::new(representation, is_integer);
-        assert_eq!(result.value as float, value);
-        result
+        results.push(json)
     }
-
-    let mut component_values = ~[];
-    let mut errors = ~[];
-
-    macro_rules! recurse(
-        ($nested_json:expr) => ({
-            let (content, nested_errors) = json_to_component_value_list($nested_json.to_owned());
-            do vec::consume(nested_errors) |_, err| { errors.push(err) }
-            content
-        });
-    )
-
-    do vec::consume(json_items) |_, item| {
-        match item {
-            JList([JString(~"ident"), JString(v)]) => component_values.push(Ident(v)),
-            JList([JString(~"at-keyword"), JString(v)]) => component_values.push(AtKeyword(v)),
-            JList([JString(~"url"), JString(v)]) => component_values.push(URL(v)),
-            JList([JString(~"string"), JString(v)]) => component_values.push(String(v)),
-
-            JList([JString(~"hash"), JString(v), JString(~"unrestricted")])
-            => component_values.push(Hash(v)),
-            JList([JString(~"hash"), JString(v), JString(~"id")])
-            => component_values.push(IDHash(v)),
-
-            JList([JString(~"number"), JString(representation), json::Number(value),
-                   JString(number_type)])
-            => component_values.push(Number(numeric(representation, value, number_type))),
-            JList([JString(~"percentage"), JString(representation), json::Number(value),
-                   JString(number_type)])
-            => component_values.push(Percentage(numeric(representation, value, number_type))),
-            JList([JString(~"dimension"), JString(representation), json::Number(value),
-                   JString(number_type), JString(dimension)])
-            => component_values.push(Dimension(numeric(representation, value, number_type),
-                                               dimension)),
-            // XXX TODO: unicode ranges
-
-            JString(~" ") => component_values.push(WhiteSpace),
-            JString(~":") => component_values.push(Colon),
-            JString(~";") => component_values.push(Semicolon),
-            JString(~"<!--") => component_values.push(CDO),
-            JString(~"-->") => component_values.push(CDC),
-            JString(string) => {
-                assert_eq!(string.len(), 1);
-                component_values.push(Delim(string[0] as char))
-            },
-
-            // XXX These seem like they shouldn’t be necessary
-            JList([JString(~"{}")]) => component_values.push(CurlyBraketBlock(~[])),
-            JList([JString(~"[]")]) => component_values.push(SquareBraketBlock(~[])),
-            JList([JString(~"()")]) => component_values.push(ParenthesisBlock(~[])),
-            JList([JString(~"function"), JString(name)])
-            => component_values.push(Function(name, ~[])),
-            //
-
-            JList([JString(~"{}"), ..content])
-            => component_values.push(CurlyBraketBlock(recurse!(content))),
-            JList([JString(~"[]"), ..content])
-            => component_values.push(SquareBraketBlock(recurse!(content))),
-            JList([JString(~"()"), ..content])
-            => component_values.push(ParenthesisBlock(recurse!(content))),
-            JList([JString(~"function"), JString(name), ..content])
-            => component_values.push(Function(name, recurse!(content))),
-
-            JList([JString(~"error"), JString(~"}")])
-            => component_values.push(CloseCurlyBraket),
-            JList([JString(~"error"), JString(~"]")])
-            => component_values.push(CloseSquareBraket),
-            JList([JString(~"error"), JString(~")")])
-            => component_values.push(CloseSquareBraket),
-
-            JList([JString(~"error"), JString(~"bad-string")])
-            => component_values.push(BadString),
-            JList([JString(~"error"), JString(~"bad-url")])
-            => component_values.push(BadURL),
-            JList([JString(~"error"), JString(~"bad-escape")])
-            => errors.push(~"Invalid escape"),
-
-            item => fail!(fmt!("Unexpected JSON: %?", item))
-        }
-    }
-    (component_values, errors)
+    results
 }
 
 
@@ -926,10 +894,8 @@ fn test_component_value_list_json() {
                 let mut parser = Parser::from_str(input);
                 let mut results = ~[];
                 for iter_component_values(parser) |c| { results.push(c) }
-                let errors = vec::map_consume(match parser { ~Parser {errors: e, _} => e },
-                                              |SyntaxError {message: m, _}| m);
-                let (expected, expected_errors) = json_to_component_value_list(expected);
-                check_results(input, results, expected, errors, expected_errors);
+                let results = component_value_list_to_json(results);
+                check_results(input, results, expected, [""], [""]);
             }
             _ => fail!()
         };

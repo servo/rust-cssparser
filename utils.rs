@@ -29,6 +29,12 @@ pub fn check_results<T: Eq, E: Eq>(
 
     fn assert_vec_equals<T: Eq>(
             message: &str, results: &[T], expected: &[T], input: &str) {
+        for results.iter().zip(expected.iter()).enumerate().advance |(i, (a, b))| {
+            if a != b {
+                fail!(fmt!("\n%s at index %u:\n%?\n!=\n%?\nInput:\n%?\n",
+                           message, i, a, b, input))
+            }
+        }
         let len_r = results.len();
         let len_e = expected.len();
         if len_r != len_e {
@@ -38,14 +44,6 @@ pub fn check_results<T: Eq, E: Eq>(
                 if len_r > len_e { &results[len_e] }
                 else { &expected[len_r] },
                 input))
-        }
-        let mut i = 0u;
-        for results.iter().zip(expected.iter()).advance |(a, b)| {
-            if a != b {
-                fail!(fmt!("\n%s at index %u:\n%?\n!=\n%?\nInput:\n%?\n",
-                           message, i, a, b, input))
-            }
-            i += 1
         }
     }
 }
