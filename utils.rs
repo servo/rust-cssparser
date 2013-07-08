@@ -22,26 +22,16 @@ pub fn ascii_lower(string: &str) -> ~str {
 
 
 #[cfg(test)]
-pub fn check_results<T: Eq, E: Eq>(
-        input: &str, results: &[T], expected: &[T],
-        errors: &[E], expected_errors: &[E]) {
-    assert_vec_equals(results, expected, input);
-    assert_vec_equals(errors, expected_errors, input);
-
-}
-
-
-#[cfg(test)]
 pub fn assert_vec_equals<T: Eq>(results: &[T], expected: &[T], message: &str) {
     for results.iter().zip(expected.iter()).enumerate().advance |(i, (a, b))| {
         if a != b {
-            fail!(fmt!("\n%s at index %u:\n%?\n!=\n%?\n", message, i, a, b))
+            fail!(fmt!("\n%?\nAt index %u:\n%?\n!=\n%?\n", message, i, a, b))
         }
     }
     let len_r = results.len();
     let len_e = expected.len();
     if len_r != len_e {
-        fail!(fmt!("\n%s: expected %u items, got %u. First extra item:\n%?\n",
+        fail!(fmt!("\n%?: expected %u items, got %u. First extra item:\n%?\n",
                    message, len_e, len_r,
                    if len_r > len_e { &results[len_e] } else { &expected[len_r] }))
     }
