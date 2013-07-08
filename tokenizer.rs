@@ -700,7 +700,8 @@ pub fn component_value_list_to_json(values: ~[ComponentValue]) -> ~[json::Json] 
 
 
 #[cfg(test)]
-fn each_json_test(json_data: &str, it: &fn (input: ~str, expected: ~[json::Json]) -> bool) -> bool {
+pub fn each_json_test(json_data: &str, it: &fn (input: ~str, expected: ~[json::Json]) -> bool)
+                      -> bool {
     let items = match json::from_str(json_data) {
         Ok(json::List(items)) => items,
         _ => fail!("Invalid JSON")

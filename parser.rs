@@ -9,8 +9,9 @@
 use std::iterator::Iterator;
 use std::util::replace;
 use std::vec;
+use extra::json;
 
-use utils::ascii_lower;
+use utils::*;
 use ast::*;
 use tokenizer::*;
 
@@ -227,6 +228,31 @@ fn consume_declaration_important(iter: &mut ComponentValueIterator) -> bool {
     }
 }
 
+
+#[cfg(test)]
+pub fn declaration_to_json(declaration: Declaration) -> ~[json::Json] {
+    let Declaration{name: name, value: value, important: important} = declaration;
+    ~[json::String(~"declaration"), json::String(name),
+      json::List(component_value_list_to_json(value)), json::Boolean(important)]
+}
+
+
+#[test]
+fn test_one_declaration_json() {
+    for each_json_test(include_str!(
+            // https://github.com/SimonSapin/tinycss2/tree/master/tinycss2/tests
+            // TODO: use git subtree or something to have the JSON files in this repository.
+            "../tinycss2/tinycss2/tests/one_declaration.json"
+    )) |input, expected| {
+        let parser = ~Parser::from_str(input);
+        let mut iter = ComponentValueIterator::from_parser(parser);
+        let result = match consume_one_declaration(&mut iter) {
+            Ok(declaration) => declaration_to_json(declaration),
+            Err(_) => ~[json::String(~"error"), json::String(~"invalid")],
+        };
+        assert_vec_equals(result, expected, input);
+    }
+}
 
 
 //#[test]
