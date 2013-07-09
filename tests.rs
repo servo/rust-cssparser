@@ -106,7 +106,7 @@ fn declaration_list() {
                 None => break,
                 Some(result) => declarations.push(match result {
                     Ok(declaration) => declaration.to_json(),
-                    Err(_) => json::List(~[json::String(~"error"), json::String(~"invalid")]),
+                    Err(reason) => reason.to_json(),
                 })
             }
         }
@@ -120,7 +120,7 @@ fn one_declaration() {
     do run_json_tests(include_str!("../tinycss2/tinycss2/tests/one_declaration.json")) |input| {
         match parse_one_declaration(&mut ComponentValueIterator::from_str(input)) {
             Ok(declaration) => declaration.to_json(),
-            Err(_) => json::List(~[json::String(~"error"), json::String(~"invalid")]),
+            Err(reason) => reason.to_json(),
         }
     }
 }
@@ -136,7 +136,7 @@ fn rule_list() {
                 None => break,
                 Some(result) => rules.push(match result {
                     Ok(rule) => rule.to_json(),
-                    Err(_) => json::List(~[json::String(~"error"), json::String(~"invalid")]),
+                    Err(reason) => reason.to_json(),
                 })
             }
         }
@@ -150,8 +150,19 @@ fn one_rule() {
     do run_json_tests(include_str!("../tinycss2/tinycss2/tests/one_rule.json")) |input| {
         match parse_one_rule(&mut ComponentValueIterator::from_str(input)) {
             Ok(rule) => rule.to_json(),
-            Err(_) => json::List(~[json::String(~"error"), json::String(~"invalid")]),
+            Err(reason) => reason.to_json(),
         }
+    }
+}
+
+
+impl ToJson for ErrorReason {
+    fn to_json(&self) -> json::Json {
+        json::List(~[json::String(~"error"), json::String(match *self {
+            ErrEmptyInput => ~"empty",
+            ErrExtraInput => ~"extra-input",
+            _ => ~"invalid",
+        })])
     }
 }
 

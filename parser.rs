@@ -71,7 +71,7 @@ macro_rules! for_iter(
 
 
 /// Call repeatedly for the top-level of a CSS stylesheet
-pub fn parse_stylesheet_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ~str>> {
+pub fn parse_stylesheet_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ErrorReason>> {
     for_iter!(iter, component_value, {
         match component_value {
             WhiteSpace | CDO | CDC => (),
@@ -88,7 +88,7 @@ pub fn parse_stylesheet_rule(iter: &mut ComponentValueIterator) -> Option<Result
 
 /// Call repeatedly for a non-top level list of rules eg. the content of an @media rule.
 /// Same as parse_stylesheet() except for the handling of top-level CDO and CDC
-pub fn parse_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ~str>> {
+pub fn parse_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ErrorReason>> {
     for_iter!(iter, component_value, {
         match component_value {
             WhiteSpace => (),
@@ -104,11 +104,11 @@ pub fn parse_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ~str
 
 
 /// Used eg. for CSSRuleList.insertRule()
-pub fn parse_one_rule(iter: &mut ComponentValueIterator) -> Result<Rule, ~str> {
+pub fn parse_one_rule(iter: &mut ComponentValueIterator) -> Result<Rule, ErrorReason> {
     match parse_rule(iter) {
-        None => Err(~"Input is empty"),
+        None => Err(ErrEmptyInput),
         Some(result) => if result.is_err() || iter.next_non_whitespace().is_none() { result }
-                        else { Err(~"Unexpected token after parsed declaration.") }
+                        else { Err(ErrExtraInput) }
     }
 }
 
@@ -116,7 +116,7 @@ pub fn parse_one_rule(iter: &mut ComponentValueIterator) -> Result<Rule, ~str> {
 /// Call repeatedly of a list of declarations.
 /// @page in CSS 2.1, all declaration lists in level 3
 pub fn parse_declaration_or_at_rule(iter: &mut ComponentValueIterator)
-                                      -> Option<Result<DeclarationListItem, ~str>> {
+                                      -> Option<Result<DeclarationListItem, ErrorReason>> {
     for_iter!(iter, component_value, {
         match component_value {
             WhiteSpace | Semicolon => (),
@@ -136,13 +136,13 @@ pub fn parse_declaration_or_at_rule(iter: &mut ComponentValueIterator)
 
 
 /// Used eg. in @supports
-pub fn parse_one_declaration(iter: &mut ComponentValueIterator) -> Result<Declaration, ~str> {
+pub fn parse_one_declaration(iter: &mut ComponentValueIterator) -> Result<Declaration, ErrorReason> {
     match iter.next_non_whitespace() {
-        None => Err(~"Input is empty"),
+        None => Err(ErrEmptyInput),
         Some(component_value) => {
             let result = parse_declaration(iter, component_value);
             if result.is_err() || iter.next_non_whitespace().is_none() { result }
-            else { Err(~"Unexpected token after parsed declaration.") }
+            else { Err(ErrExtraInput) }
         }
     }
 }
@@ -166,7 +166,7 @@ fn parse_at_rule(iter: &mut ComponentValueIterator, name: ~str) -> AtRule {
 
 
 fn parse_qualified_rule(iter: &mut ComponentValueIterator, first: ComponentValue)
-                          -> Result<QualifiedRule, ~str> {
+                          -> Result<QualifiedRule, ErrorReason> {
     match first {
         CurlyBraketBlock(content) => return Ok(QualifiedRule { prelude: ~[], block: content}),
         _ => (),
@@ -179,18 +179,18 @@ fn parse_qualified_rule(iter: &mut ComponentValueIterator, first: ComponentValue
             component_value => prelude.push(component_value),
         }
     })
-    Err(~"Missing {} block for qualified rule")
+    Err(ErrMissingQualifiedRuleBlock)
 }
 
 
 fn parse_declaration(iter: &mut ComponentValueIterator, first: ComponentValue)
-                       -> Result<Declaration, ~str> {
+                       -> Result<Declaration, ErrorReason> {
     let name = match first {
         Ident(name) => name,
-        _ => return Err(~"Expected an identifier")
+        _ => return Err(ErrInvalidDeclarationSyntax)
     };
     if iter.next_non_whitespace() != Some(Colon) {
-        return Err(~"Expected a colon")
+        return Err(ErrInvalidDeclarationSyntax)
     }
     let mut value = ~[];
     let mut important = false;
@@ -201,7 +201,7 @@ fn parse_declaration(iter: &mut ComponentValueIterator, first: ComponentValue)
                 important = true;
                 break
             } else {
-                return Err(~"Expected !important, got an invalid ! value")
+                return Err(ErrInvalidBangImportantSyntax)
             },
             component_value => value.push(component_value),
         }

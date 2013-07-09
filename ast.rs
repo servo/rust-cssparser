@@ -103,3 +103,13 @@ pub enum Rule {
     QualifiedRule(QualifiedRule),
     AtRule(AtRule),
 }
+
+#[deriving(Eq)]
+pub enum ErrorReason {
+    ErrEmptyInput,  // Parsing a single "thing", found only whitespace.
+    ErrExtraInput,  // Found more non-whitespace after parsing a single "thing".
+    ErrMissingQualifiedRuleBlock,  // EOF in a qualified rule prelude, before '{'
+    ErrInvalidDeclarationSyntax,
+    ErrInvalidBangImportantSyntax,
+    // This is meant to be extended
+}
