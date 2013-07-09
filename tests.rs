@@ -69,7 +69,7 @@ fn component_value_list() {
         let mut parser = Parser::from_str(input);
         let mut results = ~[];
         loop {
-            match consume_component_value(&mut parser) {
+            match next_component_value(&mut parser) {
                 Some(c) => results.push(c),
                 None => break,
             }
@@ -86,7 +86,7 @@ fn one_declaration() {
             // TODO: use git subtree or something to have the JSON files in this repository.
             "../tinycss2/tinycss2/tests/one_declaration.json"
     )) |input| {
-        match consume_one_declaration(&mut ComponentValueIterator::from_str(input)) {
+        match parse_one_declaration(&mut ComponentValueIterator::from_str(input)) {
             Ok(declaration) => declaration.to_json(),
             Err(_) => json::List(~[json::String(~"error"), json::String(~"invalid")]),
         }

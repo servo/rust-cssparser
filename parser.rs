@@ -34,7 +34,7 @@ impl ComponentValueIterator {
 
     #[inline]
     pub fn from_vector(mut values: ~[ComponentValue]) -> ComponentValueIterator {
-        // TODO: find a way to have consume_iter() or something instead of reverse() + pop()
+        // TODO: find a way to have parse_iter() or something instead of reverse() + pop()
         vec::reverse(values);
         VectorIter(values)
     }
@@ -52,7 +52,7 @@ impl ComponentValueIterator {
 impl Iterator<ComponentValue> for ComponentValueIterator {
     fn next(&mut self) -> Option<ComponentValue> {
         match self {
-            &ParserIter(ref mut parser) => consume_component_value(*parser),
+            &ParserIter(ref mut parser) => next_component_value(*parser),
             &VectorIter(ref mut reversed_vector)
             => if reversed_vector.is_empty() { None } else { Some(reversed_vector.pop()) }
         }
@@ -72,12 +72,12 @@ macro_rules! for_iter(
 
 
 
-pub fn consume_stylesheet_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ~str>> {
+pub fn parse_stylesheet_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ~str>> {
     for_iter!(iter, component_value, {
         match component_value {
             WhiteSpace | CDO | CDC => (),
-            AtKeyword(name) => return Some(Ok(AtRule(consume_at_rule(iter, name)))),
-            component_value => return Some(match consume_qualified_rule(iter, component_value) {
+            AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name)))),
+            component_value => return Some(match parse_qualified_rule(iter, component_value) {
                 Ok(rule) => Ok(QualifiedRule(rule)),
                 Err(reason) => Err(reason),
             }),
@@ -87,14 +87,14 @@ pub fn consume_stylesheet_rule(iter: &mut ComponentValueIterator) -> Option<Resu
 }
 
 
-/// Same as consume_stylesheet() except for the handling of top-level CDO and CDC
+/// Same as parse_stylesheet() except for the handling of top-level CDO and CDC
 /// Used eg. for @media
-pub fn consume_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ~str>> {
+pub fn parse_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ~str>> {
     for_iter!(iter, component_value, {
         match component_value {
             WhiteSpace => (),
-            AtKeyword(name) => return Some(Ok(AtRule(consume_at_rule(iter, name)))),
-            component_value => return Some(match consume_qualified_rule(iter, component_value) {
+            AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name)))),
+            component_value => return Some(match parse_qualified_rule(iter, component_value) {
                 Ok(rule) => Ok(QualifiedRule(rule)),
                 Err(reason) => Err(reason),
             }),
@@ -105,8 +105,8 @@ pub fn consume_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ~s
 
 
 /// Used eg. for CSSRuleList.insertRule()
-pub fn consume_one_rule(iter: &mut ComponentValueIterator) -> Result<Rule, ~str> {
-    match consume_rule(iter) {
+pub fn parse_one_rule(iter: &mut ComponentValueIterator) -> Result<Rule, ~str> {
+    match parse_rule(iter) {
         None => Err(~"Input is empty"),
         Some(result) => match iter.next_non_whitespace() {
             // The only possible error in `result` is EOF in a qualified rule without a {} block,
@@ -119,12 +119,12 @@ pub fn consume_one_rule(iter: &mut ComponentValueIterator) -> Result<Rule, ~str>
 
 
 /// @page in CSS 2.1, all declaration lists in level 3
-pub fn consume_declaration_or_at_rule(iter: &mut ComponentValueIterator)
+pub fn parse_declaration_or_at_rule(iter: &mut ComponentValueIterator)
                                       -> Option<Result<DeclarationListItem, ~str>> {
     match iter.next_non_whitespace() {
         None => None,
-        Some(AtKeyword(name)) => Some(Ok(Decl_AtRule(consume_at_rule(iter, name)))),
-        Some(component_value) => match consume_declaration(iter, component_value) {
+        Some(AtKeyword(name)) => Some(Ok(Decl_AtRule(parse_at_rule(iter, name)))),
+        Some(component_value) => match parse_declaration(iter, component_value) {
             Ok(declaration) => Some(Ok(Declaration(declaration))),
             Err(reason) => {
                 // Find the end of the declaration
@@ -137,11 +137,11 @@ pub fn consume_declaration_or_at_rule(iter: &mut ComponentValueIterator)
 
 
 /// Used eg. in @supports
-pub fn consume_one_declaration(iter: &mut ComponentValueIterator) -> Result<Declaration, ~str> {
+pub fn parse_one_declaration(iter: &mut ComponentValueIterator) -> Result<Declaration, ~str> {
     match iter.next_non_whitespace() {
         None => Err(~"Input is empty"),
         Some(component_value) => {
-            let result = consume_declaration(iter, component_value);
+            let result = parse_declaration(iter, component_value);
             match result {
                 Err(_) => result,
                 Ok(_) => match iter.next_non_whitespace() {
@@ -157,7 +157,7 @@ pub fn consume_one_declaration(iter: &mut ComponentValueIterator) -> Result<Decl
 ////////////   End of public API.
 
 
-fn consume_at_rule(iter: &mut ComponentValueIterator, name: ~str) -> AtRule {
+fn parse_at_rule(iter: &mut ComponentValueIterator, name: ~str) -> AtRule {
     let mut prelude = ~[];
     let mut block = None;
     for_iter!(iter, component_value, {
@@ -171,7 +171,7 @@ fn consume_at_rule(iter: &mut ComponentValueIterator, name: ~str) -> AtRule {
 }
 
 
-fn consume_qualified_rule(iter: &mut ComponentValueIterator, first: ComponentValue)
+fn parse_qualified_rule(iter: &mut ComponentValueIterator, first: ComponentValue)
                           -> Result<QualifiedRule, ~str> {
     let mut prelude = ~[first];
     for_iter!(iter, component_value, {
@@ -185,7 +185,7 @@ fn consume_qualified_rule(iter: &mut ComponentValueIterator, first: ComponentVal
 }
 
 
-fn consume_declaration(iter: &mut ComponentValueIterator, first: ComponentValue)
+fn parse_declaration(iter: &mut ComponentValueIterator, first: ComponentValue)
                        -> Result<Declaration, ~str> {
     let name = match first {
         Ident(name) => name,
@@ -199,7 +199,7 @@ fn consume_declaration(iter: &mut ComponentValueIterator, first: ComponentValue)
     for_iter!(iter, component_value, {
         match component_value {
             Semicolon => break,
-            Delim('!') => if consume_declaration_important(iter) {
+            Delim('!') => if parse_declaration_important(iter) {
                 important = true;
                 break
             } else {
@@ -213,7 +213,7 @@ fn consume_declaration(iter: &mut ComponentValueIterator, first: ComponentValue)
 
 
 #[inline]
-fn consume_declaration_important(iter: &mut ComponentValueIterator) -> bool {
+fn parse_declaration_important(iter: &mut ComponentValueIterator) -> bool {
     let ident_value = match iter.next_non_whitespace() {
         Some(Ident(value)) => value,
         _ => return false,

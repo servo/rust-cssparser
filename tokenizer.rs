@@ -29,7 +29,7 @@ impl Parser {
 }
 
 
-pub fn consume_component_value(parser: &mut Parser) -> Option<ComponentValue> {
+pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
     consume_comments(parser);
     if parser.is_eof() { return None }
     let c = parser.current_char();
@@ -197,7 +197,7 @@ fn consume_comments(parser: &mut Parser) {
 fn consume_block(parser: &mut Parser, ending_token: ComponentValue) -> ~[ComponentValue] {
     let mut content = ~[];
     loop {
-        match consume_component_value(parser) {
+        match next_component_value(parser) {
             Some(c) => if c == ending_token { break } else { content.push(c) },
             None => break,
         }
