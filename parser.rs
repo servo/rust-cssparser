@@ -10,6 +10,7 @@ use std::iterator::Iterator;
 use std::util::replace;
 use std::vec;
 use extra::json;
+use extra::json::ToJson;
 
 use utils::*;
 use ast::*;
@@ -230,10 +231,12 @@ fn consume_declaration_important(iter: &mut ComponentValueIterator) -> bool {
 
 
 #[cfg(test)]
-pub fn declaration_to_json(declaration: Declaration) -> ~[json::Json] {
-    let Declaration{name: name, value: value, important: important} = declaration;
-    ~[json::String(~"declaration"), json::String(name),
-      json::List(component_value_list_to_json(value)), json::Boolean(important)]
+impl ToJson for Declaration {
+    pub fn to_json(&self) -> json::Json {
+        let Declaration{name: name, value: value, important: important} = copy *self;
+        json::List(~[json::String(~"declaration"), json::String(name),
+                     value.to_json(), json::Boolean(important)])
+    }
 }
 
 
@@ -247,10 +250,10 @@ fn test_one_declaration_json() {
         let parser = ~Parser::from_str(input);
         let mut iter = ComponentValueIterator::from_parser(parser);
         let result = match consume_one_declaration(&mut iter) {
-            Ok(declaration) => declaration_to_json(declaration),
-            Err(_) => ~[json::String(~"error"), json::String(~"invalid")],
+            Ok(declaration) => declaration.to_json(),
+            Err(_) => json::List(~[json::String(~"error"), json::String(~"invalid")]),
         };
-        assert_vec_equals(result, expected, input);
+        assert_json_eq(result, expected, input);
     }
 }
 

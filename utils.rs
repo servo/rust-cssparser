@@ -1,11 +1,9 @@
-// When reporting these errors to the user, the application is expected
-// to show the source filename/URL/location in addition to line and column.
-pub struct ParseError {
-    message: ~str,
-    // TODO: add these:
-//    source_line: uint,
-//    source_column: uint,
-}
+use std::io;
+use std::os;
+use std::run;
+use std::task;
+use extra::json;
+use extra::tempfile;
 
 
 pub fn ascii_lower(string: &str) -> ~str {
@@ -22,18 +20,32 @@ pub fn ascii_lower(string: &str) -> ~str {
 
 
 #[cfg(test)]
-pub fn assert_vec_equals<T: Eq>(results: &[T], expected: &[T], message: &str) {
-    for results.iter().zip(expected.iter()).enumerate().advance |(i, (a, b))| {
-        if a != b {
-            fail!(fmt!("\n%?\nAt index %u:\n%?\n!=\n%?\n", message, i, a, b))
-        }
+fn write_whole_file(path: &Path, data: &str) {
+    match io::file_writer(path, [io::Create]) {
+        Ok(writer) => writer.write_str(data),
+        Err(message) => fail!(message),
     }
-    let len_r = results.len();
-    let len_e = expected.len();
-    if len_r != len_e {
-        fail!(fmt!("\n%?: expected %u items, got %u. First extra item:\n%?\n",
-                   message, len_e, len_r,
-                   if len_r > len_e { &results[len_e] } else { &expected[len_r] }))
+}
+
+
+#[cfg(test)]
+pub fn assert_json_eq(results: json::Json, expected: json::Json, message: &str) {
+    if results != expected {
+        let temp = tempfile::mkdtemp(&os::tmpdir(), "rust-cssparser-tests").get();
+        let temp_ = copy temp;
+        let results = json::to_pretty_str(&results) + "\n";
+        let expected = json::to_pretty_str(&expected) + "\n";
+        do task::try {
+            let result_path = temp.push("results.json");
+            let expected_path = temp.push("expected.json");
+            write_whole_file(&result_path, results);
+            write_whole_file(&expected_path, expected);
+            run::process_status("colordiff", [~"-u1000", result_path.to_str(),
+                                              expected_path.to_str()]);
+        };
+        os::remove_dir_recursive(&temp_);
+
+        fail!(fmt!("%s", message))
     }
 }
 

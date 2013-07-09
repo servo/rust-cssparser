@@ -2,6 +2,7 @@
 
 use std::{str, u32, vec};
 use extra::json;
+use extra::json::ToJson;
 
 use utils::*;
 use ast::*;
@@ -632,28 +633,26 @@ fn char_from_hex(hex: &[char]) -> char {
 
 
 #[cfg(test)]
-pub fn component_value_list_to_json(values: ~[ComponentValue]) -> ~[json::Json] {
-    use JList = extra::json::List;
-    use JString = extra::json::String;
-    use JNumber = extra::json::Number;
+impl ToJson for ComponentValue {
+    pub fn to_json(&self) -> json::Json {
+        use JList = extra::json::List;
+        use JString = extra::json::String;
+        use JNumber = extra::json::Number;
 
-    fn numeric(NumericValue{representation: r, value: v, int_value: i}: NumericValue)
-               -> ~[json::Json] {
-        ~[JString(r), JNumber(v as float), JString(
-            match i { Some(_) => ~"integer", _ => ~"number" })]
-    }
+        fn numeric(NumericValue{representation: r, value: v, int_value: i}: NumericValue)
+                   -> ~[json::Json] {
+            ~[JString(r), JNumber(v as float), JString(
+                match i { Some(_) => ~"integer", _ => ~"number" })]
+        }
 
-    let mut results = ~[];
-    do vec::consume(values) |_, value| {
-        let json = match value {
+        match copy *self {
             Ident(value) => JList(~[JString(~"ident"), JString(value)]),
             AtKeyword(value) => JList(~[JString(~"at-keyword"), JString(value)]),
             Hash(value) => JList(~[JString(~"hash"), JString(value), JString(~"unrestricted")]),
             IDHash(value) => JList(~[JString(~"hash"), JString(value), JString(~"id")]),
             String(value) => JList(~[JString(~"string"), JString(value)]),
             URL(value) => JList(~[JString(~"url"), JString(value)]),
-            Delim('\\') => { results.push(JList(~[JString(~"error"), JString(~"bad-escape")]));
-                             JString(~"\\") },
+            Delim('\\') => JString(~"\\"),
             Delim(value) => JString(str::from_char(value)),
 
             Number(value) => JList(~[JString(~"number")] + numeric(value)),
@@ -678,29 +677,26 @@ pub fn component_value_list_to_json(values: ~[ComponentValue]) -> ~[json::Json] 
             CDC => JString(~"-->"),
 
             Function(name, arguments)
-            => JList(~[JString(~"function"), JString(name)]
-                     + component_value_list_to_json(arguments)),
+            => JList(~[JString(~"function"), JString(name)] + vec::map(arguments, |a| a.to_json())),
             ParenthesisBlock(content)
-            => JList(~[JString(~"()")] + component_value_list_to_json(content)),
+            => JList(~[JString(~"()")] + vec::map(content, |v| v.to_json())),
             SquareBraketBlock(content)
-            => JList(~[JString(~"[]")] + component_value_list_to_json(content)),
+            => JList(~[JString(~"[]")] + vec::map(content, |v| v.to_json())),
             CurlyBraketBlock(content)
-            => JList(~[JString(~"{}")] + component_value_list_to_json(content)),
+            => JList(~[JString(~"{}")] + vec::map(content, |v| v.to_json())),
 
             BadURL => JList(~[JString(~"error"), JString(~"bad-url")]),
             BadString => JList(~[JString(~"error"), JString(~"bad-string")]),
             CloseParenthesis => JList(~[JString(~"error"), JString(~")")]),
             CloseSquareBraket => JList(~[JString(~"error"), JString(~"]")]),
             CloseCurlyBraket => JList(~[JString(~"error"), JString(~"}")]),
-        };
-        results.push(json)
+        }
     }
-    results
 }
 
 
 #[cfg(test)]
-pub fn each_json_test(json_data: &str, it: &fn (input: ~str, expected: ~[json::Json]) -> bool)
+pub fn each_json_test(json_data: &str, it: &fn (input: ~str, expected: json::Json) -> bool)
                       -> bool {
     let items = match json::from_str(json_data) {
         Ok(json::List(items)) => items,
@@ -711,7 +707,7 @@ pub fn each_json_test(json_data: &str, it: &fn (input: ~str, expected: ~[json::J
     do vec::consume(items) |_, item| {
         match (&input, item) {
             (&None, json::String(string)) => input = Some(string),
-            (&Some(_), json::List(expected)) => { it(input.swap_unwrap(), expected); },
+            (&Some(_), expected) => { it(input.swap_unwrap(), expected); },
             _ => fail!("Unexpected JSON")
         };
     }
@@ -729,7 +725,6 @@ fn test_component_value_list_json() {
         let mut parser = Parser::from_str(input);
         let mut results = ~[];
         for each_component_values(&mut parser) |component_value| { results.push(component_value) }
-        let results = component_value_list_to_json(results);
-        assert_vec_equals(results, expected, input);
+        assert_json_eq(results.to_json(), expected, input);
     }
 }
