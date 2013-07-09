@@ -7,7 +7,6 @@
 
 
 use std::iterator::Iterator;
-use std::util::replace;
 use std::vec;
 
 use ast::*;
@@ -71,7 +70,7 @@ macro_rules! for_iter(
 )
 
 
-
+/// Call repeatedly for the top-level of a CSS stylesheet
 pub fn parse_stylesheet_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ~str>> {
     for_iter!(iter, component_value, {
         match component_value {
@@ -87,8 +86,8 @@ pub fn parse_stylesheet_rule(iter: &mut ComponentValueIterator) -> Option<Result
 }
 
 
+/// Call repeatedly for a non-top level list of rules eg. the content of an @media rule.
 /// Same as parse_stylesheet() except for the handling of top-level CDO and CDC
-/// Used eg. for @media
 pub fn parse_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ~str>> {
     for_iter!(iter, component_value, {
         match component_value {
@@ -108,31 +107,31 @@ pub fn parse_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ~str
 pub fn parse_one_rule(iter: &mut ComponentValueIterator) -> Result<Rule, ~str> {
     match parse_rule(iter) {
         None => Err(~"Input is empty"),
-        Some(result) => match iter.next_non_whitespace() {
-            // The only possible error in `result` is EOF in a qualified rule without a {} block,
-            // which would not trigger Unexpected token.
-            Some(_) => Err(~"Unexpected token after parsed rule."),
-            None => result,
-        }
+        Some(result) => if result.is_err() || iter.next_non_whitespace().is_none() { result }
+                        else { Err(~"Unexpected token after parsed declaration.") }
     }
 }
 
 
+/// Call repeatedly of a list of declarations.
 /// @page in CSS 2.1, all declaration lists in level 3
 pub fn parse_declaration_or_at_rule(iter: &mut ComponentValueIterator)
                                       -> Option<Result<DeclarationListItem, ~str>> {
-    match iter.next_non_whitespace() {
-        None => None,
-        Some(AtKeyword(name)) => Some(Ok(Decl_AtRule(parse_at_rule(iter, name)))),
-        Some(component_value) => match parse_declaration(iter, component_value) {
-            Ok(declaration) => Some(Ok(Declaration(declaration))),
-            Err(reason) => {
-                // Find the end of the declaration
-                for iter.advance |v| { if v == Semicolon { break } }
-                Some(Err(reason))
-            }
-        },
-    }
+    for_iter!(iter, component_value, {
+        match component_value {
+            WhiteSpace | Semicolon => (),
+            AtKeyword(name) => return Some(Ok(Decl_AtRule(parse_at_rule(iter, name)))),
+            component_value => return Some(match parse_declaration(iter, component_value) {
+                Ok(declaration) => Ok(Declaration(declaration)),
+                Err(reason) => {
+                    // Find the end of the declaration
+                    for iter.advance |v| { if v == Semicolon { break } }
+                    Err(reason)
+                }
+            }),
+        }
+    })
+    None
 }
 
 
@@ -142,19 +141,14 @@ pub fn parse_one_declaration(iter: &mut ComponentValueIterator) -> Result<Declar
         None => Err(~"Input is empty"),
         Some(component_value) => {
             let result = parse_declaration(iter, component_value);
-            match result {
-                Err(_) => result,
-                Ok(_) => match iter.next_non_whitespace() {
-                    Some(_) => Err(~"Unexpected token after parsed rule."),
-                    None => result,
-                }
-            }
+            if result.is_err() || iter.next_non_whitespace().is_none() { result }
+            else { Err(~"Unexpected token after parsed declaration.") }
         }
     }
 }
 
 
-////////////   End of public API.
+//  ***********  End of public API  ***********
 
 
 fn parse_at_rule(iter: &mut ComponentValueIterator, name: ~str) -> AtRule {
@@ -173,11 +167,15 @@ fn parse_at_rule(iter: &mut ComponentValueIterator, name: ~str) -> AtRule {
 
 fn parse_qualified_rule(iter: &mut ComponentValueIterator, first: ComponentValue)
                           -> Result<QualifiedRule, ~str> {
+    match first {
+        CurlyBraketBlock(content) => return Ok(QualifiedRule { prelude: ~[], block: content}),
+        _ => (),
+    }
     let mut prelude = ~[first];
     for_iter!(iter, component_value, {
         match component_value {
             CurlyBraketBlock(content)
-            => return Ok(QualifiedRule {prelude: replace(&mut prelude, ~[]), block: content}),
+            => return Ok(QualifiedRule {prelude: prelude, block: content}),
             component_value => prelude.push(component_value),
         }
     })

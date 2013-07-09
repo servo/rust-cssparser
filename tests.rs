@@ -36,8 +36,7 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
 }
 
 
-fn run_json_tests(json_data: &str, parse: &fn (input: ~str) -> json::Json)
-                      -> bool {
+fn run_json_tests(json_data: &str, parse: &fn (input: ~str) -> json::Json) {
     let items = match json::from_str(json_data) {
         Ok(json::List(items)) => items,
         _ => fail!("Invalid JSON")
@@ -55,8 +54,11 @@ fn run_json_tests(json_data: &str, parse: &fn (input: ~str) -> json::Json)
             _ => fail!("Unexpected JSON")
         };
     }
-    true
 }
+
+
+// JSON files are in https://github.com/SimonSapin/tinycss2/tree/master/tinycss2/tests
+// TODO: use git subtree or something to have them in this repository.
 
 
 #[test]
@@ -75,30 +77,133 @@ fn component_value_list() {
             }
         }
         results.to_json()
-    };
+    }
+}
+
+
+#[test]
+fn one_component_value() {
+    do run_json_tests(include_str!("../tinycss2/tinycss2/tests/one_component_value.json")) |input| {
+        let mut iter = ComponentValueIterator::from_str(input);
+        match iter.next_non_whitespace() {
+            None => json::List(~[json::String(~"error"), json::String(~"empty")]),
+            Some(component_value) => match iter.next_non_whitespace() {
+                Some(_) => json::List(~[json::String(~"error"), json::String(~"extra-input")]),
+                None => component_value.to_json(),
+            }
+        }
+    }
+}
+
+
+#[test]
+fn declaration_list() {
+    do run_json_tests(include_str!("../tinycss2/tinycss2/tests/declaration_list.json")) |input| {
+        let mut iter = ComponentValueIterator::from_str(input);
+        let mut declarations = ~[];
+        loop {
+            match parse_declaration_or_at_rule(&mut iter) {
+                None => break,
+                Some(result) => declarations.push(match result {
+                    Ok(declaration) => declaration.to_json(),
+                    Err(_) => json::List(~[json::String(~"error"), json::String(~"invalid")]),
+                })
+            }
+        }
+        json::List(declarations)
+    }
 }
 
 
 #[test]
 fn one_declaration() {
-    do run_json_tests(include_str!(
-            // https://github.com/SimonSapin/tinycss2/tree/master/tinycss2/tests
-            // TODO: use git subtree or something to have the JSON files in this repository.
-            "../tinycss2/tinycss2/tests/one_declaration.json"
-    )) |input| {
+    do run_json_tests(include_str!("../tinycss2/tinycss2/tests/one_declaration.json")) |input| {
         match parse_one_declaration(&mut ComponentValueIterator::from_str(input)) {
             Ok(declaration) => declaration.to_json(),
             Err(_) => json::List(~[json::String(~"error"), json::String(~"invalid")]),
         }
-    };
+    }
+}
+
+
+#[test]
+fn rule_list() {
+    do run_json_tests(include_str!("../tinycss2/tinycss2/tests/rule_list.json")) |input| {
+        let mut iter = ComponentValueIterator::from_str(input);
+        let mut rules = ~[];
+        loop {
+            match parse_rule(&mut iter) {
+                None => break,
+                Some(result) => rules.push(match result {
+                    Ok(rule) => rule.to_json(),
+                    Err(_) => json::List(~[json::String(~"error"), json::String(~"invalid")]),
+                })
+            }
+        }
+        json::List(rules)
+    }
+}
+
+
+#[test]
+fn one_rule() {
+    do run_json_tests(include_str!("../tinycss2/tinycss2/tests/one_rule.json")) |input| {
+        match parse_one_rule(&mut ComponentValueIterator::from_str(input)) {
+            Ok(rule) => rule.to_json(),
+            Err(_) => json::List(~[json::String(~"error"), json::String(~"invalid")]),
+        }
+    }
+}
+
+
+impl ToJson for Rule {
+    fn to_json(&self) -> json::Json {
+        match *self {
+            QualifiedRule(ref rule) => rule.to_json(),
+            AtRule(ref rule) => rule.to_json(),
+        }
+    }
+}
+
+
+impl ToJson for DeclarationListItem {
+    fn to_json(&self) -> json::Json {
+        match *self {
+            Declaration(ref declaration) => declaration.to_json(),
+            Decl_AtRule(ref at_rule) => at_rule.to_json(),
+        }
+    }
+}
+
+
+impl ToJson for AtRule {
+    fn to_json(&self) -> json::Json {
+        match *self {
+            AtRule{name: ref name, prelude: ref prelude, block: ref block}
+            => json::List(~[json::String(~"at-rule"), name.to_json(),
+                            prelude.to_json(), block.to_json()])
+        }
+    }
+}
+
+
+impl ToJson for QualifiedRule {
+    fn to_json(&self) -> json::Json {
+        match *self {
+            QualifiedRule{prelude: ref prelude, block: ref block}
+            => json::List(~[json::String(~"qualified rule"), prelude.to_json(), block.to_json()])
+        }
+    }
 }
 
 
 impl ToJson for Declaration {
     fn to_json(&self) -> json::Json {
-        let Declaration{name: name, value: value, important: important} = copy *self;
-        json::List(~[json::String(~"declaration"), json::String(name),
-                     value.to_json(), json::Boolean(important)])
+        match *self {
+            Declaration{name: ref name, value: ref value, important: ref important}
+            =>  json::List(~[json::String(~"declaration"), name.to_json(),
+                             value.to_json(), important.to_json()])
+        }
     }
 }
 
@@ -107,28 +212,30 @@ impl ToJson for ComponentValue {
     fn to_json(&self) -> json::Json {
         use JList = extra::json::List;
         use JString = extra::json::String;
-        use JNumber = extra::json::Number;
 
-        fn numeric(NumericValue{representation: r, value: v, int_value: i}: NumericValue)
-                   -> ~[json::Json] {
-            ~[JString(r), JNumber(v as float), JString(
-                match i { Some(_) => ~"integer", _ => ~"number" })]
+        fn numeric(value: &NumericValue) -> ~[json::Json] {
+            match *value {
+                NumericValue{representation: ref r, value: ref v, int_value: ref i}
+                => ~[r.to_json(), v.to_json(),
+                     JString(match *i { Some(_) => ~"integer", _ => ~"number" })]
+            }
         }
 
-        match copy *self {
-            Ident(value) => JList(~[JString(~"ident"), JString(value)]),
-            AtKeyword(value) => JList(~[JString(~"at-keyword"), JString(value)]),
-            Hash(value) => JList(~[JString(~"hash"), JString(value), JString(~"unrestricted")]),
-            IDHash(value) => JList(~[JString(~"hash"), JString(value), JString(~"id")]),
-            String(value) => JList(~[JString(~"string"), JString(value)]),
-            URL(value) => JList(~[JString(~"url"), JString(value)]),
+        match *self {
+            Ident(ref value) => JList(~[JString(~"ident"), value.to_json()]),
+            AtKeyword(ref value) => JList(~[JString(~"at-keyword"), value.to_json()]),
+            Hash(ref value) => JList(~[JString(~"hash"), value.to_json(),
+                                       JString(~"unrestricted")]),
+            IDHash(ref value) => JList(~[JString(~"hash"), value.to_json(), JString(~"id")]),
+            String(ref value) => JList(~[JString(~"string"), value.to_json()]),
+            URL(ref value) => JList(~[JString(~"url"), value.to_json()]),
             Delim('\\') => JString(~"\\"),
             Delim(value) => JString(str::from_char(value)),
 
-            Number(value) => JList(~[JString(~"number")] + numeric(value)),
-            Percentage(value) => JList(~[JString(~"percentage")] + numeric(value)),
-            Dimension(value, unit)
-            => JList(~[JString(~"dimension")] + numeric(value) + [JString(unit)]),
+            Number(ref value) => JList(~[JString(~"number")] + numeric(value)),
+            Percentage(ref value) => JList(~[JString(~"percentage")] + numeric(value)),
+            Dimension(ref value, ref unit)
+            => JList(~[JString(~"dimension")] + numeric(value) + [unit.to_json()]),
 
             // TODO:
             UnicodeRange(_start, _end) => fail!(),
@@ -146,14 +253,15 @@ impl ToJson for ComponentValue {
             CDO => JString(~"<!--"),
             CDC => JString(~"-->"),
 
-            Function(name, arguments)
-            => JList(~[JString(~"function"), JString(name)] + vec::map(arguments, |a| a.to_json())),
-            ParenthesisBlock(content)
-            => JList(~[JString(~"()")] + vec::map(content, |v| v.to_json())),
-            SquareBraketBlock(content)
-            => JList(~[JString(~"[]")] + vec::map(content, |v| v.to_json())),
-            CurlyBraketBlock(content)
-            => JList(~[JString(~"{}")] + vec::map(content, |v| v.to_json())),
+            Function(ref name, ref arguments)
+            => JList(~[JString(~"function"), name.to_json()]
+                     + vec::map(*arguments, |c| (*c).to_json())),
+            ParenthesisBlock(ref content)
+            => JList(~[JString(~"()")] + vec::map(*content, |c| (*c).to_json())),
+            SquareBraketBlock(ref content)
+            => JList(~[JString(~"[]")] + vec::map(*content, |c| (*c).to_json())),
+            CurlyBraketBlock(ref content)
+            => JList(~[JString(~"{}")] + vec::map(*content, |c| (*c).to_json())),
 
             BadURL => JList(~[JString(~"error"), JString(~"bad-url")]),
             BadString => JList(~[JString(~"error"), JString(~"bad-string")]),
