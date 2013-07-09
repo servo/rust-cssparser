@@ -9,10 +9,7 @@
 use std::iterator::Iterator;
 use std::util::replace;
 use std::vec;
-use extra::json;
-use extra::json::ToJson;
 
-use utils::*;
 use ast::*;
 use tokenizer::*;
 
@@ -26,24 +23,24 @@ enum ComponentValueIterator {
 
 impl ComponentValueIterator {
     #[inline]
-    fn from_str(input: ~str) -> ComponentValueIterator {
+    pub fn from_str(input: ~str) -> ComponentValueIterator {
         ComponentValueIterator::from_parser(~Parser::from_str(input))
     }
 
     #[inline]
-    fn from_parser(parser: ~Parser) -> ComponentValueIterator {
+    pub fn from_parser(parser: ~Parser) -> ComponentValueIterator {
         ParserIter(parser)
     }
 
     #[inline]
-    fn from_vector(mut values: ~[ComponentValue]) -> ComponentValueIterator {
+    pub fn from_vector(mut values: ~[ComponentValue]) -> ComponentValueIterator {
         // TODO: find a way to have consume_iter() or something instead of reverse() + pop()
         vec::reverse(values);
         VectorIter(values)
     }
 
     #[inline]
-    fn next_non_whitespace(&mut self) -> Option<ComponentValue> {
+    pub fn next_non_whitespace(&mut self) -> Option<ComponentValue> {
         for self.advance |component_value| {
             if component_value != WhiteSpace { return Some(component_value) }
         }
@@ -226,34 +223,6 @@ fn consume_declaration_important(iter: &mut ComponentValueIterator) -> bool {
         Some(Semicolon) => true,
         None => true,
         _ => false
-    }
-}
-
-
-#[cfg(test)]
-impl ToJson for Declaration {
-    pub fn to_json(&self) -> json::Json {
-        let Declaration{name: name, value: value, important: important} = copy *self;
-        json::List(~[json::String(~"declaration"), json::String(name),
-                     value.to_json(), json::Boolean(important)])
-    }
-}
-
-
-#[test]
-fn test_one_declaration_json() {
-    for each_json_test(include_str!(
-            // https://github.com/SimonSapin/tinycss2/tree/master/tinycss2/tests
-            // TODO: use git subtree or something to have the JSON files in this repository.
-            "../tinycss2/tinycss2/tests/one_declaration.json"
-    )) |input, expected| {
-        let parser = ~Parser::from_str(input);
-        let mut iter = ComponentValueIterator::from_parser(parser);
-        let result = match consume_one_declaration(&mut iter) {
-            Ok(declaration) => declaration.to_json(),
-            Err(_) => json::List(~[json::String(~"error"), json::String(~"invalid")]),
-        };
-        assert_json_eq(result, expected, input);
     }
 }
 

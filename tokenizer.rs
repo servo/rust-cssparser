@@ -1,10 +1,7 @@
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 
 use std::{str, u32, vec};
-use extra::json;
-use extra::json::ToJson;
 
-use utils::*;
 use ast::*;
 
 
@@ -27,17 +24,6 @@ impl Parser {
             position: 0,
 //            line: 1,
 //            column: 1,
-        }
-    }
-}
-
-
-// Old style for loop
-pub fn each_component_values(parser: &mut Parser, it: &fn (v: ComponentValue) -> bool) -> bool {
-    loop {
-        match consume_component_value(parser) {
-            Some(component_value) => if !it(component_value) { return false },
-            None => return true,
         }
     }
 }
@@ -115,7 +101,28 @@ pub fn consume_component_value(parser: &mut Parser) -> Option<ComponentValue> {
 }
 
 
+pub fn ascii_lower(string: &str) -> ~str {
+    // Warning: premature optimization ahead ;)
+    // TODO: would it be more efficient to work on bytes,
+    // without decoding/re-encoding UTF-8?
+    do string.map_chars |c| {
+        match c {
+            'A'..'Z' => c + 'a' - 'A',
+            _ => c,
+        }
+    }
+}
+
+
 //  ***********  End of public API  ***********
+
+
+#[test]
+fn test_ascii_lower() {
+    assert!(ascii_lower("url()URL()uRl()Ürl") == ~"url()url()url()Ürl");
+    // Dotted capital I, Kelvin sign, Sharp S.
+    assert!(ascii_lower("HİKß") == ~"hİKß");
+}
 
 
 #[inline]
@@ -189,9 +196,11 @@ fn consume_comments(parser: &mut Parser) {
 
 fn consume_block(parser: &mut Parser, ending_token: ComponentValue) -> ~[ComponentValue] {
     let mut content = ~[];
-    for each_component_values(parser) |component_value| {
-        if component_value == ending_token { break }
-        content.push(component_value)
+    loop {
+        match consume_component_value(parser) {
+            Some(c) => if c == ending_token { break } else { content.push(c) },
+            None => break,
+        }
     }
     content
 }
@@ -629,102 +638,4 @@ fn consume_escape(parser: &mut Parser) -> char {
 #[inline]
 fn char_from_hex(hex: &[char]) -> char {
     u32::from_str_radix(str::from_chars(hex), 16).get() as char
-}
-
-
-#[cfg(test)]
-impl ToJson for ComponentValue {
-    pub fn to_json(&self) -> json::Json {
-        use JList = extra::json::List;
-        use JString = extra::json::String;
-        use JNumber = extra::json::Number;
-
-        fn numeric(NumericValue{representation: r, value: v, int_value: i}: NumericValue)
-                   -> ~[json::Json] {
-            ~[JString(r), JNumber(v as float), JString(
-                match i { Some(_) => ~"integer", _ => ~"number" })]
-        }
-
-        match copy *self {
-            Ident(value) => JList(~[JString(~"ident"), JString(value)]),
-            AtKeyword(value) => JList(~[JString(~"at-keyword"), JString(value)]),
-            Hash(value) => JList(~[JString(~"hash"), JString(value), JString(~"unrestricted")]),
-            IDHash(value) => JList(~[JString(~"hash"), JString(value), JString(~"id")]),
-            String(value) => JList(~[JString(~"string"), JString(value)]),
-            URL(value) => JList(~[JString(~"url"), JString(value)]),
-            Delim('\\') => JString(~"\\"),
-            Delim(value) => JString(str::from_char(value)),
-
-            Number(value) => JList(~[JString(~"number")] + numeric(value)),
-            Percentage(value) => JList(~[JString(~"percentage")] + numeric(value)),
-            Dimension(value, unit)
-            => JList(~[JString(~"dimension")] + numeric(value) + [JString(unit)]),
-
-            // TODO:
-            UnicodeRange(_start, _end) => fail!(),
-            EmptyUnicodeRange => fail!(),
-
-            WhiteSpace => JString(~" "),
-            Colon => JString(~":"),
-            Semicolon => JString(~";"),
-            IncludeMath => JString(~"~="),
-            DashMatch => JString(~"|="),
-            PrefixMatch => JString(~"^="),
-            SuffixMatch => JString(~"$="),
-            SubstringMatch => JString(~"*="),
-            Column => JString(~"||"),
-            CDO => JString(~"<!--"),
-            CDC => JString(~"-->"),
-
-            Function(name, arguments)
-            => JList(~[JString(~"function"), JString(name)] + vec::map(arguments, |a| a.to_json())),
-            ParenthesisBlock(content)
-            => JList(~[JString(~"()")] + vec::map(content, |v| v.to_json())),
-            SquareBraketBlock(content)
-            => JList(~[JString(~"[]")] + vec::map(content, |v| v.to_json())),
-            CurlyBraketBlock(content)
-            => JList(~[JString(~"{}")] + vec::map(content, |v| v.to_json())),
-
-            BadURL => JList(~[JString(~"error"), JString(~"bad-url")]),
-            BadString => JList(~[JString(~"error"), JString(~"bad-string")]),
-            CloseParenthesis => JList(~[JString(~"error"), JString(~")")]),
-            CloseSquareBraket => JList(~[JString(~"error"), JString(~"]")]),
-            CloseCurlyBraket => JList(~[JString(~"error"), JString(~"}")]),
-        }
-    }
-}
-
-
-#[cfg(test)]
-pub fn each_json_test(json_data: &str, it: &fn (input: ~str, expected: json::Json) -> bool)
-                      -> bool {
-    let items = match json::from_str(json_data) {
-        Ok(json::List(items)) => items,
-        _ => fail!("Invalid JSON")
-    };
-    assert!(items.len() % 2 == 0);
-    let mut input: Option<~str> = None;
-    do vec::consume(items) |_, item| {
-        match (&input, item) {
-            (&None, json::String(string)) => input = Some(string),
-            (&Some(_), expected) => { it(input.swap_unwrap(), expected); },
-            _ => fail!("Unexpected JSON")
-        };
-    }
-    true
-}
-
-
-#[test]
-fn test_component_value_list_json() {
-    for each_json_test(include_str!(
-            // https://github.com/SimonSapin/tinycss2/tree/master/tinycss2/tests
-            // TODO: use git subtree or something to have the JSON files in this repository.
-            "../tinycss2/tinycss2/tests/component_value_list.json"
-    )) |input, expected| {
-        let mut parser = Parser::from_str(input);
-        let mut results = ~[];
-        for each_component_values(&mut parser) |component_value| { results.push(component_value) }
-        assert_json_eq(results.to_json(), expected, input);
-    }
 }

@@ -5,5 +5,7 @@ extern mod extra;
 
 pub mod tokenizer;
 pub mod parser;
-pub mod utils;
 pub mod ast;
+
+#[cfg(test)]
+mod tests;
