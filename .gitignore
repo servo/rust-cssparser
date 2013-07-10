@@ -1,1 +1,7 @@
-cssparser-tests
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.dummy
+*-test

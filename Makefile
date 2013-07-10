@@ -1,10 +1,26 @@
-run-tests: cssparser-tests
-	./cssparser-tests
+RUSTC ?= rustc
+RUSTFLAGS ?=
 
-debug: cssparser-tests
+RUST_SRC=tokenizer.rs parser.rs ast.rs tests.rs
+
+.PHONY: all
+all:    libcssparser.dummy
+
+libcssparser.dummy: cssparser.rc $(RUST_SRC)
+	$(RUSTC) $(RUSTFLAGS) $< -o $@
+	touch $@
+
+cssparser-test: cssparser.rc $(RUST_SRC)
+	$(RUSTC) $(RUSTFLAGS) $< -o $@ --test
+
+.PHONY: check
+check: cssparser-test
+	./cssparser-test
+
+.PHONY: check-debug
+check-debug: cssparser-tests
 	echo -e "start\n break upcall_fail\n continue\n where\n continue" | gdb -q ./cssparser-tests
 
-cssparser-tests: cssparser.rc tokenizer.rs parser.rs ast.rs tests.rs
-	rustc --test $< -o $@
-
-.PHONY: run-tests debug
+.PHONY: clean
+clean:
+	rm -f *.o *.a *.so *.dylib *.dll *.dummy *-test
