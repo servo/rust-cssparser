@@ -35,7 +35,7 @@ pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
     let c = parser.current_char();
     Some(match c {
         '-' => {
-            if parser.starts_with(~"-->") {
+            if parser.starts_with("-->") {
                 parser.position += 3;
                 CDC
             }
@@ -46,7 +46,7 @@ pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
             }
         },
         '<' => {
-            if parser.starts_with(~"<!--") {
+            if parser.starts_with("<!--") {
                 parser.position += 4;
                 CDO
             } else {
@@ -57,6 +57,12 @@ pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
         '0'..'9' | '.' | '+' => consume_numeric(parser),
         'u' | 'U' => consume_unicode_range(parser),
         'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(parser),
+        '~' if parser.starts_with("~=") => { parser.position += 2; IncludeMath }
+        '|' if parser.starts_with("|=") => { parser.position += 2; DashMatch }
+        '^' if parser.starts_with("^=") => { parser.position += 2; PrefixMatch }
+        '$' if parser.starts_with("$=") => { parser.position += 2; SuffixMatch }
+        '*' if parser.starts_with("*=") => { parser.position += 2; SubstringMatch }
+        '|' if parser.starts_with("||") => { parser.position += 2; Column }
         _ if c >= '\x80' => consume_ident(parser),  // Non-ASCII
         _ => {
             match parser.consume_char() {
@@ -82,18 +88,6 @@ pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
                 ']' => CloseSquareBraket,
                 '{' => CurlyBraketBlock(consume_block(parser, CloseCurlyBraket)),
                 '}' => CloseCurlyBraket,
-                '~' if !parser.is_eof() && parser.current_char() == '='
-                => { parser.position += 1; IncludeMath }
-                '|' if !parser.is_eof() && parser.current_char() == '='
-                => { parser.position += 1; DashMatch }
-                '|' if !parser.is_eof() && parser.current_char() == '|'
-                => { parser.position += 1; Column }
-                '^' if !parser.is_eof() && parser.current_char() == '='
-                => { parser.position += 1; PrefixMatch }
-                '$' if !parser.is_eof() && parser.current_char() == '='
-                => { parser.position += 1; SuffixMatch }
-                '*' if !parser.is_eof() && parser.current_char() == '='
-                => { parser.position += 1; SubstringMatch }
                 _ => Delim(c)
             }
         }
@@ -170,20 +164,15 @@ impl Parser {
     }
 
     #[inline]
-    fn starts_with(&self, needle: ~str) -> bool {
-        // XXX Duplicate str::match_at which is not public.
-        let mut i = self.position;
-        if i + needle.len() > self.length { return false }
-        let haystack: &str = self.input;
-        for needle.bytes_iter().advance |c| { if haystack[i] != c { return false; } i += 1u; }
-        return true;
+    fn starts_with(&self, needle: &str) -> bool {
+        self.input.slice_from(self.position).starts_with(needle)
     }
 }
 
 
 #[inline]
 fn consume_comments(parser: &mut Parser) {
-    while parser.starts_with(~"/*") {
+    while parser.starts_with("/*") {
         parser.position += 2;  // +2 to consume "/*"
         match parser.input.slice_from(parser.position).find_str("*/") {
             // +2 to consume "*/"
@@ -215,7 +204,7 @@ macro_rules! is_match(
 
 #[inline]
 fn is_invalid_escape(parser: &mut Parser) -> bool {
-    parser.next_n_chars(2) == ~['\\', '\n']
+    parser.starts_with("\\\n")
 }
 
 
@@ -249,11 +238,11 @@ fn consume_quoted_string(parser: &mut Parser, single_quote: bool) -> ComponentVa
                 return BadString;
             },
             '\\' => {
-                match parser.next_n_chars(1) {
-                    ['\n'] => parser.position += 1,  // Escaped newline
-                    [] => (),  // Escaped EOF
-                    _ => string.push_char(consume_escape(parser))
+                if !parser.is_eof() {
+                    if parser.current_char() == '\n' { parser.position += 1 }  // Escaped newline
+                    else { string.push_char(consume_escape(parser)) }
                 }
+                // else: escaped EOF, do nothing.
             }
             c => string.push_char(c),
         }
@@ -514,9 +503,11 @@ fn consume_unquoted_url(parser: &mut Parser) -> ComponentValue {
             ')' => break,
             '\x00'..'\x08' | '\x0B' | '\x0E'..'\x1F' | '\x7F'  // non-printable
                 | '"' | '\'' | '(' => return consume_bad_url(parser),
-            '\\' => match parser.next_n_chars(1) {
-                ['\n'] => return consume_bad_url(parser),
-                _ => consume_escape(parser)
+            '\\' => {
+                if !parser.is_eof() && parser.current_char() == '\n' {
+                    return consume_bad_url(parser)
+                }
+                consume_escape(parser)
             },
             c => c
         };
