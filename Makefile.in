@@ -1,7 +1,13 @@
+VPATH=%VPATH%
+
+CC ?= gcc
+CXX ?= g++
+CXXFLAGS ?=
+AR ?= ar
 RUSTC ?= rustc
 RUSTFLAGS ?=
 
-RUST_SRC=tokenizer.rs parser.rs ast.rs tests.rs
+RUST_SRC=$(shell find $(VPATH)/. -type f -name '*.rs')
 
 .PHONY: all
 all:    libcssparser.dummy
