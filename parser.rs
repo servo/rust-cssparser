@@ -20,7 +20,7 @@ use tokenizer::*;
 // TODO: Use a trait?
 enum ComponentValueIterator {
     ParserIter(~Parser),
-    VectorIter(~[ComponentValue]),
+    VectorIter(vec::VecConsumeIterator<ComponentValue>),
 }
 
 
@@ -36,10 +36,8 @@ impl ComponentValueIterator {
     }
 
     #[inline]
-    pub fn from_vector(mut values: ~[ComponentValue]) -> ComponentValueIterator {
-        // TODO: find a way to have parse_iter() or something instead of reverse() + pop()
-        vec::reverse(values);
-        VectorIter(values)
+    pub fn from_vector(values: ~[ComponentValue]) -> ComponentValueIterator {
+        VectorIter(values.consume_iter())
     }
 
     #[inline]
@@ -56,8 +54,7 @@ impl Iterator<ComponentValue> for ComponentValueIterator {
     fn next(&mut self) -> Option<ComponentValue> {
         match self {
             &ParserIter(ref mut parser) => next_component_value(*parser),
-            &VectorIter(ref mut reversed_vector)
-            => if reversed_vector.is_empty() { None } else { Some(reversed_vector.pop()) }
+            &VectorIter(ref mut iter) => iter.next()
         }
     }
 }

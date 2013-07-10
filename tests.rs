@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::{io, os, str, vec, run, task};
+use std::{io, os, str, run, task};
 use extra::{tempfile, json};
 use extra::json::ToJson;
 
@@ -47,7 +47,7 @@ fn run_json_tests(json_data: &str, parse: &fn (input: ~str) -> json::Json) {
     };
     assert!(items.len() % 2 == 0);
     let mut input: Option<~str> = None;
-    do vec::consume(items) |_, item| {
+    for items.consume_iter().advance |item| {
         match (&input, item) {
             (&None, json::String(string)) => input = Some(string),
             (&Some(_), expected) => {
@@ -242,7 +242,7 @@ impl ToJson for ComponentValue {
             Number(ref value) => JList(~[JString(~"number")] + numeric(value)),
             Percentage(ref value) => JList(~[JString(~"percentage")] + numeric(value)),
             Dimension(ref value, ref unit)
-            => JList(~[JString(~"dimension")] + numeric(value) + [unit.to_json()]),
+            => JList(~[JString(~"dimension")] + numeric(value) + ~[unit.to_json()]),
 
             // TODO:
             UnicodeRange(_start, _end) => fail!(),
@@ -262,13 +262,13 @@ impl ToJson for ComponentValue {
 
             Function(ref name, ref arguments)
             => JList(~[JString(~"function"), name.to_json()]
-                     + vec::map(*arguments, |c| (*c).to_json())),
+                     + arguments.map(|c| (*c).to_json())),
             ParenthesisBlock(ref content)
-            => JList(~[JString(~"()")] + vec::map(*content, |c| (*c).to_json())),
+            => JList(~[JString(~"()")] + content.map(|c| (*c).to_json())),
             SquareBraketBlock(ref content)
-            => JList(~[JString(~"[]")] + vec::map(*content, |c| (*c).to_json())),
+            => JList(~[JString(~"[]")] + content.map(|c| (*c).to_json())),
             CurlyBraketBlock(ref content)
-            => JList(~[JString(~"{}")] + vec::map(*content, |c| (*c).to_json())),
+            => JList(~[JString(~"{}")] + content.map(|c| (*c).to_json())),
 
             BadURL => JList(~[JString(~"error"), JString(~"bad-url")]),
             BadString => JList(~[JString(~"error"), JString(~"bad-string")]),
