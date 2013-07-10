@@ -5,3 +5,4 @@
 *.dll
 *.dummy
 *-test
+Makefile
