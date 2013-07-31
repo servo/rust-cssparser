@@ -2,32 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::{f64, i32};
-
 
 #[deriving(Eq)]
 pub struct NumericValue {
     representation: ~str,
     value: f64,
     int_value: Option<i32>,
-}
-
-impl NumericValue {
-    pub fn new(representation: ~str, is_integer: bool) -> NumericValue {
-        // TODO: handle overflow
-        NumericValue {
-            int_value: if is_integer { Some(
-                // Remove any + sign as int::from_str() does not parse them.
-                if representation[0] != '+' as u8 {
-                    i32::from_str(representation)
-                } else {
-                    i32::from_str(representation.slice_from(1))
-                }.get()
-            )} else { None },
-            value: f64::from_str(representation).get(),
-            representation: representation,
-        }
-    }
 }
 
 

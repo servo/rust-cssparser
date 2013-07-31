@@ -4,16 +4,16 @@
 
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 
-use std::{str, u32, vec};
+use std::{str, u32, i32, f64, vec};
 
 use ast::*;
 use super::eq_ascii_lower;
 
 
-pub struct Parser {
-    priv input: ~str,
-    priv length: uint,  // All counted in bytes, not characters
-    priv position: uint,  // All counted in bytes, not characters
+struct Parser {
+    input: ~str,
+    length: uint,  // All counted in bytes, not characters
+    position: uint,  // All counted in bytes, not characters
     // TODO: add these in tokens
 //    priv line: uint,
 //    priv column: uint,  // All counted in bytes, not characters
@@ -34,6 +34,13 @@ impl Parser {
 }
 
 
+macro_rules! is_match(
+    ($value:expr, $($pattern:pat)|+) => (
+        match $value { $($pattern)|+ => true, _ => false }
+    );
+)
+
+
 pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
     consume_comments(parser);
     if parser.is_eof() { return None }
@@ -43,11 +50,20 @@ pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
             if parser.starts_with("-->") {
                 parser.position += 3;
                 CDC
-            }
-            else if next_is_namestart_or_escape(parser) {
+            } else if next_is_namestart_or_escape(parser) {
                 consume_ident(parser)
-            } else {
+            } else if (
+                parser.position + 1 < parser.length
+                && is_match!(parser.char_at(1), '0'..'9')
+            ) || (
+                parser.position + 2 < parser.length
+                && parser.char_at(1) == '.'
+                && is_match!(parser.char_at(2), '0'..'9')
+            ) {
                 consume_numeric(parser)
+            } else {
+                parser.position += 1;
+                Delim('-')
             }
         },
         '<' => {
@@ -59,7 +75,30 @@ pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
                 Delim('<')
             }
         },
-        '0'..'9' | '.' | '+' => consume_numeric(parser),
+        '0'..'9' => consume_numeric(parser),
+        '.' => {
+            if (parser.position + 1 < parser.length && is_match!(parser.char_at(1), '0'..'9')) {
+                consume_numeric(parser)
+            } else {
+                parser.position += 1;
+                Delim('.')
+            }
+        }
+        '+' => {
+            if (
+                parser.position + 1 < parser.length
+                && is_match!(parser.char_at(1), '0'..'9')
+            ) || (
+                parser.position + 2 < parser.length
+                && parser.char_at(1) == '.'
+                && is_match!(parser.char_at(2), '0'..'9')
+            ) {
+                consume_numeric(parser)
+            } else {
+                parser.position += 1;
+                Delim('+')
+            }
+        },
         'u' | 'U' => consume_unicode_range(parser),
         'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(parser),
         '~' if parser.starts_with("~=") => { parser.position += 2; IncludeMath }
@@ -124,7 +163,12 @@ impl Parser {
 
     // Assumes non-EOF
     #[inline]
-    fn current_char(&self) -> char { self.input.char_at(self.position) }
+    fn current_char(&self) -> char { self.char_at(0) }
+
+    #[inline]
+    fn char_at(&self, offset: uint) -> char {
+        self.input.char_at(self.position + offset)
+    }
 
     #[inline]
     fn consume_char(&mut self) -> char {
@@ -177,13 +221,6 @@ fn consume_block(parser: &mut Parser, ending_token: ComponentValue) -> ~[Compone
     }
     content
 }
-
-
-macro_rules! is_match(
-    ($value:expr, $pattern:pat) => (
-        match $value { $pattern => true, _ => false }
-    );
-)
 
 
 #[inline]
@@ -314,87 +351,66 @@ fn consume_ident_string_rest(parser: &mut Parser) -> ~str {
 
 
 fn consume_numeric(parser: &mut Parser) -> ComponentValue {
-    let c = parser.consume_char();
-    match c {
-        '-' | '+' => consume_numeric_sign(parser, c),
-        '.' => {
-            if parser.is_eof() { return Delim('.') }
-            match parser.current_char() {
-                '0'..'9' => consume_numeric_fraction(parser, ~"."),
-                _ => Delim('.'),
-            }
-        },
-        '0'..'9' => consume_numeric_rest(parser, c),
-        _ => fail!(),  // consume_numeric() should not have been called here.
+    // Parse [+-]?\d*(\.\d+)?([eE][+-]?\d+)?
+    // But this is always called so that there is at least one digit in \d*(\.\d+)?
+    let mut representation = ~"";
+    let mut is_integer = true;
+    if is_match!(parser.current_char(), '-' | '+') {
+         representation.push_char(parser.consume_char())
     }
-}
-
-
-fn consume_numeric_sign(parser: &mut Parser, sign: char)
-        -> ComponentValue {
-    if parser.is_eof() { return Delim(sign) }
-    match parser.current_char() {
-        '.' => {
-            parser.position += 1;
-            if !parser.is_eof()
-                    && is_match!(parser.current_char(), '0'..'9') {
-                consume_numeric_fraction(parser, str::from_char(sign) + ".")
-            } else {
-                parser.position -= 1;
-                Delim(sign)
-            }
-        },
-        '0'..'9' => consume_numeric_rest(parser, sign),
-        _ => Delim(sign)
-    }
-}
-
-
-fn consume_numeric_rest(parser: &mut Parser, initial_char: char)
-        -> ComponentValue {
-    let mut string = str::from_char(initial_char);
-    while !parser.is_eof() {
-        let c = parser.current_char();
-        match c {
-            '0'..'9' => { string.push_char(c); parser.position += 1 },
-            '.' => {
-                parser.position += 1;
-                if !parser.is_eof()
-                        && is_match!(parser.current_char(), '0'..'9') {
-                    string.push_char('.');
-                    return consume_numeric_fraction(parser, string);
-                } else {
-                    parser.position -= 1; break
-                }
-            },
-            _ => match consume_scientific_number(parser, string) {
-                Ok(token) => return token,
-                Err(s) => { string = s; break }
-            }
-        }
-    }
-    consume_numeric_end(parser, NumericValue::new(string, true))
-}
-
-
-fn consume_numeric_fraction(parser: &mut Parser, string: ~str)
-        -> ComponentValue {
-    let mut string: ~str = string;
     while !parser.is_eof() {
         match parser.current_char() {
-            '0'..'9' => string.push_char(parser.consume_char()),
-            _ => match consume_scientific_number(parser, string) {
-                Ok(token) => return token,
-                Err(s) => { string = s; break }
+            '0'..'9' => representation.push_char(parser.consume_char()),
+            _ => break
+        }
+    }
+    if parser.position + 1 < parser.length && parser.current_char() == '.'
+            && is_match!(parser.char_at(1), '0'..'9') {
+        is_integer = false;
+        representation.push_char(parser.consume_char());  // '.'
+        representation.push_char(parser.consume_char());  // digit
+        while !parser.is_eof() {
+            match parser.current_char() {
+                '0'..'9' => representation.push_char(parser.consume_char()),
+                _ => break
             }
         }
     }
-    consume_numeric_end(parser, NumericValue::new(string, false))
-}
-
-
-fn consume_numeric_end(parser: &mut Parser, value: NumericValue)
-        -> ComponentValue {
+    if (
+        parser.position + 1 < parser.length
+        && is_match!(parser.current_char(), 'e' | 'E')
+        && is_match!(parser.char_at(1), '0'..'9')
+    ) || (
+        parser.position + 2 < parser.length
+        && is_match!(parser.current_char(), 'e' | 'E')
+        && is_match!(parser.char_at(1), '+' | '-')
+        && is_match!(parser.char_at(2), '0'..'9')
+    ) {
+        is_integer = false;
+        representation.push_char(parser.consume_char());  // 'e' or 'E'
+        representation.push_char(parser.consume_char());  // sign or digit
+        // If the above was a sign, the first digit it consumed below
+        // and we make one extraneous is_eof() check.
+        while !parser.is_eof() {
+            match parser.current_char() {
+                '0'..'9' => representation.push_char(parser.consume_char()),
+                _ => break
+            }
+        }
+    }
+    // TODO: handle overflow
+    let value = NumericValue {
+        int_value: if is_integer { Some(
+            // Remove any + sign as int::from_str() does not parse them.
+            if representation[0] != '+' as u8 {
+                i32::from_str(representation)
+            } else {
+                i32::from_str(representation.slice_from(1))
+            }.get()
+        )} else { None },
+        value: f64::from_str(representation).get(),
+        representation: representation,
+    };
     if parser.is_eof() { return Number(value) }
     match parser.current_char() {
         '%' => { parser.position += 1; Percentage(value) },
@@ -405,37 +421,6 @@ fn consume_numeric_end(parser: &mut Parser, value: NumericValue)
             }
         },
     }
-}
-
-
-fn consume_scientific_number(parser: &mut Parser, string: ~str)
-        -> Result<ComponentValue, ~str> {
-    let next_3 = parser.next_n_chars(3);
-    let mut string: ~str = string;
-    if (next_3.len() >= 2
-        && (next_3[0] == 'e' || next_3[0] == 'E')
-        && (is_match!(next_3[1], '0'..'9'))
-    ) {
-        string.push_char(next_3[0]);
-        string.push_char(next_3[1]);
-        parser.position += 2;
-    } else if (
-        next_3.len() == 3
-        && (next_3[0] == 'e' || next_3[0] == 'E')
-        && (next_3[1] == '+' || next_3[1] == '-')
-        && is_match!(next_3[2], '0'..'9')
-    ) {
-        string.push_char(next_3[0]);
-        string.push_char(next_3[1]);
-        string.push_char(next_3[2]);
-        parser.position += 3;
-    } else {
-        return Err(string)
-    }
-    while !parser.is_eof() && is_match!(parser.current_char(), '0'..'9') {
-        string.push_char(parser.consume_char())
-    }
-    Ok(consume_numeric_end(parser, NumericValue::new(string, false)))
 }
 
 
@@ -506,7 +491,7 @@ fn consume_bad_url(parser: &mut Parser) -> ComponentValue {
     while !parser.is_eof() {
         match parser.consume_char() {
             ')' => break,
-            '\\' => parser.position += 1, // Skip an escaped ) or \
+            '\\' => parser.position += 1, // Skip an escaped ')' or '\'
             _ => ()
         }
     }
