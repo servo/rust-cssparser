@@ -46,44 +46,29 @@ pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
     if parser.is_eof() { return None }
     let c = parser.current_char();
     Some(match c {
-        '-' => {
-            if parser.starts_with("-->") {
-                parser.position += 3;
-                CDC
-            } else if next_is_namestart_or_escape(parser) {
-                consume_ident(parser)
-            } else if (
-                parser.position + 1 < parser.length
-                && is_match!(parser.char_at(1), '0'..'9')
-            ) || (
-                parser.position + 2 < parser.length
-                && parser.char_at(1) == '.'
-                && is_match!(parser.char_at(2), '0'..'9')
-            ) {
-                consume_numeric(parser)
-            } else {
-                parser.position += 1;
-                Delim('-')
+        '\t' | '\n' | ' ' => {
+            parser.position += 1;
+            while !parser.is_eof() {
+                match parser.current_char() {
+                    '\t' | '\n' | ' ' => parser.position += 1,
+                    _ => break,
+                }
             }
+            WhiteSpace
         },
-        '<' => {
-            if parser.starts_with("<!--") {
-                parser.position += 4;
-                CDO
-            } else {
-                parser.position += 1;
-                Delim('<')
-            }
+        '"' => consume_quoted_string(parser, false),
+        '#' => { parser.position += 1; consume_hash(parser) },
+        '$' => {
+            if parser.starts_with("$=") { parser.position += 2; SuffixMatch }
+            else { parser.position += 1; Delim(c) }
         },
-        '0'..'9' => consume_numeric(parser),
-        '.' => {
-            if (parser.position + 1 < parser.length && is_match!(parser.char_at(1), '0'..'9')) {
-                consume_numeric(parser)
-            } else {
-                parser.position += 1;
-                Delim('.')
-            }
-        }
+        '\'' => consume_quoted_string(parser, true),
+        '(' => ParenthesisBlock(consume_block(parser, CloseParenthesis)),
+        ')' => { parser.position += 1; CloseParenthesis },
+        '*' => {
+            if parser.starts_with("*=") { parser.position += 2; SubstringMatch }
+            else { parser.position += 1; Delim(c) }
+        },
         '+' => {
             if (
                 parser.position + 1 < parser.length
@@ -96,45 +81,77 @@ pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
                 consume_numeric(parser)
             } else {
                 parser.position += 1;
-                Delim('+')
+                Delim(c)
             }
         },
-        'u' | 'U' => consume_unicode_range(parser),
-        'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(parser),
-        '~' if parser.starts_with("~=") => { parser.position += 2; IncludeMath }
-        '|' if parser.starts_with("|=") => { parser.position += 2; DashMatch }
-        '^' if parser.starts_with("^=") => { parser.position += 2; PrefixMatch }
-        '$' if parser.starts_with("$=") => { parser.position += 2; SuffixMatch }
-        '*' if parser.starts_with("*=") => { parser.position += 2; SubstringMatch }
-        '|' if parser.starts_with("||") => { parser.position += 2; Column }
-        _ if c >= '\x80' => consume_ident(parser),  // Non-ASCII
-        _ => {
-            match parser.consume_char() {
-                '\t' | '\n' | ' ' => {
-                    while !parser.is_eof() {
-                        match parser.current_char() {
-                            '\t' | '\n' | ' '
-                                => parser.position += 1,
-                            _ => break,
-                        }
-                    }
-                    WhiteSpace
-                },
-                '"' => consume_quoted_string(parser, false),
-                '#' => consume_hash(parser),
-                '\'' => consume_quoted_string(parser, true),
-                '(' => ParenthesisBlock(consume_block(parser, CloseParenthesis)),
-                ')' => CloseParenthesis,
-                ':' => Colon,
-                ';' => Semicolon,
-                '@' => consume_at_keyword(parser),
-                '[' => SquareBraketBlock(consume_block(parser, CloseSquareBraket)),
-                ']' => CloseSquareBraket,
-                '{' => CurlyBraketBlock(consume_block(parser, CloseCurlyBraket)),
-                '}' => CloseCurlyBraket,
-                _ => Delim(c)
+        '-' => {
+            if (
+                parser.position + 1 < parser.length
+                && is_match!(parser.char_at(1), '0'..'9')
+            ) || (
+                parser.position + 2 < parser.length
+                && parser.char_at(1) == '.'
+                && is_match!(parser.char_at(2), '0'..'9')
+            ) {
+                consume_numeric(parser)
+            } else if next_is_namestart_or_escape(parser) {
+                consume_ident(parser)
+            } else if parser.starts_with("-->") {
+                parser.position += 3;
+                CDC
+            } else {
+                parser.position += 1;
+                Delim(c)
+            }
+        },
+        '.' => {
+            if (parser.position + 1 < parser.length && is_match!(parser.char_at(1), '0'..'9')) {
+                consume_numeric(parser)
+            } else {
+                parser.position += 1;
+                Delim(c)
             }
         }
+        '0'..'9' => consume_numeric(parser),
+        ':' => { parser.position += 1; Colon },
+        ';' => { parser.position += 1; Semicolon },
+        '<' => {
+            if parser.starts_with("<!--") {
+                parser.position += 4;
+                CDO
+            } else {
+                parser.position += 1;
+                Delim(c)
+            }
+        },
+        '@' => { parser.position += 1; consume_at_keyword(parser) },
+        'u' | 'U' => consume_unicode_range(parser),
+        'a'..'z' | 'A'..'Z' | '_' | '\\' => consume_ident(parser),
+        '[' => SquareBraketBlock(consume_block(parser, CloseSquareBraket)),
+        ']' => { parser.position += 1; CloseSquareBraket },
+        '^' => {
+            if parser.starts_with("^=") { parser.position += 2; PrefixMatch }
+            else { parser.position += 1; Delim(c) }
+        },
+        '{' => CurlyBraketBlock(consume_block(parser, CloseCurlyBraket)),
+        '|' => {
+            if parser.starts_with("|=") { parser.position += 2; DashMatch }
+            else if parser.starts_with("||") { parser.position += 2; Column }
+            else { parser.position += 1; Delim(c) }
+        },
+        '}' => { parser.position += 1; CloseCurlyBraket },
+        '~' => {
+            if parser.starts_with("~=") { parser.position += 2; IncludeMath }
+            else { parser.position += 1; Delim(c) }
+        },
+        _ => {
+            if c > '\x7F' {  // Non-ASCII
+                consume_ident(parser)
+            } else {
+                parser.position += 1;
+                Delim(c)
+            }
+        },
     })
 }
 
@@ -212,6 +229,7 @@ fn consume_comments(parser: &mut Parser) {
 
 
 fn consume_block(parser: &mut Parser, ending_token: ComponentValue) -> ~[ComponentValue] {
+    parser.position += 1;  // Skip the initial {[(
     let mut content = ~[];
     loop {
         match next_component_value(parser) {
@@ -249,6 +267,7 @@ fn next_is_namestart_or_escape(parser: &mut Parser) -> bool {
 
 
 fn consume_quoted_string(parser: &mut Parser, single_quote: bool) -> ComponentValue {
+    parser.position += 1;  // Skip the initial quote
     let mut string: ~str = ~"";
     while !parser.is_eof() {
         match parser.consume_char() {
@@ -297,8 +316,10 @@ fn consume_ident(parser: &mut Parser) -> ComponentValue {
             if parser.is_eof() { return Ident(string) }
             match parser.current_char() {
                 '(' => {
-                    parser.position += 1;
-                    if eq_ascii_lower(string, "url") { consume_url(parser) }
+                    if eq_ascii_lower(string, "url") {
+                        parser.position += 1;
+                        consume_url(parser)
+                    }
                     else { Function(string, consume_block(parser, CloseParenthesis)) }
                 },
                 _ => Ident(string)
@@ -440,7 +461,6 @@ fn consume_url(parser: &mut Parser) -> ComponentValue {
 
 fn consume_quoted_url(parser: &mut Parser, single_quote: bool)
         -> ComponentValue {
-    parser.position += 1;  // The initial quote
     match consume_quoted_string(parser, single_quote) {
         String(string) => consume_url_end(parser, string),
         BadString => consume_bad_url(parser),
