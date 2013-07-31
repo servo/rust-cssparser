@@ -7,6 +7,7 @@
 use std::{str, u32, vec};
 
 use ast::*;
+use super::eq_ascii_lower;
 
 
 pub struct Parser {
@@ -99,28 +100,7 @@ pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
 }
 
 
-pub fn ascii_lower(string: &str) -> ~str {
-    // Warning: premature optimization ahead ;)
-    // TODO: would it be more efficient to work on bytes,
-    // without decoding/re-encoding UTF-8?
-    do string.map_chars |c| {
-        match c {
-            'A'..'Z' => c + 'a' - 'A',
-            _ => c,
-        }
-    }
-}
-
-
 //  ***********  End of public API  ***********
-
-
-#[test]
-fn test_ascii_lower() {
-    assert!(ascii_lower("url()URL()uRl()Ürl") == ~"url()url()url()Ürl");
-    // Dotted capital I, Kelvin sign, Sharp S.
-    assert!(ascii_lower("HİKß") == ~"hİKß");
-}
 
 
 #[inline]
@@ -281,7 +261,7 @@ fn consume_ident(parser: &mut Parser) -> ComponentValue {
             match parser.current_char() {
                 '(' => {
                     parser.position += 1;
-                    if ascii_lower(string) == ~"url" { consume_url(parser) }
+                    if eq_ascii_lower(string, "url") { consume_url(parser) }
                     else { Function(string, consume_block(parser, CloseParenthesis)) }
                 },
                 _ => Ident(string)

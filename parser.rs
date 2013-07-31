@@ -15,6 +15,7 @@ use std::vec;
 
 use ast::*;
 use tokenizer::*;
+use super::eq_ascii_lower;
 
 
 // TODO: Use a trait?
@@ -217,7 +218,7 @@ fn parse_declaration_important(iter: &mut ComponentValueIterator) -> bool {
         Some(Ident(value)) => value,
         _ => return false,
     };
-    if ascii_lower(ident_value) != ~"important" { return false }
+    if !eq_ascii_lower(ident_value, "important") { return false }
     match iter.next_non_whitespace() {
         Some(Semicolon) => true,
         None => true,
