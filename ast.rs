@@ -12,6 +12,14 @@ pub struct NumericValue {
 
 
 #[deriving(Eq)]
+pub struct SourceLocation {
+//    line: uint,
+//    column: uint,
+    position: uint,
+}
+
+
+#[deriving(Eq)]
 pub enum ComponentValue {
     // Preserved tokens. Same as in the tokenizer.
     Ident(~str),
@@ -39,12 +47,12 @@ pub enum ComponentValue {
     CDC,  // -->
 
     // Function
-    Function(~str, ~[ComponentValue]),  // name, arguments
+    Function(~str, ~[(ComponentValue, SourceLocation)]),  // name, arguments
 
     // Simple block
-    ParenthesisBlock(~[ComponentValue]),  // (…)
-    SquareBraketBlock(~[ComponentValue]),  // […]
-    CurlyBraketBlock(~[ComponentValue]),  // {…}
+    ParenthesisBlock(~[(ComponentValue, SourceLocation)]),  // (…)
+    SquareBraketBlock(~[(ComponentValue, SourceLocation)]),  // […]
+    CurlyBraketBlock(~[(ComponentValue, SourceLocation)]),  // {…}
 
     // These are always invalid
     BadURL,
@@ -57,22 +65,25 @@ pub enum ComponentValue {
 
 #[deriving(Eq)]
 pub struct Declaration {
+    location: SourceLocation,
     name: ~str,
-    value: ~[ComponentValue],
+    value: ~[(ComponentValue, SourceLocation)],
     important: bool,
 }
 
 #[deriving(Eq)]
 pub struct QualifiedRule {
-    prelude: ~[ComponentValue],
-    block: ~[ComponentValue],
+    location: SourceLocation,
+    prelude: ~[(ComponentValue, SourceLocation)],
+    block: ~[(ComponentValue, SourceLocation)],
 }
 
 #[deriving(Eq)]
 pub struct AtRule {
+    location: SourceLocation,
     name: ~str,
-    prelude: ~[ComponentValue],
-    block: Option<~[ComponentValue]>,
+    prelude: ~[(ComponentValue, SourceLocation)],
+    block: Option<~[(ComponentValue, SourceLocation)]>,
 }
 
 #[deriving(Eq)]

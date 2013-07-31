@@ -68,7 +68,7 @@ fn component_value_list() {
         let mut results = ~[];
         loop {
             match next_component_value(&mut parser) {
-                Some(c) => results.push(c),
+                Some((c, _)) => results.push(c),
                 None => break,
             }
         }
@@ -83,7 +83,7 @@ fn one_component_value() {
         let mut iter = ComponentValueIterator::from_str(input);
         match iter.next_non_whitespace() {
             None => json::List(~[json::String(~"error"), json::String(~"empty")]),
-            Some(component_value) => match iter.next_non_whitespace() {
+            Some((component_value, _)) => match iter.next_non_whitespace() {
                 Some(_) => json::List(~[json::String(~"error"), json::String(~"extra-input")]),
                 None => component_value.to_json(),
             }
@@ -183,12 +183,22 @@ impl ToJson for DeclarationListItem {
 }
 
 
+fn list_to_json(list: &~[(ComponentValue, SourceLocation)]) -> ~[json::Json] {
+    list.map(|tuple| {
+        match *tuple {
+            (ref c, _) => c.to_json()
+        }
+    })
+}
+
+
 impl ToJson for AtRule {
     fn to_json(&self) -> json::Json {
         match *self {
-            AtRule{name: ref name, prelude: ref prelude, block: ref block}
+            AtRule{name: ref name, prelude: ref prelude, block: ref block, _}
             => json::List(~[json::String(~"at-rule"), name.to_json(),
-                            prelude.to_json(), block.to_json()])
+                            json::List(list_to_json(prelude)),
+                            block.map(list_to_json).to_json()])
         }
     }
 }
@@ -197,8 +207,9 @@ impl ToJson for AtRule {
 impl ToJson for QualifiedRule {
     fn to_json(&self) -> json::Json {
         match *self {
-            QualifiedRule{prelude: ref prelude, block: ref block}
-            => json::List(~[json::String(~"qualified rule"), prelude.to_json(), block.to_json()])
+            QualifiedRule{prelude: ref prelude, block: ref block, _}
+            => json::List(~[json::String(~"qualified rule"),
+                            json::List(list_to_json(prelude)), json::List(list_to_json(block))])
         }
     }
 }
@@ -207,9 +218,9 @@ impl ToJson for QualifiedRule {
 impl ToJson for Declaration {
     fn to_json(&self) -> json::Json {
         match *self {
-            Declaration{name: ref name, value: ref value, important: ref important}
+            Declaration{name: ref name, value: ref value, important: ref important, _}
             =>  json::List(~[json::String(~"declaration"), name.to_json(),
-                             value.to_json(), important.to_json()])
+                             json::List(list_to_json(value)), important.to_json()])
         }
     }
 }
@@ -261,14 +272,13 @@ impl ToJson for ComponentValue {
             CDC => JString(~"-->"),
 
             Function(ref name, ref arguments)
-            => JList(~[JString(~"function"), name.to_json()]
-                     + arguments.map(|c| (*c).to_json())),
+            => JList(~[JString(~"function"), name.to_json()] + list_to_json(arguments)),
             ParenthesisBlock(ref content)
-            => JList(~[JString(~"()")] + content.map(|c| (*c).to_json())),
+            => JList(~[JString(~"()")] + list_to_json(content)),
             SquareBraketBlock(ref content)
-            => JList(~[JString(~"[]")] + content.map(|c| (*c).to_json())),
+            => JList(~[JString(~"[]")] + list_to_json(content)),
             CurlyBraketBlock(ref content)
-            => JList(~[JString(~"{}")] + content.map(|c| (*c).to_json())),
+            => JList(~[JString(~"{}")] + list_to_json(content)),
 
             BadURL => JList(~[JString(~"error"), JString(~"bad-url")]),
             BadString => JList(~[JString(~"error"), JString(~"bad-string")]),

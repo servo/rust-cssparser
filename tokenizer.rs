@@ -41,11 +41,12 @@ macro_rules! is_match(
 )
 
 
-pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
+pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, SourceLocation)> {
     consume_comments(parser);
     if parser.is_eof() { return None }
+    let start_location = SourceLocation{position: parser.position};
     let c = parser.current_char();
-    Some(match c {
+    let component_value = match c {
         '\t' | '\n' | ' ' => {
             parser.position += 1;
             while !parser.is_eof() {
@@ -175,7 +176,8 @@ pub fn next_component_value(parser: &mut Parser) -> Option<ComponentValue> {
                 Delim(c)
             }
         },
-    })
+    };
+    Some((component_value, start_location))
 }
 
 
@@ -237,12 +239,16 @@ fn consume_comments(parser: &mut Parser) {
 }
 
 
-fn consume_block(parser: &mut Parser, ending_token: ComponentValue) -> ~[ComponentValue] {
+fn consume_block(parser: &mut Parser, ending_token: ComponentValue)
+                 -> ~[(ComponentValue, SourceLocation)] {
     parser.position += 1;  // Skip the initial {[(
     let mut content = ~[];
     loop {
         match next_component_value(parser) {
-            Some(c) => if c == ending_token { break } else { content.push(c) },
+            Some((component_value, location)) => {
+                if component_value == ending_token { break }
+                else { content.push((component_value, location)) }
+            },
             None => break,
         }
     }
