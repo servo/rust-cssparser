@@ -9,6 +9,7 @@ use extra::json::ToJson;
 use ast::*;
 use tokenizer::*;
 use parser::*;
+use color::*;
 
 
 fn write_whole_file(path: &Path, data: &str) {
@@ -80,10 +81,8 @@ fn component_value_list() {
 #[test]
 fn one_component_value() {
     do run_json_tests(include_str!("css-parsing-tests/one_component_value.json")) |input| {
-        match parse_one_component_value(&mut ComponentValueIterator::from_str(input)) {
-            Ok((component_value, _location)) => component_value.to_json(),
-            Err(reason) => reason.to_json(),
-        }
+        let iter = &mut ComponentValueIterator::from_str(input);
+        result_to_json(parse_one_component_value(iter).chain(|(c, _)| Ok(c)))
     }
 }
 
@@ -136,10 +135,55 @@ fn one_rule() {
 }
 
 
+fn run_color_tests(json_data: &str, to_json: &fn(result: Option<Color>) -> json::Json) {
+    do run_json_tests(json_data) |input| {
+        match parse_one_component_value(&mut ComponentValueIterator::from_str(input)) {
+            Ok((component_value, _location)) => to_json(parse_color(component_value)),
+            Err(_reason) => json::Null,
+        }
+    }
+}
+
+
+//#[test]
+//fn color3() {
+//    run_color_tests(include_str!("css-parsing-tests/color3.json"), |c| c.to_json())
+//}
+
+
+//#[test]
+//fn color3_hsl() {
+//    run_color_tests(include_str!("css-parsing-tests/color3_hsl.json"), |c| c.to_json())
+//}
+
+
+#[test]
+fn color3_keywords() {
+    do run_color_tests(include_str!("css-parsing-tests/color3_keywords.json")) |c| {
+        let m = 255 as ColorFloat;
+        match c {
+            Some(RGBA(r, g, b, a)) => (~[r * m, g * m, b * m, a]).to_json(),
+            Some(CurrentColor) => json::String(~"currentColor"),
+            None => json::Null,
+        }
+    }
+}
+
+
 fn result_to_json<A:ToJson, B:ToJson>(result: Result<A, B>) -> json::Json {
     match result {
         Ok(ref a) => a.to_json(),
         Err(ref b) => b.to_json(),
+    }
+}
+
+
+impl ToJson for Color {
+    fn to_json(&self) -> json::Json {
+        match *self {
+            RGBA(r, g, b, a) => (~[r, g, b, a]).to_json(),
+            CurrentColor => json::String(~"currentColor"),
+        }
     }
 }
 

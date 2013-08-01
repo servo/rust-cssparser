@@ -6,3 +6,4 @@
 *.dummy
 *-test
 Makefile
+/color_data.rs

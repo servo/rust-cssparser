@@ -7,7 +7,8 @@ AR ?= ar
 RUSTC ?= rustc
 RUSTFLAGS ?=
 
-RUST_SRC=$(shell find $(VPATH)/. -type f -name '*.rs')
+GENERATED_RUST_SRC=color_data.rs
+RUST_SRC=$(shell find $(VPATH)/. -type f -name '*.rs') $(GENERATED_RUST_SRC)
 
 .PHONY: all
 all:    libcssparser.dummy
@@ -30,3 +31,7 @@ check-debug: cssparser-tests
 .PHONY: clean
 clean:
 	rm -f *.o *.a *.so *.dylib *.dll *.dummy *-test
+
+
+color_data.rs: make_color_data.py
+	python $< > $@

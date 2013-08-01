@@ -10,6 +10,7 @@ extern mod extra;
 pub mod tokenizer;
 pub mod parser;
 pub mod ast;
+pub mod color;
 
 #[cfg(test)]
 mod tests;
