@@ -13,8 +13,8 @@ pub struct NumericValue {
 
 #[deriving(Eq)]
 pub struct SourceLocation {
-    line: uint,
-    column: uint,
+    line: uint,  // First line is 1
+    column: uint,  // First character of a line is at column 1
 }
 
 

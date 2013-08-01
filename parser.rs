@@ -150,6 +150,19 @@ pub fn parse_one_declaration(iter: &mut ComponentValueIterator) -> Result<Declar
 }
 
 
+/// Used eg. in attr(foo, color)
+pub fn parse_one_component_value(iter: &mut ComponentValueIterator)
+                                 -> Result<(ComponentValue, SourceLocation), ErrorReason> {
+    match iter.next_non_whitespace() {
+        None => Err(ErrEmptyInput),
+        Some(item) => {
+            if iter.next_non_whitespace().is_none() { Ok(item) }
+            else { Err(ErrExtraInput) }
+        }
+    }
+}
+
+
 //  ***********  End of public API  ***********
 
 

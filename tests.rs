@@ -64,10 +64,10 @@ fn run_json_tests(json_data: &str, parse: &fn (input: ~str) -> json::Json) {
 #[test]
 fn component_value_list() {
     do run_json_tests(include_str!("css-parsing-tests/component_value_list.json")) |input| {
-        let mut parser = Parser::from_str(input);
+        let parser = &mut Parser::from_str(input);
         let mut results = ~[];
         loop {
-            match next_component_value(&mut parser) {
+            match next_component_value(parser) {
                 Some((c, _)) => results.push(c),
                 None => break,
             }
@@ -80,13 +80,9 @@ fn component_value_list() {
 #[test]
 fn one_component_value() {
     do run_json_tests(include_str!("css-parsing-tests/one_component_value.json")) |input| {
-        let mut iter = ComponentValueIterator::from_str(input);
-        match iter.next_non_whitespace() {
-            None => json::List(~[json::String(~"error"), json::String(~"empty")]),
-            Some((component_value, _)) => match iter.next_non_whitespace() {
-                Some(_) => json::List(~[json::String(~"error"), json::String(~"extra-input")]),
-                None => component_value.to_json(),
-            }
+        match parse_one_component_value(&mut ComponentValueIterator::from_str(input)) {
+            Ok((component_value, _location)) => component_value.to_json(),
+            Err(reason) => reason.to_json(),
         }
     }
 }
@@ -95,15 +91,12 @@ fn one_component_value() {
 #[test]
 fn declaration_list() {
     do run_json_tests(include_str!("css-parsing-tests/declaration_list.json")) |input| {
-        let mut iter = ComponentValueIterator::from_str(input);
+        let iter = &mut ComponentValueIterator::from_str(input);
         let mut declarations = ~[];
         loop {
-            match parse_declaration_or_at_rule(&mut iter) {
+            match parse_declaration_or_at_rule(iter) {
                 None => break,
-                Some(result) => declarations.push(match result {
-                    Ok(declaration) => declaration.to_json(),
-                    Err(reason) => reason.to_json(),
-                })
+                Some(result) => declarations.push(result_to_json(result)),
             }
         }
         json::List(declarations)
@@ -114,10 +107,7 @@ fn declaration_list() {
 #[test]
 fn one_declaration() {
     do run_json_tests(include_str!("css-parsing-tests/one_declaration.json")) |input| {
-        match parse_one_declaration(&mut ComponentValueIterator::from_str(input)) {
-            Ok(declaration) => declaration.to_json(),
-            Err(reason) => reason.to_json(),
-        }
+        result_to_json(parse_one_declaration(&mut ComponentValueIterator::from_str(input)))
     }
 }
 
@@ -125,15 +115,12 @@ fn one_declaration() {
 #[test]
 fn rule_list() {
     do run_json_tests(include_str!("css-parsing-tests/rule_list.json")) |input| {
-        let mut iter = ComponentValueIterator::from_str(input);
+        let iter = &mut ComponentValueIterator::from_str(input);
         let mut rules = ~[];
         loop {
-            match parse_rule(&mut iter) {
+            match parse_rule(iter) {
                 None => break,
-                Some(result) => rules.push(match result {
-                    Ok(rule) => rule.to_json(),
-                    Err(reason) => reason.to_json(),
-                })
+                Some(result) => rules.push(result_to_json(result)),
             }
         }
         json::List(rules)
@@ -144,10 +131,15 @@ fn rule_list() {
 #[test]
 fn one_rule() {
     do run_json_tests(include_str!("css-parsing-tests/one_rule.json")) |input| {
-        match parse_one_rule(&mut ComponentValueIterator::from_str(input)) {
-            Ok(rule) => rule.to_json(),
-            Err(reason) => reason.to_json(),
-        }
+        result_to_json(parse_one_rule(&mut ComponentValueIterator::from_str(input)))
+    }
+}
+
+
+fn result_to_json<A:ToJson, B:ToJson>(result: Result<A, B>) -> json::Json {
+    match result {
+        Ok(ref a) => a.to_json(),
+        Err(ref b) => b.to_json(),
     }
 }
 
