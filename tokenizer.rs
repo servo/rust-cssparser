@@ -14,9 +14,8 @@ struct Parser {
     input: ~str,
     length: uint,  // All counted in bytes, not characters
     position: uint,  // All counted in bytes, not characters
-    // TODO: add these in tokens
-//    priv line: uint,
-//    priv column: uint,  // All counted in bytes, not characters
+    line: uint,
+    last_line_start: uint,  // All counted in bytes, not characters
 }
 
 
@@ -27,8 +26,8 @@ impl Parser {
             length: input.len(),
             input: input,
             position: 0,
-//            line: 1,
-//            column: 1,
+            line: 1,
+            last_line_start: 0,
         }
     }
 }
@@ -43,15 +42,28 @@ macro_rules! is_match(
 
 pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, SourceLocation)> {
     consume_comments(parser);
-    if parser.is_eof() { return None }
-    let start_location = SourceLocation{position: parser.position};
+    if parser.is_eof() {
+        if CFG_TEST {
+            assert!(parser.line == parser.input.split_iter('\n').len_(),
+                    "The tokenizer is missing a parser.new_line() call somewhere.")
+        }
+        return None
+    }
+    let start_location = SourceLocation{
+        line: parser.line,
+        // The start of the line is column 1:
+        column: parser.position - parser.last_line_start + 1,
+    };
     let c = parser.current_char();
     let component_value = match c {
         '\t' | '\n' | ' ' => {
-            parser.position += 1;
             while !parser.is_eof() {
                 match parser.current_char() {
-                    '\t' | '\n' | ' ' => parser.position += 1,
+                    ' ' | '\t' => parser.position += 1,
+                    '\n' => {
+                        parser.position += 1;
+                        parser.new_line();
+                    },
                     _ => break,
                 }
             }
@@ -184,6 +196,13 @@ pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, Sour
 //  ***********  End of public API  ***********
 
 
+#[cfg(not(test))]
+static CFG_TEST: bool = false;
+
+#[cfg(test)]
+static CFG_TEST: bool = true;
+
+
 #[inline]
 fn preprocess(input: &str) -> ~str {
     // TODO: Is this faster if done in one pass?
@@ -223,6 +242,15 @@ impl Parser {
     fn starts_with(&self, needle: &str) -> bool {
         self.input.slice_from(self.position).starts_with(needle)
     }
+
+    #[inline]
+    fn new_line(&mut self) {
+        if CFG_TEST {
+            assert!(self.input.char_at(self.position - 1) == '\n')
+        }
+        self.line += 1;
+        self.last_line_start = self.position;
+    }
 }
 
 
@@ -230,10 +258,17 @@ impl Parser {
 fn consume_comments(parser: &mut Parser) {
     while parser.starts_with("/*") {
         parser.position += 2;  // +2 to consume "/*"
-        match parser.input.slice_from(parser.position).find_str("*/") {
-            // +2 to consume "*/"
-            Some(offset) => parser.position += offset + 2,
-            None => parser.position = parser.length  // EOF
+        while !parser.is_eof() {
+            match parser.consume_char() {
+                '*' => {
+                    if !parser.is_eof() && parser.current_char() == '/' {
+                        parser.position += 1;
+                        break
+                    }
+                },
+                '\n' => parser.new_line(),
+                _ => ()
+            }
         }
     }
 }
@@ -264,6 +299,7 @@ fn consume_string(parser: &mut Parser, single_quote: bool) -> ComponentValue {
 }
 
 
+// Return None on syntax error (ie. unescaped newline)
 fn consume_quoted_string(parser: &mut Parser, single_quote: bool) -> Option<~str> {
     parser.position += 1;  // Skip the initial quote
     let mut string: ~str = ~"";
@@ -277,7 +313,10 @@ fn consume_quoted_string(parser: &mut Parser, single_quote: bool) -> Option<~str
             },
             '\\' => {
                 if !parser.is_eof() {
-                    if parser.current_char() == '\n' { parser.position += 1 }  // Escaped newline
+                    if parser.current_char() == '\n' {  // Escaped newline
+                        parser.position += 1;
+                        parser.new_line();
+                    }
                     else { string.push_char(consume_escape(parser)) }
                 }
                 // else: escaped EOF, do nothing.
@@ -427,8 +466,11 @@ fn consume_url(parser: &mut Parser) -> ComponentValue {
         let mut string = ~"";
         while !parser.is_eof() {
             let next_char = match parser.consume_char() {
-                '\t' | '\n' | ' '
-                    => return consume_url_end(parser, string),
+                ' ' | '\t' => return consume_url_end(parser, string),
+                '\n' => {
+                    parser.new_line();
+                    return consume_url_end(parser, string)
+                },
                 ')' => break,
                 '\x00'..'\x08' | '\x0B' | '\x0E'..'\x1F' | '\x7F'  // non-printable
                     | '"' | '\'' | '(' => return consume_bad_url(parser),
@@ -448,7 +490,8 @@ fn consume_url(parser: &mut Parser) -> ComponentValue {
     fn consume_url_end(parser: &mut Parser, string: ~str) -> ComponentValue {
         while !parser.is_eof() {
             match parser.consume_char() {
-                '\t' | '\n' | ' ' => (),
+                ' ' | '\t' => (),
+                '\n' => parser.new_line(),
                 ')' => break,
                 _ => return consume_bad_url(parser)
             }
@@ -462,6 +505,7 @@ fn consume_url(parser: &mut Parser) -> ComponentValue {
             match parser.consume_char() {
                 ')' => break,
                 '\\' => parser.position += 1, // Skip an escaped ')' or '\'
+                '\n' => parser.new_line(),
                 _ => ()
             }
         }
@@ -538,7 +582,8 @@ fn consume_escape(parser: &mut Parser) -> char {
             }
             if !parser.is_eof() {
                 match parser.current_char() {
-                    '\t' | '\n' | ' ' => parser.position += 1,
+                    ' ' | '\t' => parser.position += 1,
+                    '\n' => { parser.position += 1; parser.new_line() },
                     _ => ()
                 }
             }

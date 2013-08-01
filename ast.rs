@@ -13,9 +13,8 @@ pub struct NumericValue {
 
 #[deriving(Eq)]
 pub struct SourceLocation {
-//    line: uint,
-//    column: uint,
-    position: uint,
+    line: uint,
+    column: uint,
 }
 
 

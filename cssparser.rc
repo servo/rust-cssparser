@@ -15,6 +15,13 @@ pub mod ast;
 mod tests;
 
 
+#[cfg(not(test))]
+static CFG_TEST: bool = false;
+
+#[cfg(test)]
+static CFG_TEST: bool = true;
+
+
 /// Return whether `string` is an ASCII case-insensitive match for `reference`,
 /// where `reference` is already in ASCII lower-case.
 pub fn eq_ascii_lower(string: &str, reference: &str) -> bool {
@@ -28,16 +35,9 @@ pub fn eq_ascii_lower(string: &str, reference: &str) -> bool {
         true
     }
 
-    #[cfg(not(test))]
-    #[inline]
-    fn check_reference(_reference: &str) {}
-    #[cfg(test)]
-    #[inline]
-    fn check_reference(reference: &str) {
+    if CFG_TEST {
         assert!(eq(reference, reference), ~"Reference must be ASCII lower case.");
     }
-    check_reference(reference);
-
     string.len() == reference.len() && eq(string, reference)
 }
 
