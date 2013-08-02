@@ -326,16 +326,16 @@ impl ToJson for ComponentValue {
             => JList(~[JString(~"function"), name.to_json()] + list_to_json(arguments)),
             ParenthesisBlock(ref content)
             => JList(~[JString(~"()")] + list_to_json(content)),
-            SquareBraketBlock(ref content)
+            SquareBracketBlock(ref content)
             => JList(~[JString(~"[]")] + list_to_json(content)),
-            CurlyBraketBlock(ref content)
+            CurlyBracketBlock(ref content)
             => JList(~[JString(~"{}")] + list_to_json(content)),
 
             BadURL => JList(~[JString(~"error"), JString(~"bad-url")]),
             BadString => JList(~[JString(~"error"), JString(~"bad-string")]),
             CloseParenthesis => JList(~[JString(~"error"), JString(~")")]),
-            CloseSquareBraket => JList(~[JString(~"error"), JString(~"]")]),
-            CloseCurlyBraket => JList(~[JString(~"error"), JString(~"}")]),
+            CloseSquareBracket => JList(~[JString(~"error"), JString(~"]")]),
+            CloseCurlyBracket => JList(~[JString(~"error"), JString(~"}")]),
         }
     }
 }

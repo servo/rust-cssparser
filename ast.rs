@@ -51,15 +51,15 @@ pub enum ComponentValue {
 
     // Simple block
     ParenthesisBlock(~[(ComponentValue, SourceLocation)]),  // (…)
-    SquareBraketBlock(~[(ComponentValue, SourceLocation)]),  // […]
-    CurlyBraketBlock(~[(ComponentValue, SourceLocation)]),  // {…}
+    SquareBracketBlock(~[(ComponentValue, SourceLocation)]),  // […]
+    CurlyBracketBlock(~[(ComponentValue, SourceLocation)]),  // {…}
 
     // These are always invalid
     BadURL,
     BadString,
     CloseParenthesis, // )
-    CloseSquareBraket, // ]
-    CloseCurlyBraket, // }
+    CloseSquareBracket, // ]
+    CloseCurlyBracket, // }
 }
 
 

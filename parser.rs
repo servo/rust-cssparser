@@ -172,7 +172,7 @@ fn parse_at_rule(iter: &mut ComponentValueIterator, name: ~str, location: Source
     let mut block = None;
     for_iter!(iter, (component_value, location), {
         match component_value {
-            CurlyBraketBlock(content) => { block = Some(content); break },
+            CurlyBracketBlock(content) => { block = Some(content); break },
             Semicolon => break,
             component_value => prelude.push((component_value, location)),
         }
@@ -184,14 +184,14 @@ fn parse_at_rule(iter: &mut ComponentValueIterator, name: ~str, location: Source
 fn parse_qualified_rule(iter: &mut ComponentValueIterator, first: (ComponentValue, SourceLocation))
                           -> Result<QualifiedRule, ErrorReason> {
     match first {
-        (CurlyBraketBlock(content), location)
+        (CurlyBracketBlock(content), location)
         => return Ok(QualifiedRule { location: location, prelude: ~[], block: content }),
         _ => (),
     }
     let mut prelude = ~[first];
     for_iter!(iter, (component_value, location), {
         match component_value {
-            CurlyBraketBlock(content)
+            CurlyBracketBlock(content)
             => return Ok(QualifiedRule {location: location, prelude: prelude, block: content}),
             component_value => prelude.push((component_value, location)),
         }
