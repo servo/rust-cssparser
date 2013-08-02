@@ -7,7 +7,7 @@
 pub struct NumericValue {
     representation: ~str,
     value: f64,
-    int_value: Option<i32>,
+    int_value: Option<i64>,
 }
 
 

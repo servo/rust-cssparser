@@ -4,7 +4,7 @@
 
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 
-use std::{str, u32, i32, f64};
+use std::{str, u32, i64, f64};
 
 use ast::*;
 use super::eq_ascii_lower;
@@ -426,9 +426,9 @@ fn consume_numeric(parser: &mut Parser) -> ComponentValue {
         int_value: if is_integer { Some(
             // Remove any + sign as int::from_str() does not parse them.
             if representation[0] != '+' as u8 {
-                i32::from_str(representation)
+                i64::from_str(representation)
             } else {
-                i32::from_str(representation.slice_from(1))
+                i64::from_str(representation.slice_from(1))
             }.get()
         )} else { None },
         value: f64::from_str(representation).get(),

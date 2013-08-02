@@ -1,10 +1,13 @@
+use std::libc::c_float;
 use ast::*;
 use super::to_ascii_lower;
 use self::color_data::{COLOR_KEYWORDS, COLOR_VALUES};
 
 mod color_data;
 
-pub type ColorFloat = f64;
+
+// Try to match rust-azure’s AzFloat
+pub type ColorFloat = c_float;
 
 
 pub enum Color {
@@ -115,31 +118,31 @@ fn parse_color_function(name: &str, arguments: &[(ComponentValue, SourceLocation
         // Either integers or percentages, but all the same type.
         match iter.next() {
             Some(&Number(ref v)) if v.int_value.is_some() => {
-                red = v.value / 255.;
+                red = (v.value as ColorFloat / 255.) as ColorFloat;
                 expect_comma!();
-                green = expect_integer!() / 255.;
+                green = (expect_integer!() / 255.) as ColorFloat;
                 expect_comma!();
-                blue = expect_integer!() / 255.;
+                blue = (expect_integer!() / 255.) as ColorFloat;
             }
             Some(&Percentage(ref v)) => {
-                red = v.value / 100.;
+                red = (v.value as ColorFloat / 100.) as ColorFloat;
                 expect_comma!();
-                green = expect_percentage!() / 100.;
+                green = (expect_percentage!() / 100.) as ColorFloat;
                 expect_comma!();
-                blue = expect_percentage!() / 100.;
+                blue = (expect_percentage!() / 100.) as ColorFloat;
             }
             _ => return None
         };
     } else {
-        let hue: ColorFloat = expect_number!() / 360.;
+        let hue = expect_number!() / 360.;
         let hue = hue - hue.floor();
         expect_comma!();
-        let saturation: ColorFloat = (expect_percentage!() / 100.).max(&0.).min(&1.);
+        let saturation = (expect_percentage!() / 100.).max(&0.).min(&1.);
         expect_comma!();
-        let lightness: ColorFloat = (expect_percentage!() / 100.).max(&0.).min(&1.);
+        let lightness = (expect_percentage!() / 100.).max(&0.).min(&1.);
 
         // http://www.w3.org/TR/css3-color/#hsl-color
-        fn hue_to_rgb(m1: ColorFloat, m2: ColorFloat, mut h: ColorFloat) -> ColorFloat {
+        fn hue_to_rgb(m1: f64, m2: f64, mut h: f64) -> f64 {
             if h < 0. { h += 1. }
             if h > 1. { h -= 1. }
 
@@ -151,17 +154,14 @@ fn parse_color_function(name: &str, arguments: &[(ComponentValue, SourceLocation
         let m2 = if lightness <= 0.5 { lightness * (saturation + 1.) }
                  else { lightness + saturation - lightness * saturation };
         let m1 = lightness * 2. - m2;
-        red = hue_to_rgb(m1, m2, hue + 1. / 3.);
-        green = hue_to_rgb(m1, m2, hue);
-        blue = hue_to_rgb(m1, m2, hue - 1. / 3.);
+        red = hue_to_rgb(m1, m2, hue + 1. / 3.) as ColorFloat;
+        green = hue_to_rgb(m1, m2, hue) as ColorFloat;
+        blue = hue_to_rgb(m1, m2, hue - 1. / 3.) as ColorFloat;
     }
 
     let alpha = if has_alpha {
         expect_comma!();
-        match iter.next() {
-            Some(&Number(ref a)) => a.value.max(&0.).min(&1.),
-            _ => return None
-        }
+        (expect_number!()).max(&0.).min(&1.) as ColorFloat
     } else {
         1.
     };

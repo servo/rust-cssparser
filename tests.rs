@@ -22,7 +22,7 @@ fn write_whole_file(path: &Path, data: &str) {
 
 fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
     match (a, b) {
-        (&json::Number(a), &json::Number(b)) => (a - b).abs() < 1e-10,
+        (&json::Number(a), &json::Number(b)) => (a - b).abs() < 1e-6,
         (&json::String(ref a), &json::String(ref b)) => a == b,
         (&json::Boolean(a), &json::Boolean(b)) => a == b,
         (&json::List(ref a), &json::List(ref b))
