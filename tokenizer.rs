@@ -106,6 +106,7 @@ pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, Sour
                 Delim(c)
             }
         },
+        ',' => { parser.position += 1; Comma },
         '-' => {
             if (
                 parser.position + 1 < parser.length

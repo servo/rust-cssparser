@@ -312,6 +312,7 @@ impl ToJson for ComponentValue {
             WhiteSpace => JString(~" "),
             Colon => JString(~":"),
             Semicolon => JString(~";"),
+            Comma => JString(~","),
             IncludeMath => JString(~"~="),
             DashMatch => JString(~"|="),
             PrefixMatch => JString(~"^="),

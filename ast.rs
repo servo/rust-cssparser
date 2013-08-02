@@ -36,6 +36,7 @@ pub enum ComponentValue {
     WhiteSpace,
     Colon,  // :
     Semicolon,  // ;
+    Comma,  // ,
     IncludeMath, // ~=
     DashMatch, // |=
     PrefixMatch, // ^=
