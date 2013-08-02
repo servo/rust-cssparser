@@ -20,8 +20,22 @@ fn write_whole_file(path: &Path, data: &str) {
 }
 
 
+fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
+    match (a, b) {
+        (&json::Number(a), &json::Number(b)) => (a - b).abs() < 1e-10,
+        (&json::String(ref a), &json::String(ref b)) => a == b,
+        (&json::Boolean(a), &json::Boolean(b)) => a == b,
+        (&json::List(ref a), &json::List(ref b))
+            => a.iter().zip(b.iter()).all(|(ref a, ref b)| almost_equals(*a, *b)),
+        (&json::Object(_), &json::Object(_)) => fail!(~"Not implemented"),
+        (&json::Null, &json::Null) => true,
+        _ => false,
+    }
+}
+
+
 fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
-    if results != expected {
+    if !almost_equals(&results, &expected) {
         let temp = tempfile::mkdtemp(&os::tmpdir(), "rust-cssparser-tests").get();
         let temp_ = copy temp;
         let results = json::to_pretty_str(&results) + "\n";
@@ -138,17 +152,17 @@ fn one_rule() {
 fn run_color_tests(json_data: &str, to_json: &fn(result: Option<Color>) -> json::Json) {
     do run_json_tests(json_data) |input| {
         match parse_one_component_value(&mut ComponentValueIterator::from_str(input)) {
-            Ok((component_value, _location)) => to_json(parse_color(component_value)),
+            Ok((component_value, _location)) => to_json(parse_color(&component_value)),
             Err(_reason) => json::Null,
         }
     }
 }
 
 
-//#[test]
-//fn color3() {
-//    run_color_tests(include_str!("css-parsing-tests/color3.json"), |c| c.to_json())
-//}
+#[test]
+fn color3() {
+    run_color_tests(include_str!("css-parsing-tests/color3.json"), |c| c.to_json())
+}
 
 
 //#[test]
@@ -157,12 +171,12 @@ fn run_color_tests(json_data: &str, to_json: &fn(result: Option<Color>) -> json:
 //}
 
 
+/// color3_keywords.json is different: R, G and B are in 0..255 rather than 0..1
 #[test]
 fn color3_keywords() {
     do run_color_tests(include_str!("css-parsing-tests/color3_keywords.json")) |c| {
-        let m = 255 as ColorFloat;
         match c {
-            Some(RGBA(r, g, b, a)) => (~[r * m, g * m, b * m, a]).to_json(),
+            Some(RGBA(r, g, b, a)) => (~[r * 255., g * 255., b * 255., a]).to_json(),
             Some(CurrentColor) => json::String(~"currentColor"),
             None => json::Null,
         }
