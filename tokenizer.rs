@@ -160,7 +160,7 @@ pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, Sour
             else { consume_ident_like(parser) }
         },
         'a'..'z' | 'A'..'Z' | '_' => consume_ident_like(parser),
-        '[' => SquareBracketBlock(consume_block(parser, CloseSquareBraket)),
+        '[' => SquareBracketBlock(consume_block(parser, CloseSquareBracket)),
         '\\' => {
             if !parser.starts_with("\\\n") { consume_ident_like(parser) }
             else { parser.position += 1; Delim(c) }
@@ -170,7 +170,7 @@ pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, Sour
             if parser.starts_with("^=") { parser.position += 2; PrefixMatch }
             else { parser.position += 1; Delim(c) }
         },
-        '{' => CurlyBracketBlock(consume_block(parser, CloseCurlyBraket)),
+        '{' => CurlyBracketBlock(consume_block(parser, CloseCurlyBracket)),
         '|' => {
             if parser.starts_with("|=") { parser.position += 2; DashMatch }
             else if parser.starts_with("||") { parser.position += 2; Column }
