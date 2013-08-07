@@ -36,8 +36,8 @@ fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
 
 fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
     if !almost_equals(&results, &expected) {
-        let temp = tempfile::mkdtemp(&os::tmpdir(), "rust-cssparser-tests").get();
-        let temp_ = copy temp;
+        let temp = tempfile::mkdtemp(&os::tmpdir(), "rust-cssparser-tests").unwrap();
+        let temp_ = temp.clone();
         let results = json::to_pretty_str(&results) + "\n";
         let expected = json::to_pretty_str(&expected) + "\n";
         do task::try {
@@ -62,11 +62,11 @@ fn run_json_tests(json_data: &str, parse: &fn (input: ~str) -> json::Json) {
     };
     assert!(items.len() % 2 == 0);
     let mut input: Option<~str> = None;
-    for items.consume_iter().advance |item| {
+    for item in items.consume_iter() {
         match (&input, item) {
             (&None, json::String(string)) => input = Some(string),
             (&Some(_), expected) => {
-                let input = input.swap_unwrap();
+                let input = input.take_unwrap();
                 let result = parse(input.to_owned());
                 assert_json_eq(result, expected, input);
             },

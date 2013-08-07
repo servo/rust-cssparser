@@ -5,9 +5,9 @@
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 
 use std::{str, u32, i64, f64};
+use std::ascii::eq_ignore_ascii_case;
 
 use ast::*;
-use super::eq_ascii_lower;
 
 
 struct Parser {
@@ -43,7 +43,7 @@ macro_rules! is_match(
 pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, SourceLocation)> {
     consume_comments(parser);
     if parser.is_eof() {
-        if CFG_TEST {
+        if cfg!(test) {
             assert!(parser.line == parser.input.split_iter('\n').len_(),
                     "The tokenizer is missing a parser.new_line() call somewhere.")
         }
@@ -197,13 +197,6 @@ pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, Sour
 //  ***********  End of public API  ***********
 
 
-#[cfg(not(test))]
-static CFG_TEST: bool = false;
-
-#[cfg(test)]
-static CFG_TEST: bool = true;
-
-
 #[inline]
 fn preprocess(input: &str) -> ~str {
     // TODO: Is this faster if done in one pass?
@@ -246,7 +239,7 @@ impl Parser {
 
     #[inline]
     fn new_line(&mut self) {
-        if CFG_TEST {
+        if cfg!(test) {
             assert!(self.input.char_at(self.position - 1) == '\n')
         }
         self.line += 1;
@@ -347,7 +340,7 @@ fn is_ident_start(parser: &mut Parser) -> bool {
 fn consume_ident_like(parser: &mut Parser) -> ComponentValue {
     let value = consume_name(parser);
     if !parser.is_eof() && parser.current_char() == '(' {
-        if eq_ascii_lower(value, "url") { consume_url(parser) }
+        if eq_ignore_ascii_case(value, "url") { consume_url(parser) }
         else { Function(value, consume_block(parser, CloseParenthesis)) }
     } else {
         Ident(value)
@@ -429,9 +422,9 @@ fn consume_numeric(parser: &mut Parser) -> ComponentValue {
                 i64::from_str(representation)
             } else {
                 i64::from_str(representation.slice_from(1))
-            }.get()
+            }.unwrap()
         )} else { None },
-        value: f64::from_str(representation).get(),
+        value: f64::from_str(representation).unwrap(),
         representation: representation,
     };
     if !parser.is_eof() && parser.current_char() == '%' {
@@ -599,5 +592,5 @@ fn consume_escape(parser: &mut Parser) -> char {
 
 #[inline]
 fn char_from_hex(hex: &str) -> char {
-    u32::from_str_radix(hex, 16).get() as char
+    u32::from_str_radix(hex, 16).unwrap() as char
 }
