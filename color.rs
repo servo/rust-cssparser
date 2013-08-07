@@ -87,9 +87,7 @@ fn parse_color_function(name: &str, arguments: &[(ComponentValue, SourceLocation
         else if "hsla" == lower_name { (false, true) }
         else { return None };
 
-    let mut iter = do arguments.iter().filter_map |&(ref c, _)| {
-        if c != &WhiteSpace { Some(c) } else { None }
-    };
+    let mut iter = arguments.skip_whitespace();
     macro_rules! expect_comma(
         () => ( if iter.next() != Some(&Comma) { return None } );
     )

@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::str::ToStr;
+use std::vec;
 
 
 #[deriving(Eq)]
@@ -113,4 +114,31 @@ pub enum ErrorReason {
 
 impl ToStr for ErrorReason {
     fn to_str(&self) -> ~str { fmt!("%?", self) }
+}
+
+
+pub trait SkipWhitespaceIterable<'self> {
+    pub fn skip_whitespace(self) -> SkipWhitespaceIterator<'self>;
+}
+
+impl<'self> SkipWhitespaceIterable<'self> for &'self [(ComponentValue, SourceLocation)] {
+    pub fn skip_whitespace(self) -> SkipWhitespaceIterator<'self> {
+        SkipWhitespaceIterator{ iter: self.iter() }
+    }
+}
+
+struct SkipWhitespaceIterator<'self> {
+    iter: vec::VecIterator<'self, (ComponentValue, SourceLocation)>,
+}
+
+impl<'self> Iterator<&'self ComponentValue> for SkipWhitespaceIterator<'self> {
+    fn next(&mut self) -> Option<&'self ComponentValue> {
+        loop {
+            match self.iter.next() {
+                Some(&(WhiteSpace, _)) => (),
+                Some(&(ref component_value, _)) => return Some(component_value),
+                None => return None
+            }
+        }
+    }
 }
