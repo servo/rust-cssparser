@@ -43,7 +43,7 @@ macro_rules! is_match(
 pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, SourceLocation)> {
     consume_comments(parser);
     if parser.is_eof() {
-        if CFG_TEST {
+        if cfg!(test) {
             assert!(parser.line == parser.input.split_iter('\n').len_(),
                     "The tokenizer is missing a parser.new_line() call somewhere.")
         }
@@ -197,13 +197,6 @@ pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, Sour
 //  ***********  End of public API  ***********
 
 
-#[cfg(not(test))]
-static CFG_TEST: bool = false;
-
-#[cfg(test)]
-static CFG_TEST: bool = true;
-
-
 #[inline]
 fn preprocess(input: &str) -> ~str {
     // TODO: Is this faster if done in one pass?
@@ -246,7 +239,7 @@ impl Parser {
 
     #[inline]
     fn new_line(&mut self) {
-        if CFG_TEST {
+        if cfg!(test) {
             assert!(self.input.char_at(self.position - 1) == '\n')
         }
         self.line += 1;
