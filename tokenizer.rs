@@ -5,9 +5,9 @@
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 
 use std::{str, u32, i64, f64};
+use std::ascii::eq_ignore_ascii_case;
 
 use ast::*;
-use super::eq_ascii_lower;
 
 
 struct Parser {
@@ -347,7 +347,7 @@ fn is_ident_start(parser: &mut Parser) -> bool {
 fn consume_ident_like(parser: &mut Parser) -> ComponentValue {
     let value = consume_name(parser);
     if !parser.is_eof() && parser.current_char() == '(' {
-        if eq_ascii_lower(value, "url") { consume_url(parser) }
+        if eq_ignore_ascii_case(value, "url") { consume_url(parser) }
         else { Function(value, consume_block(parser, CloseParenthesis)) }
     } else {
         Ident(value)
