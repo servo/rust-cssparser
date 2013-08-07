@@ -20,7 +20,7 @@ use tokenizer::*;
 
 // TODO: Use a trait?
 enum ComponentValueIterator {
-    ParserIter(~Parser),
+    ParserIter(Parser),
     VectorIter(vec::ConsumeIterator<(ComponentValue, SourceLocation)>),
 }
 
@@ -28,12 +28,7 @@ enum ComponentValueIterator {
 impl ComponentValueIterator {
     #[inline]
     pub fn from_str(input: ~str) -> ComponentValueIterator {
-        ComponentValueIterator::from_parser(~Parser::from_str(input))
-    }
-
-    #[inline]
-    pub fn from_parser(parser: ~Parser) -> ComponentValueIterator {
-        ParserIter(parser)
+        ParserIter(Parser::from_str(input))
     }
 
     #[inline]
@@ -54,7 +49,7 @@ impl ComponentValueIterator {
 impl Iterator<(ComponentValue, SourceLocation)> for ComponentValueIterator {
     fn next(&mut self) -> Option<(ComponentValue, SourceLocation)> {
         match self {
-            &ParserIter(ref mut parser) => next_component_value(*parser),
+            &ParserIter(ref mut parser) => next_component_value(parser),
             &VectorIter(ref mut iter) => iter.next()
         }
     }
