@@ -3,17 +3,96 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // http://dev.w3.org/csswg/css-syntax/#parsing
-//
-// The input to the tree construction stage is a sequence of tokens
-// from the tokenization stage.
-// The output is a tree of items with a stylesheet at the root
-// and all other nodes being at-rules, style rules, or declarations.
+
+/// The input to these functions needs to implement Iterator<(ComponentValue, SourceLocation)>.
+/// The input is consumed to avoid doing a lot of copying.
+/// A conforming input can be obtained:
+///
+/// * From a string in CSS syntax, with tokenize()
+/// * From a ~[(ComponentValue, SourceLocation)] vector
+///   (as found in "nested" component values such as CurlyBracketBlock),
+///   with v.consume_iter()
 
 
 use std::iterator::Iterator;
 use std::ascii::eq_ignore_ascii_case;
 
 use ast::*;
+
+
+/// Parse top-level of a CSS stylesheet.
+/// Return a Iterator<Result<Rule, ErrorReason>>
+#[inline]
+pub fn parse_stylesheet<T: Iterator<Node>>(iter: T) -> StylesheetParser<T> {
+    StylesheetParser(iter)
+}
+
+
+/// Parse a non-top level list of rules eg. the content of an @media rule.
+/// Return a Iterator<Result<Rule, ErrorReason>>
+#[inline]
+pub fn parse_rule_list<T: Iterator<Node>>(iter: T) -> RuleListParser<T> {
+    RuleListParser(iter)
+}
+
+
+/// Parse a list of declarations and at-rules,
+/// like @page in CSS 2.1, all declaration lists in level 3
+/// Return a Iterator<Result<DeclarationListItem, ErrorReason>>
+#[inline]
+pub fn parse_declaration_list<T: Iterator<Node>>(iter: T) -> DeclarationListParser<T> {
+    DeclarationListParser(iter)
+}
+
+
+/// Parse a single rule.
+/// Used eg. for CSSRuleList.insertRule()
+pub fn parse_one_rule<T: Iterator<Node>>(iter: T) -> Result<Rule, ErrorReason> {
+    let mut parser = RuleListParser(iter);
+    match parser.next() {
+        None => Err(ErrEmptyInput),
+        Some(result) => {
+            if result.is_err() || next_non_whitespace(&mut *parser).is_none() { result }
+            else { Err(ErrExtraInput) }
+        }
+    }
+}
+
+
+/// Parse a single declaration (not an at-rule)
+/// Used eg. in @supports
+pub fn parse_one_declaration<T: Iterator<Node>>(mut iter: T) -> Result<Declaration, ErrorReason> {
+    match next_non_whitespace(&mut iter) {
+        None => Err(ErrEmptyInput),
+        Some(item) => {
+            let result = parse_declaration(&mut iter, item);
+            if result.is_err() || next_non_whitespace(&mut iter).is_none() { result }
+            else { Err(ErrExtraInput) }
+        }
+    }
+}
+
+
+/// Parse a single component value.
+/// Used eg. in attr(foo, color)
+pub fn parse_one_component_value<T: Iterator<Node>>(mut iter: T)
+                                -> Result<ComponentValue, ErrorReason> {
+    match next_non_whitespace(&mut iter) {
+        None => Err(ErrEmptyInput),
+        Some((component_value, _location)) => {
+            if next_non_whitespace(&mut iter).is_none() { Ok(component_value) }
+            else { Err(ErrExtraInput) }
+        }
+    }
+}
+
+
+//  ***********  End of public API  ***********
+
+
+struct StylesheetParser<T>(T);
+struct RuleListParser<T>(T);
+struct DeclarationListParser<T>(T);
 
 
 // Work around "error: cannot borrow `*iter` as mutable more than once at a time"
@@ -27,97 +106,64 @@ macro_rules! for_iter(
 )
 
 
-/// Call repeatedly for the top-level of a CSS stylesheet
-pub fn parse_stylesheet_rule<T: Iterator<Node>>(iter: &mut T) -> Option<Result<Rule, ErrorReason>> {
-    for_iter!(iter, (component_value, location), {
-        match component_value {
-            WhiteSpace | CDO | CDC => (),
-            AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
-            _ => return Some(match parse_qualified_rule(iter, (component_value, location)) {
-                Ok(rule) => Ok(QualifiedRule(rule)),
-                Err(reason) => Err(reason),
-            }),
-        }
-    })
-    None
-}
-
-
-/// Call repeatedly for a non-top level list of rules eg. the content of an @media rule.
-/// Same as parse_stylesheet() except for the handling of top-level CDO and CDC
-pub fn parse_rule<T: Iterator<Node>>(iter: &mut T) -> Option<Result<Rule, ErrorReason>> {
-    for_iter!(iter, (component_value, location), {
-        match component_value {
-            WhiteSpace => (),
-            AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
-            _ => return Some(match parse_qualified_rule(iter, (component_value, location)) {
-                Ok(rule) => Ok(QualifiedRule(rule)),
-                Err(reason) => Err(reason),
-            }),
-        }
-    })
-    None
-}
-
-
-/// Used eg. for CSSRuleList.insertRule()
-pub fn parse_one_rule<T: Iterator<Node>>(iter: &mut T) -> Result<Rule, ErrorReason> {
-    match parse_rule(iter) {
-        None => Err(ErrEmptyInput),
-        Some(result) => if result.is_err() || next_non_whitespace(iter).is_none() { result }
-                        else { Err(ErrExtraInput) }
+impl<T: Iterator<Node>> Iterator<Result<Rule, ErrorReason>> for StylesheetParser<T> {
+    fn next(&mut self) -> Option<Result<Rule, ErrorReason>> {
+        let iter = &mut **self;
+        for_iter!(iter, (component_value, location), {
+            match component_value {
+                WhiteSpace | CDO | CDC => (),
+                AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
+                _ => return Some(match parse_qualified_rule(iter, (component_value, location)) {
+                    Ok(rule) => Ok(QualifiedRule(rule)),
+                    Err(reason) => Err(reason),
+                }),
+            }
+        })
+        None
     }
 }
 
 
-/// Call repeatedly of a list of declarations.
-/// @page in CSS 2.1, all declaration lists in level 3
-pub fn parse_declaration_or_at_rule<T: Iterator<Node>>(iter: &mut T)
-                                   -> Option<Result<DeclarationListItem, ErrorReason>> {
-    for_iter!(iter, (component_value, location), {
-        match component_value {
-            WhiteSpace | Semicolon => (),
-            AtKeyword(name) => return Some(Ok(Decl_AtRule(parse_at_rule(iter, name, location)))),
-            _ => return Some(match parse_declaration(iter, (component_value, location)) {
-                Ok(declaration) => Ok(Declaration(declaration)),
-                Err(reason) => {
-                    // Find the end of the declaration
-                    for (v, _) in *iter { if v == Semicolon { break } }
-                    Err(reason)
-                }
-            }),
-        }
-    })
-    None
-}
-
-
-/// Used eg. in @supports
-pub fn parse_one_declaration<T: Iterator<Node>>(iter: &mut T) -> Result<Declaration, ErrorReason> {
-    match next_non_whitespace(iter) {
-        None => Err(ErrEmptyInput),
-        Some(item) => {
-            let result = parse_declaration(iter, item);
-            if result.is_err() || next_non_whitespace(iter).is_none() { result }
-            else { Err(ErrExtraInput) }
-        }
+impl<T: Iterator<Node>> Iterator<Result<Rule, ErrorReason>> for RuleListParser<T> {
+    fn next(&mut self) -> Option<Result<Rule, ErrorReason>> {
+        let iter = &mut **self;
+        for_iter!(iter, (component_value, location), {
+            match component_value {
+                WhiteSpace => (),
+                AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
+                _ => return Some(match parse_qualified_rule(iter, (component_value, location)) {
+                    Ok(rule) => Ok(QualifiedRule(rule)),
+                    Err(reason) => Err(reason),
+                }),
+            }
+        })
+        None
     }
 }
 
 
-/// Used eg. in attr(foo, color)
-pub fn parse_one_component_value<T: Iterator<Node>>(iter: &mut T) -> Result<Node, ErrorReason> {
-    match next_non_whitespace(iter) {
-        None => Err(ErrEmptyInput),
-        Some(item) => {
-            if next_non_whitespace(iter).is_none() { Ok(item) }
-            else { Err(ErrExtraInput) }
-        }
+impl<T: Iterator<Node>> Iterator<Result<DeclarationListItem, ErrorReason>>
+for DeclarationListParser<T> {
+    fn next(&mut self) -> Option<Result<DeclarationListItem, ErrorReason>> {
+        let iter = &mut **self;
+        for_iter!(iter, (component_value, location), {
+            match component_value {
+                WhiteSpace | Semicolon => (),
+                AtKeyword(name)
+                => return Some(Ok(Decl_AtRule(parse_at_rule(iter, name, location)))),
+                _ => return Some(match parse_declaration(iter, (component_value, location)) {
+                    Ok(declaration) => Ok(Declaration(declaration)),
+                    Err(reason) => {
+                        // Find the end of the declaration
+                        for (v, _) in *iter { if v == Semicolon { break } }
+                        Err(reason)
+                    }
+                }),
+            }
+        })
+        None
     }
 }
-
-
-//  ***********  End of public API  ***********
 
 
 fn parse_at_rule<T: Iterator<Node>>(iter: &mut T, name: ~str, location: SourceLocation)

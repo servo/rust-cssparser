@@ -10,6 +10,7 @@ use std::ascii::eq_ignore_ascii_case;
 use ast::*;
 
 
+/// Returns a Iterator<(ComponentValue, SourceLocation)>
 pub fn tokenize(input: &str) -> Parser {
     let input = preprocess(input);
     Parser {
