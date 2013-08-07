@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use std::str::ToStr;
+
 
 #[deriving(Eq)]
 pub struct NumericValue {
@@ -107,4 +109,8 @@ pub enum ErrorReason {
     ErrInvalidDeclarationSyntax,
     ErrInvalidBangImportantSyntax,
     // This is meant to be extended
+}
+
+impl ToStr for ErrorReason {
+    fn to_str(&self) -> ~str { fmt!("%?", self) }
 }

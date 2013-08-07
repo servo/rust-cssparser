@@ -12,16 +12,16 @@
 
 use std::iterator::Iterator;
 use std::vec;
+use std::ascii::eq_ignore_ascii_case;
 
 use ast::*;
 use tokenizer::*;
-use super::eq_ascii_lower;
 
 
 // TODO: Use a trait?
 enum ComponentValueIterator {
     ParserIter(~Parser),
-    VectorIter(vec::VecConsumeIterator<(ComponentValue, SourceLocation)>),
+    VectorIter(vec::ConsumeIterator<(ComponentValue, SourceLocation)>),
 }
 
 
@@ -43,7 +43,7 @@ impl ComponentValueIterator {
 
     #[inline]
     pub fn next_non_whitespace(&mut self) -> Option<(ComponentValue, SourceLocation)> {
-        for self.advance |(component_value, location)| {
+        for (component_value, location) in *self {
             if component_value != WhiteSpace { return Some((component_value, location)) }
         }
         None
@@ -127,7 +127,7 @@ pub fn parse_declaration_or_at_rule(iter: &mut ComponentValueIterator)
                 Ok(declaration) => Ok(Declaration(declaration)),
                 Err(reason) => {
                     // Find the end of the declaration
-                    for iter.advance |(v, _)| { if v == Semicolon { break } }
+                    for (v, _) in *iter { if v == Semicolon { break } }
                     Err(reason)
                 }
             }),
@@ -234,7 +234,7 @@ fn parse_declaration_important(iter: &mut ComponentValueIterator) -> bool {
         Some((Ident(value), _)) => value,
         _ => return false,
     };
-    if !eq_ascii_lower(ident_value, "important") { return false }
+    if !eq_ignore_ascii_case(ident_value, "important") { return false }
     match iter.next_non_whitespace() {
         Some((Semicolon, _)) => true,
         None => true,

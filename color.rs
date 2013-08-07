@@ -1,6 +1,7 @@
 use std::libc::c_float;
+use std::ascii::to_ascii_lower;
+
 use ast::*;
-use super::to_ascii_lower;
 use self::color_data::{COLOR_KEYWORDS, COLOR_VALUES};
 
 mod color_data;
