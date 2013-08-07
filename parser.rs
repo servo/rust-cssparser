@@ -21,7 +21,7 @@ use super::eq_ascii_lower;
 // TODO: Use a trait?
 enum ComponentValueIterator {
     ParserIter(~Parser),
-    VectorIter(vec::VecConsumeIterator<(ComponentValue, SourceLocation)>),
+    VectorIter(vec::ConsumeIterator<(ComponentValue, SourceLocation)>),
 }
 
 
@@ -43,7 +43,7 @@ impl ComponentValueIterator {
 
     #[inline]
     pub fn next_non_whitespace(&mut self) -> Option<(ComponentValue, SourceLocation)> {
-        for self.advance |(component_value, location)| {
+        for (component_value, location) in *self {
             if component_value != WhiteSpace { return Some((component_value, location)) }
         }
         None
@@ -127,7 +127,7 @@ pub fn parse_declaration_or_at_rule(iter: &mut ComponentValueIterator)
                 Ok(declaration) => Ok(Declaration(declaration)),
                 Err(reason) => {
                     // Find the end of the declaration
-                    for iter.advance |(v, _)| { if v == Semicolon { break } }
+                    for (v, _) in *iter { if v == Semicolon { break } }
                     Err(reason)
                 }
             }),

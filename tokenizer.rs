@@ -429,9 +429,9 @@ fn consume_numeric(parser: &mut Parser) -> ComponentValue {
                 i64::from_str(representation)
             } else {
                 i64::from_str(representation.slice_from(1))
-            }.get()
+            }.unwrap()
         )} else { None },
-        value: f64::from_str(representation).get(),
+        value: f64::from_str(representation).unwrap(),
         representation: representation,
     };
     if !parser.is_eof() && parser.current_char() == '%' {
@@ -599,5 +599,5 @@ fn consume_escape(parser: &mut Parser) -> char {
 
 #[inline]
 fn char_from_hex(hex: &str) -> char {
-    u32::from_str_radix(hex, 16).get() as char
+    u32::from_str_radix(hex, 16).unwrap() as char
 }

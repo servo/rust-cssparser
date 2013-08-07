@@ -28,7 +28,7 @@ static CFG_TEST: bool = true;
 pub fn eq_ascii_lower(string: &str, reference: &str) -> bool {
     #[inline]
     fn eq(string: &str, reference: &str) -> bool {
-        for std::uint::range(0, string.len()) |i| {
+        for i in range(0, string.len()) {
             if ASCII_LOWER_MAP[string[i]] != reference[i] {
                 return false
             }
@@ -47,7 +47,7 @@ pub fn eq_ascii_lower(string: &str, reference: &str) -> bool {
 /// A-Z is replaced by a-z, non-ASCII letters are unchanged.
 pub fn to_ascii_lower(string: &str) -> ~str {
     let mut lower = string.to_owned();
-    for std::uint::range(0, lower.len()) |i| {
+    for i in range(0, lower.len()) {
         lower[i] = ASCII_LOWER_MAP[lower[i]];
     }
     lower
@@ -62,7 +62,7 @@ fn test_ascii_lower() {
     assert!(eq_ascii_lower("HİKß", "hİKß"));
     assert!(to_ascii_lower("HİKß") == ~"hİKß");
 
-    for std::uint::range(0, 128) |i| {
+    for i in range(0, 128) {
         let c = i as char;
         let lower = if 'A' <= c && c <= 'Z' { c + 'a' - 'A' } else { c };
         assert!(ASCII_LOWER_MAP[i] as char == lower)
