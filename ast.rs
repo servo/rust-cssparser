@@ -21,13 +21,16 @@ pub struct SourceLocation {
 }
 
 
+pub type Node = (ComponentValue, SourceLocation);  // TODO this is not a good name
+
+
 #[deriving(Eq)]
 pub enum ComponentValue {
-    // Preserved tokens. Same as in the tokenizer.
+    // Preserved tokens.
     Ident(~str),
     AtKeyword(~str),
     Hash(~str),
-    IDHash(~str),  // Hash token that is a valid ID selector.
+    IDHash(~str),  // Hash that is a valid ID selector.
     String(~str),
     URL(~str),
     Delim(char),
@@ -50,12 +53,12 @@ pub enum ComponentValue {
     CDC,  // -->
 
     // Function
-    Function(~str, ~[(ComponentValue, SourceLocation)]),  // name, arguments
+    Function(~str, ~[Node]),  // name, arguments
 
     // Simple block
-    ParenthesisBlock(~[(ComponentValue, SourceLocation)]),  // (…)
-    SquareBracketBlock(~[(ComponentValue, SourceLocation)]),  // […]
-    CurlyBracketBlock(~[(ComponentValue, SourceLocation)]),  // {…}
+    ParenthesisBlock(~[Node]),  // (…)
+    SquareBracketBlock(~[Node]),  // […]
+    CurlyBracketBlock(~[Node]),  // {…}
 
     // These are always invalid
     BadURL,
@@ -70,23 +73,23 @@ pub enum ComponentValue {
 pub struct Declaration {
     location: SourceLocation,
     name: ~str,
-    value: ~[(ComponentValue, SourceLocation)],
+    value: ~[Node],
     important: bool,
 }
 
 #[deriving(Eq)]
 pub struct QualifiedRule {
     location: SourceLocation,
-    prelude: ~[(ComponentValue, SourceLocation)],
-    block: ~[(ComponentValue, SourceLocation)],
+    prelude: ~[Node],
+    block: ~[Node],
 }
 
 #[deriving(Eq)]
 pub struct AtRule {
     location: SourceLocation,
     name: ~str,
-    prelude: ~[(ComponentValue, SourceLocation)],
-    block: Option<~[(ComponentValue, SourceLocation)]>,
+    prelude: ~[Node],
+    block: Option<~[Node]>,
 }
 
 #[deriving(Eq)]
@@ -121,24 +124,21 @@ pub trait SkipWhitespaceIterable<'self> {
     pub fn skip_whitespace(self) -> SkipWhitespaceIterator<'self>;
 }
 
-impl<'self> SkipWhitespaceIterable<'self> for &'self [(ComponentValue, SourceLocation)] {
+impl<'self> SkipWhitespaceIterable<'self> for &'self [Node] {
     pub fn skip_whitespace(self) -> SkipWhitespaceIterator<'self> {
         SkipWhitespaceIterator{ iter: self.iter() }
     }
 }
 
 struct SkipWhitespaceIterator<'self> {
-    iter: vec::VecIterator<'self, (ComponentValue, SourceLocation)>,
+    iter: vec::VecIterator<'self, Node>,
 }
 
 impl<'self> Iterator<&'self ComponentValue> for SkipWhitespaceIterator<'self> {
     fn next(&mut self) -> Option<&'self ComponentValue> {
-        loop {
-            match self.iter.next() {
-                Some(&(WhiteSpace, _)) => (),
-                Some(&(ref component_value, _)) => return Some(component_value),
-                None => return None
-            }
+        for &(ref component_value, _) in self.iter {
+            if component_value != &WhiteSpace { return Some(component_value) }
         }
+        None
     }
 }

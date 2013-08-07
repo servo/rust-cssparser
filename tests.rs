@@ -7,7 +7,7 @@ use extra::{tempfile, json};
 use extra::json::ToJson;
 
 use ast::*;
-use tokenizer::*;
+use tokenizer::tokenize;
 use parser::*;
 use color::*;
 
@@ -79,14 +79,8 @@ fn run_json_tests(json_data: &str, parse: &fn (input: ~str) -> json::Json) {
 #[test]
 fn component_value_list() {
     do run_json_tests(include_str!("css-parsing-tests/component_value_list.json")) |input| {
-        let parser = &mut Parser::from_str(input);
         let mut results = ~[];
-        loop {
-            match next_component_value(parser) {
-                Some((c, _)) => results.push(c),
-                None => break,
-            }
-        }
+        for (c, _) in &mut tokenize(input) { results.push(c) }
         results.to_json()
     }
 }
@@ -95,8 +89,8 @@ fn component_value_list() {
 #[test]
 fn one_component_value() {
     do run_json_tests(include_str!("css-parsing-tests/one_component_value.json")) |input| {
-        let iter = &mut ComponentValueIterator::from_str(input);
-        result_to_json(parse_one_component_value(iter).chain(|(c, _)| Ok(c)))
+        let result = parse_one_component_value(&mut tokenize(input));
+        result_to_json(result.chain(|(c, _)| Ok(c)))
     }
 }
 
@@ -104,7 +98,7 @@ fn one_component_value() {
 #[test]
 fn declaration_list() {
     do run_json_tests(include_str!("css-parsing-tests/declaration_list.json")) |input| {
-        let iter = &mut ComponentValueIterator::from_str(input);
+        let iter = &mut tokenize(input);
         let mut declarations = ~[];
         loop {
             match parse_declaration_or_at_rule(iter) {
@@ -120,7 +114,7 @@ fn declaration_list() {
 #[test]
 fn one_declaration() {
     do run_json_tests(include_str!("css-parsing-tests/one_declaration.json")) |input| {
-        result_to_json(parse_one_declaration(&mut ComponentValueIterator::from_str(input)))
+        result_to_json(parse_one_declaration(&mut tokenize(input)))
     }
 }
 
@@ -128,7 +122,7 @@ fn one_declaration() {
 #[test]
 fn rule_list() {
     do run_json_tests(include_str!("css-parsing-tests/rule_list.json")) |input| {
-        let iter = &mut ComponentValueIterator::from_str(input);
+        let iter = &mut tokenize(input);
         let mut rules = ~[];
         loop {
             match parse_rule(iter) {
@@ -144,14 +138,14 @@ fn rule_list() {
 #[test]
 fn one_rule() {
     do run_json_tests(include_str!("css-parsing-tests/one_rule.json")) |input| {
-        result_to_json(parse_one_rule(&mut ComponentValueIterator::from_str(input)))
+        result_to_json(parse_one_rule(&mut tokenize(input)))
     }
 }
 
 
 fn run_color_tests(json_data: &str, to_json: &fn(result: Option<Color>) -> json::Json) {
     do run_json_tests(json_data) |input| {
-        match parse_one_component_value(&mut ComponentValueIterator::from_str(input)) {
+        match parse_one_component_value(&mut tokenize(input)) {
             Ok((component_value, _location)) => to_json(parse_color(&component_value)),
             Err(_reason) => json::Null,
         }

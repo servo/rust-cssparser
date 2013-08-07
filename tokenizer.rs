@@ -10,6 +10,41 @@ use std::ascii::eq_ignore_ascii_case;
 use ast::*;
 
 
+pub fn tokenize(input: &str) -> Parser {
+    let input = preprocess(input);
+    Parser {
+        length: input.len(),
+        input: input,
+        position: 0,
+        line: 1,
+        last_line_start: 0,
+    }
+}
+
+impl Iterator<Node> for Parser {
+    #[inline]
+    pub fn next(&mut self) -> Option<Node> { next_component_value(self) }
+}
+
+
+//  ***********  End of public API  ***********
+
+
+#[inline]
+fn preprocess(input: &str) -> ~str {
+    // TODO: Is this faster if done in one pass?
+    input.replace("\r\n", "\n").replace("\r", "\n").replace("\x0C", "\n").replace("\x00", "\uFFFD")
+}
+
+
+#[test]
+fn test_preprocess() {
+    assert!(preprocess("") == ~"");
+    assert!(preprocess("Lorem\r\n\t\x00ipusm\ndoror\uFFFD\r")
+            == ~"Lorem\n\t\uFFFDipusm\ndoror\uFFFD\n");
+}
+
+
 struct Parser {
     input: ~str,
     length: uint,  // All counted in bytes, not characters
@@ -20,18 +55,39 @@ struct Parser {
 
 
 impl Parser {
-    pub fn from_str(input: &str) -> Parser {
-        let input = preprocess(input);
-        Parser {
-            length: input.len(),
-            input: input,
-            position: 0,
-            line: 1,
-            last_line_start: 0,
+    #[inline]
+    fn is_eof(&self) -> bool { self.position >= self.length }
+
+    // Assumes non-EOF
+    #[inline]
+    fn current_char(&self) -> char { self.char_at(0) }
+
+    #[inline]
+    fn char_at(&self, offset: uint) -> char {
+        self.input.char_at(self.position + offset)
+    }
+
+    #[inline]
+    fn consume_char(&mut self) -> char {
+        let range = self.input.char_range_at(self.position);
+        self.position = range.next;
+        range.ch
+    }
+
+    #[inline]
+    fn starts_with(&self, needle: &str) -> bool {
+        self.input.slice_from(self.position).starts_with(needle)
+    }
+
+    #[inline]
+    fn new_line(&mut self) {
+        if cfg!(test) {
+            assert!(self.input.char_at(self.position - 1) == '\n')
         }
+        self.line += 1;
+        self.last_line_start = self.position;
     }
 }
-
 
 macro_rules! is_match(
     ($value:expr, $($pattern:pat)|+) => (
@@ -40,7 +96,7 @@ macro_rules! is_match(
 )
 
 
-pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, SourceLocation)> {
+fn next_component_value(parser: &mut Parser) -> Option<Node> {
     consume_comments(parser);
     if parser.is_eof() {
         if cfg!(test) {
@@ -194,60 +250,6 @@ pub fn next_component_value(parser: &mut Parser) -> Option<(ComponentValue, Sour
 }
 
 
-//  ***********  End of public API  ***********
-
-
-#[inline]
-fn preprocess(input: &str) -> ~str {
-    // TODO: Is this faster if done in one pass?
-    input.replace("\r\n", "\n").replace("\r", "\n").replace("\x0C", "\n").replace("\x00", "\uFFFD")
-}
-
-
-#[test]
-fn test_preprocess() {
-    assert!(preprocess("") == ~"");
-    assert!(preprocess("Lorem\r\n\t\x00ipusm\ndoror\uFFFD\r")
-            == ~"Lorem\n\t\uFFFDipusm\ndoror\uFFFD\n");
-}
-
-
-impl Parser {
-    #[inline]
-    fn is_eof(&self) -> bool { self.position >= self.length }
-
-    // Assumes non-EOF
-    #[inline]
-    fn current_char(&self) -> char { self.char_at(0) }
-
-    #[inline]
-    fn char_at(&self, offset: uint) -> char {
-        self.input.char_at(self.position + offset)
-    }
-
-    #[inline]
-    fn consume_char(&mut self) -> char {
-        let range = self.input.char_range_at(self.position);
-        self.position = range.next;
-        range.ch
-    }
-
-    #[inline]
-    fn starts_with(&self, needle: &str) -> bool {
-        self.input.slice_from(self.position).starts_with(needle)
-    }
-
-    #[inline]
-    fn new_line(&mut self) {
-        if cfg!(test) {
-            assert!(self.input.char_at(self.position - 1) == '\n')
-        }
-        self.line += 1;
-        self.last_line_start = self.position;
-    }
-}
-
-
 #[inline]
 fn consume_comments(parser: &mut Parser) {
     while parser.starts_with("/*") {
@@ -268,8 +270,7 @@ fn consume_comments(parser: &mut Parser) {
 }
 
 
-fn consume_block(parser: &mut Parser, ending_token: ComponentValue)
-                 -> ~[(ComponentValue, SourceLocation)] {
+fn consume_block(parser: &mut Parser, ending_token: ComponentValue) -> ~[Node] {
     parser.position += 1;  // Skip the initial {[(
     let mut content = ~[];
     loop {
