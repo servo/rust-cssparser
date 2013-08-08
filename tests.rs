@@ -6,10 +6,7 @@ use std::{io, os, str, run, task};
 use extra::{tempfile, json};
 use extra::json::ToJson;
 
-use ast::*;
-use tokenizer::tokenize;
-use parser::*;
-use color::*;
+use super::*;
 
 
 fn write_whole_file(path: &Path, data: &str) {
@@ -119,7 +116,7 @@ fn rule_list() {
 #[test]
 fn stylesheet() {
     do run_json_tests(include_str!("css-parsing-tests/stylesheet.json")) |input| {
-        parse_stylesheet(tokenize(input)).to_owned_vec()
+        parse_stylesheet_rules(tokenize(input)).to_owned_vec()
     }
 }
 

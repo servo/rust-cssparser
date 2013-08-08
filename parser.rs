@@ -23,7 +23,7 @@ use ast::*;
 /// Parse top-level of a CSS stylesheet.
 /// Return a Iterator<Result<Rule, ErrorReason>>
 #[inline]
-pub fn parse_stylesheet<T: Iterator<Node>>(iter: T) -> StylesheetParser<T> {
+pub fn parse_stylesheet_rules<T: Iterator<Node>>(iter: T) -> StylesheetParser<T> {
     StylesheetParser(iter)
 }
 
