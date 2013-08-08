@@ -259,8 +259,7 @@ impl ToJson for AtRule {
         match *self {
             AtRule{name: ref name, prelude: ref prelude, block: ref block, _}
             => json::List(~[json::String(~"at-rule"), name.to_json(),
-                            json::List(list_to_json(prelude)),
-                            block.map(list_to_json).to_json()])
+                            prelude.to_json(), block.map(list_to_json).to_json()])
         }
     }
 }
@@ -271,7 +270,7 @@ impl ToJson for QualifiedRule {
         match *self {
             QualifiedRule{prelude: ref prelude, block: ref block, _}
             => json::List(~[json::String(~"qualified rule"),
-                            json::List(list_to_json(prelude)), json::List(list_to_json(block))])
+                            prelude.to_json(), json::List(list_to_json(block))])
         }
     }
 }
@@ -282,7 +281,7 @@ impl ToJson for Declaration {
         match *self {
             Declaration{name: ref name, value: ref value, important: ref important, _}
             =>  json::List(~[json::String(~"declaration"), name.to_json(),
-                             json::List(list_to_json(value)), important.to_json()])
+                             value.to_json(), important.to_json()])
         }
     }
 }
@@ -335,11 +334,11 @@ impl ToJson for ComponentValue {
             CDC => JString(~"-->"),
 
             Function(ref name, ref arguments)
-            => JList(~[JString(~"function"), name.to_json()] + list_to_json(arguments)),
+            => JList(~[JString(~"function"), name.to_json()] + arguments.map(|a| a.to_json())),
             ParenthesisBlock(ref content)
-            => JList(~[JString(~"()")] + list_to_json(content)),
+            => JList(~[JString(~"()")] + content.map(|c| c.to_json())),
             SquareBracketBlock(ref content)
-            => JList(~[JString(~"[]")] + list_to_json(content)),
+            => JList(~[JString(~"[]")] + content.map(|c| c.to_json())),
             CurlyBracketBlock(ref content)
             => JList(~[JString(~"{}")] + list_to_json(content)),
 

@@ -53,11 +53,11 @@ pub enum ComponentValue {
     CDC,  // -->
 
     // Function
-    Function(~str, ~[Node]),  // name, arguments
+    Function(~str, ~[ComponentValue]),  // name, arguments
 
     // Simple block
-    ParenthesisBlock(~[Node]),  // (…)
-    SquareBracketBlock(~[Node]),  // […]
+    ParenthesisBlock(~[ComponentValue]),  // (…)
+    SquareBracketBlock(~[ComponentValue]),  // […]
     CurlyBracketBlock(~[Node]),  // {…}
 
     // These are always invalid
@@ -73,14 +73,14 @@ pub enum ComponentValue {
 pub struct Declaration {
     location: SourceLocation,
     name: ~str,
-    value: ~[Node],
+    value: ~[ComponentValue],
     important: bool,
 }
 
 #[deriving(Eq)]
 pub struct QualifiedRule {
     location: SourceLocation,
-    prelude: ~[Node],
+    prelude: ~[ComponentValue],
     block: ~[Node],
 }
 
@@ -88,7 +88,7 @@ pub struct QualifiedRule {
 pub struct AtRule {
     location: SourceLocation,
     name: ~str,
-    prelude: ~[Node],
+    prelude: ~[ComponentValue],
     block: Option<~[Node]>,
 }
 
@@ -124,19 +124,19 @@ pub trait SkipWhitespaceIterable<'self> {
     pub fn skip_whitespace(self) -> SkipWhitespaceIterator<'self>;
 }
 
-impl<'self> SkipWhitespaceIterable<'self> for &'self [Node] {
+impl<'self> SkipWhitespaceIterable<'self> for &'self [ComponentValue] {
     pub fn skip_whitespace(self) -> SkipWhitespaceIterator<'self> {
         SkipWhitespaceIterator{ iter: self.iter() }
     }
 }
 
 struct SkipWhitespaceIterator<'self> {
-    iter: vec::VecIterator<'self, Node>,
+    iter: vec::VecIterator<'self, ComponentValue>,
 }
 
 impl<'self> Iterator<&'self ComponentValue> for SkipWhitespaceIterator<'self> {
     fn next(&mut self) -> Option<&'self ComponentValue> {
-        for &(ref component_value, _) in self.iter {
+        for component_value in self.iter {
             if component_value != &WhiteSpace { return Some(component_value) }
         }
         None

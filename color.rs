@@ -76,7 +76,7 @@ fn parse_color_hash(value: &str) -> Option<Color> {
 
 
 #[inline]
-fn parse_color_function(name: &str, arguments: &[(ComponentValue, SourceLocation)])
+fn parse_color_function(name: &str, arguments: &[ComponentValue])
                         -> Option<Color> {
     let lower_name = to_ascii_lower(name);
 

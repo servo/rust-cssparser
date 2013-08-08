@@ -230,7 +230,7 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
             if tokenizer.starts_with("^=") { tokenizer.position += 2; PrefixMatch }
             else { tokenizer.position += 1; Delim(c) }
         },
-        '{' => CurlyBracketBlock(consume_block(tokenizer, CloseCurlyBracket)),
+        '{' => CurlyBracketBlock(consume_block_with_location(tokenizer, CloseCurlyBracket)),
         '|' => {
             if tokenizer.starts_with("|=") { tokenizer.position += 2; DashMatch }
             else if tokenizer.starts_with("||") { tokenizer.position += 2; Column }
@@ -274,7 +274,23 @@ fn consume_comments(tokenizer: &mut Tokenizer) {
 }
 
 
-fn consume_block(tokenizer: &mut Tokenizer, ending_token: ComponentValue) -> ~[Node] {
+fn consume_block(tokenizer: &mut Tokenizer, ending_token: ComponentValue) -> ~[ComponentValue] {
+    tokenizer.position += 1;  // Skip the initial {[(
+    let mut content = ~[];
+    loop {
+        match next_component_value(tokenizer) {
+            Some((component_value, _location)) => {
+                if component_value == ending_token { break }
+                else { content.push(component_value) }
+            },
+            None => break,
+        }
+    }
+    content
+}
+
+
+fn consume_block_with_location(tokenizer: &mut Tokenizer, ending_token: ComponentValue) -> ~[Node] {
     tokenizer.position += 1;  // Skip the initial {[(
     let mut content = ~[];
     loop {
