@@ -164,7 +164,7 @@ fn color3_keywords() {
 }
 
 
-impl ToJson for Result<Rule, ErrorReason> {
+impl ToJson for Result<Rule, SyntaxError> {
     fn to_json(&self) -> json::Json {
         match *self {
             Ok(ref a) => a.to_json(),
@@ -174,7 +174,7 @@ impl ToJson for Result<Rule, ErrorReason> {
 }
 
 
-impl ToJson for Result<DeclarationListItem, ErrorReason> {
+impl ToJson for Result<DeclarationListItem, SyntaxError> {
     fn to_json(&self) -> json::Json {
         match *self {
             Ok(ref a) => a.to_json(),
@@ -184,7 +184,7 @@ impl ToJson for Result<DeclarationListItem, ErrorReason> {
 }
 
 
-impl ToJson for Result<Declaration, ErrorReason> {
+impl ToJson for Result<Declaration, SyntaxError> {
     fn to_json(&self) -> json::Json {
         match *self {
             Ok(ref a) => a.to_json(),
@@ -194,12 +194,23 @@ impl ToJson for Result<Declaration, ErrorReason> {
 }
 
 
-impl ToJson for Result<ComponentValue, ErrorReason> {
+impl ToJson for Result<ComponentValue, SyntaxError> {
     fn to_json(&self) -> json::Json {
         match *self {
             Ok(ref a) => a.to_json(),
             Err(ref b) => b.to_json(),
         }
+    }
+}
+
+
+impl ToJson for SyntaxError {
+    fn to_json(&self) -> json::Json {
+        json::List(~[json::String(~"error"), json::String(match self.reason {
+            ErrEmptyInput => ~"empty",
+            ErrExtraInput => ~"extra-input",
+            _ => ~"invalid",
+        })])
     }
 }
 
@@ -210,17 +221,6 @@ impl ToJson for Color {
             RGBA(r, g, b, a) => (~[r, g, b, a]).to_json(),
             CurrentColor => json::String(~"currentColor"),
         }
-    }
-}
-
-
-impl ToJson for ErrorReason {
-    fn to_json(&self) -> json::Json {
-        json::List(~[json::String(~"error"), json::String(match *self {
-            ErrEmptyInput => ~"empty",
-            ErrExtraInput => ~"extra-input",
-            _ => ~"invalid",
-        })])
     }
 }
 

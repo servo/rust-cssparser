@@ -106,6 +106,12 @@ pub enum Rule {
 }
 
 #[deriving(Eq)]
+pub struct SyntaxError {
+    location: SourceLocation,
+    reason: ErrorReason,
+}
+
+#[deriving(Eq)]
 pub enum ErrorReason {
     ErrEmptyInput,  // Parsing a single "thing", found only whitespace.
     ErrExtraInput,  // Found more non-whitespace after parsing a single "thing".
@@ -115,8 +121,10 @@ pub enum ErrorReason {
     // This is meant to be extended
 }
 
-impl ToStr for ErrorReason {
-    fn to_str(&self) -> ~str { fmt!("%?", self) }
+impl ToStr for SyntaxError {
+    fn to_str(&self) -> ~str {
+        fmt!("%u:%u %?", self.location.line, self.location.column, self.reason)
+    }
 }
 
 

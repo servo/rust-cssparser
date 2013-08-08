@@ -21,7 +21,7 @@ use ast::*;
 
 
 /// Parse top-level of a CSS stylesheet.
-/// Return a Iterator<Result<Rule, ErrorReason>>
+/// Return a Iterator<Result<Rule, SyntaxError>>
 #[inline]
 pub fn parse_stylesheet_rules<T: Iterator<Node>>(iter: T) -> StylesheetParser<T> {
     StylesheetParser(iter)
@@ -29,7 +29,7 @@ pub fn parse_stylesheet_rules<T: Iterator<Node>>(iter: T) -> StylesheetParser<T>
 
 
 /// Parse a non-top level list of rules eg. the content of an @media rule.
-/// Return a Iterator<Result<Rule, ErrorReason>>
+/// Return a Iterator<Result<Rule, SyntaxError>>
 #[inline]
 pub fn parse_rule_list<T: Iterator<Node>>(iter: T) -> RuleListParser<T> {
     RuleListParser(iter)
@@ -38,7 +38,7 @@ pub fn parse_rule_list<T: Iterator<Node>>(iter: T) -> RuleListParser<T> {
 
 /// Parse a list of declarations and at-rules,
 /// like @page in CSS 2.1, all declaration lists in level 3
-/// Return a Iterator<Result<DeclarationListItem, ErrorReason>>
+/// Return a Iterator<Result<DeclarationListItem, SyntaxError>>
 #[inline]
 pub fn parse_declaration_list<T: Iterator<Node>>(iter: T) -> DeclarationListParser<T> {
     DeclarationListParser(iter)
@@ -47,13 +47,16 @@ pub fn parse_declaration_list<T: Iterator<Node>>(iter: T) -> DeclarationListPars
 
 /// Parse a single rule.
 /// Used eg. for CSSRuleList.insertRule()
-pub fn parse_one_rule<T: Iterator<Node>>(iter: T) -> Result<Rule, ErrorReason> {
+pub fn parse_one_rule<T: Iterator<Node>>(iter: T) -> Result<Rule, SyntaxError> {
     let mut parser = RuleListParser(iter);
     match parser.next() {
-        None => Err(ErrEmptyInput),
+        None => error(START_LOCATION, ErrEmptyInput),
         Some(result) => {
-            if result.is_err() || next_non_whitespace(&mut *parser).is_none() { result }
-            else { Err(ErrExtraInput) }
+            if result.is_err() { result }
+            else { match next_non_whitespace(&mut *parser) {
+                None => result,
+                Some((_component_value, location)) => error(location, ErrExtraInput),
+            }}
         }
     }
 }
@@ -61,13 +64,16 @@ pub fn parse_one_rule<T: Iterator<Node>>(iter: T) -> Result<Rule, ErrorReason> {
 
 /// Parse a single declaration (not an at-rule)
 /// Used eg. in @supports
-pub fn parse_one_declaration<T: Iterator<Node>>(mut iter: T) -> Result<Declaration, ErrorReason> {
+pub fn parse_one_declaration<T: Iterator<Node>>(mut iter: T) -> Result<Declaration, SyntaxError> {
     match next_non_whitespace(&mut iter) {
-        None => Err(ErrEmptyInput),
+        None => error(START_LOCATION, ErrEmptyInput),
         Some((component_value, location)) => {
             let result = parse_declaration(&mut iter, component_value, location);
-            if result.is_err() || next_non_whitespace(&mut iter).is_none() { result }
-            else { Err(ErrExtraInput) }
+            if result.is_err() { result }
+            else { match next_non_whitespace(&mut iter) {
+                None => result,
+                Some((_component_value, location)) => error(location, ErrExtraInput),
+            }}
         }
     }
 }
@@ -76,12 +82,14 @@ pub fn parse_one_declaration<T: Iterator<Node>>(mut iter: T) -> Result<Declarati
 /// Parse a single component value.
 /// Used eg. in attr(foo, color)
 pub fn parse_one_component_value<T: Iterator<Node>>(mut iter: T)
-                                -> Result<ComponentValue, ErrorReason> {
+                                -> Result<ComponentValue, SyntaxError> {
     match next_non_whitespace(&mut iter) {
-        None => Err(ErrEmptyInput),
+        None => error(START_LOCATION, ErrEmptyInput),
         Some((component_value, _location)) => {
-            if next_non_whitespace(&mut iter).is_none() { Ok(component_value) }
-            else { Err(ErrExtraInput) }
+            match next_non_whitespace(&mut iter) {
+                None => Ok(component_value),
+                Some((_component_value, location)) => error(location, ErrExtraInput),
+            }
         }
     }
 }
@@ -106,8 +114,8 @@ macro_rules! for_iter(
 )
 
 
-impl<T: Iterator<Node>> Iterator<Result<Rule, ErrorReason>> for StylesheetParser<T> {
-    fn next(&mut self) -> Option<Result<Rule, ErrorReason>> {
+impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for StylesheetParser<T> {
+    fn next(&mut self) -> Option<Result<Rule, SyntaxError>> {
         let iter = &mut **self;
         for_iter!(iter, (component_value, location), {
             match component_value {
@@ -115,7 +123,7 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, ErrorReason>> for StylesheetParser
                 AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
                 _ => return Some(match parse_qualified_rule(iter, component_value, location) {
                     Ok(rule) => Ok(QualifiedRule(rule)),
-                    Err(reason) => Err(reason),
+                    Err(e) => Err(e),
                 }),
             }
         })
@@ -124,8 +132,8 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, ErrorReason>> for StylesheetParser
 }
 
 
-impl<T: Iterator<Node>> Iterator<Result<Rule, ErrorReason>> for RuleListParser<T> {
-    fn next(&mut self) -> Option<Result<Rule, ErrorReason>> {
+impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for RuleListParser<T> {
+    fn next(&mut self) -> Option<Result<Rule, SyntaxError>> {
         let iter = &mut **self;
         for_iter!(iter, (component_value, location), {
             match component_value {
@@ -133,7 +141,7 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, ErrorReason>> for RuleListParser<T
                 AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
                 _ => return Some(match parse_qualified_rule(iter, component_value, location) {
                     Ok(rule) => Ok(QualifiedRule(rule)),
-                    Err(reason) => Err(reason),
+                    Err(e) => Err(e),
                 }),
             }
         })
@@ -142,9 +150,9 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, ErrorReason>> for RuleListParser<T
 }
 
 
-impl<T: Iterator<Node>> Iterator<Result<DeclarationListItem, ErrorReason>>
+impl<T: Iterator<Node>> Iterator<Result<DeclarationListItem, SyntaxError>>
 for DeclarationListParser<T> {
-    fn next(&mut self) -> Option<Result<DeclarationListItem, ErrorReason>> {
+    fn next(&mut self) -> Option<Result<DeclarationListItem, SyntaxError>> {
         let iter = &mut **self;
         for_iter!(iter, (component_value, location), {
             match component_value {
@@ -153,10 +161,10 @@ for DeclarationListParser<T> {
                 => return Some(Ok(Decl_AtRule(parse_at_rule(iter, name, location)))),
                 _ => return Some(match parse_declaration(iter, component_value, location) {
                     Ok(declaration) => Ok(Declaration(declaration)),
-                    Err(reason) => {
+                    Err(e) => {
                         // Find the end of the declaration
                         for (v, _) in *iter { if v == Semicolon { break } }
-                        Err(reason)
+                        Err(e)
                     }
                 }),
             }
@@ -183,7 +191,7 @@ fn parse_at_rule<T: Iterator<Node>>(iter: &mut T, name: ~str, location: SourceLo
 
 fn parse_qualified_rule<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
                                            location: SourceLocation)
-                                           -> Result<QualifiedRule, ErrorReason> {
+                                           -> Result<QualifiedRule, SyntaxError> {
     match first {
         CurlyBracketBlock(content)
         => return Ok(QualifiedRule { location: location, prelude: ~[], block: content }),
@@ -197,20 +205,20 @@ fn parse_qualified_rule<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
             component_value => prelude.push(component_value),
         }
     })
-    Err(ErrMissingQualifiedRuleBlock)
+    error(location, ErrMissingQualifiedRuleBlock)
 }
 
 
 fn parse_declaration<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
                                         location: SourceLocation)
-                                        -> Result<Declaration, ErrorReason> {
+                                        -> Result<Declaration, SyntaxError> {
     let name = match first {
         Ident(name) => name,
-        _ => return Err(ErrInvalidDeclarationSyntax)
+        _ => return error(location, ErrInvalidDeclarationSyntax)
     };
     match next_non_whitespace(iter) {
         Some((Colon, _)) => (),
-        _ => return Err(ErrInvalidDeclarationSyntax),
+        _ => return error(location, ErrInvalidDeclarationSyntax),
     }
     let mut value = ~[];
     let mut important = false;
@@ -221,7 +229,7 @@ fn parse_declaration<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
                 important = true;
                 break
             } else {
-                return Err(ErrInvalidBangImportantSyntax)
+                return error(location, ErrInvalidBangImportantSyntax)
             },
             component_value => value.push(component_value),
         }
@@ -252,3 +260,13 @@ fn next_non_whitespace<T: Iterator<Node>>(iter: &mut T) -> Option<Node> {
     }
     None
 }
+
+
+#[inline]
+fn error<T>(location: SourceLocation, reason: ErrorReason) -> Result<T, SyntaxError> {
+    Err(SyntaxError{location: location, reason: reason})
+}
+
+
+// When parsing one thing on an empty input
+static START_LOCATION: SourceLocation = SourceLocation{ line: 1, column: 1 };
