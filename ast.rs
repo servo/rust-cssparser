@@ -150,3 +150,27 @@ impl<'self> Iterator<&'self ComponentValue> for SkipWhitespaceIterator<'self> {
         None
     }
 }
+
+
+pub trait ConsumeSkipWhitespaceIterable {
+    pub fn consume_skip_whitespace(self) -> ConsumeSkipWhitespaceIterator;
+}
+
+impl ConsumeSkipWhitespaceIterable for ~[ComponentValue] {
+    pub fn consume_skip_whitespace(self) -> ConsumeSkipWhitespaceIterator {
+        ConsumeSkipWhitespaceIterator{ iter: self.consume_iter() }
+    }
+}
+
+struct ConsumeSkipWhitespaceIterator {
+    iter: vec::ConsumeIterator<ComponentValue>,
+}
+
+impl Iterator<ComponentValue> for ConsumeSkipWhitespaceIterator {
+    fn next(&mut self) -> Option<ComponentValue> {
+        for component_value in self.iter {
+            if component_value != WhiteSpace { return Some(component_value) }
+        }
+        None
+    }
+}
