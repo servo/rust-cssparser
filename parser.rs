@@ -24,7 +24,7 @@ use ast::*;
 /// Return a Iterator<Result<Rule, SyntaxError>>
 #[inline]
 pub fn parse_stylesheet_rules<T: Iterator<Node>>(iter: T) -> StylesheetParser<T> {
-    StylesheetParser(iter)
+    StylesheetParser{ iter: iter }
 }
 
 
@@ -32,7 +32,7 @@ pub fn parse_stylesheet_rules<T: Iterator<Node>>(iter: T) -> StylesheetParser<T>
 /// Return a Iterator<Result<Rule, SyntaxError>>
 #[inline]
 pub fn parse_rule_list<T: Iterator<Node>>(iter: T) -> RuleListParser<T> {
-    RuleListParser(iter)
+    RuleListParser{ iter: iter }
 }
 
 
@@ -41,19 +41,19 @@ pub fn parse_rule_list<T: Iterator<Node>>(iter: T) -> RuleListParser<T> {
 /// Return a Iterator<Result<DeclarationListItem, SyntaxError>>
 #[inline]
 pub fn parse_declaration_list<T: Iterator<Node>>(iter: T) -> DeclarationListParser<T> {
-    DeclarationListParser(iter)
+    DeclarationListParser{ iter: iter }
 }
 
 
 /// Parse a single rule.
 /// Used eg. for CSSRuleList.insertRule()
 pub fn parse_one_rule<T: Iterator<Node>>(iter: T) -> Result<Rule, SyntaxError> {
-    let mut parser = RuleListParser(iter);
+    let mut parser = RuleListParser{ iter: iter };
     match parser.next() {
         None => error(START_LOCATION, ErrEmptyInput),
         Some(result) => {
             if result.is_err() { result }
-            else { match next_non_whitespace(&mut *parser) {
+            else { match next_non_whitespace(&mut parser.iter) {
                 None => result,
                 Some((_component_value, location)) => error(location, ErrExtraInput),
             }}
@@ -98,9 +98,9 @@ pub fn parse_one_component_value<T: Iterator<Node>>(mut iter: T)
 //  ***********  End of public API  ***********
 
 
-struct StylesheetParser<T>(T);
-struct RuleListParser<T>(T);
-struct DeclarationListParser<T>(T);
+struct StylesheetParser<T>{ iter: T }
+struct RuleListParser<T>{ iter: T }
+struct DeclarationListParser<T>{ iter: T }
 
 
 // Work around "error: cannot borrow `*iter` as mutable more than once at a time"
@@ -116,7 +116,7 @@ macro_rules! for_iter(
 
 impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for StylesheetParser<T> {
     fn next(&mut self) -> Option<Result<Rule, SyntaxError>> {
-        let iter = &mut **self;
+        let iter = &mut self.iter;
         for_iter!(iter, (component_value, location), {
             match component_value {
                 WhiteSpace | CDO | CDC => (),
@@ -134,7 +134,7 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for StylesheetParser
 
 impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for RuleListParser<T> {
     fn next(&mut self) -> Option<Result<Rule, SyntaxError>> {
-        let iter = &mut **self;
+        let iter = &mut self.iter;
         for_iter!(iter, (component_value, location), {
             match component_value {
                 WhiteSpace => (),
@@ -153,7 +153,7 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for RuleListParser<T
 impl<T: Iterator<Node>> Iterator<Result<DeclarationListItem, SyntaxError>>
 for DeclarationListParser<T> {
     fn next(&mut self) -> Option<Result<DeclarationListItem, SyntaxError>> {
-        let iter = &mut **self;
+        let iter = &mut self.iter;
         for_iter!(iter, (component_value, location), {
             match component_value {
                 WhiteSpace | Semicolon => (),
