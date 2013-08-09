@@ -238,7 +238,7 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
         },
         '}' => { tokenizer.position += 1; CloseCurlyBracket },
         '~' => {
-            if tokenizer.starts_with("~=") { tokenizer.position += 2; IncludeMath }
+            if tokenizer.starts_with("~=") { tokenizer.position += 2; IncludeMatch }
             else { tokenizer.position += 1; Delim(c) }
         },
         _ => {
