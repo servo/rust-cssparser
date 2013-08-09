@@ -11,11 +11,13 @@ pub use ast::*;
 pub use tokenizer::*;
 pub use parser::*;
 pub use color::*;
+pub use nth::*;
 
 mod ast;
 mod tokenizer;
 mod parser;
 mod color;
+mod nth;
 
 #[cfg(test)]
 mod tests;

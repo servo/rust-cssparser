@@ -164,6 +164,14 @@ fn color3_keywords() {
 }
 
 
+#[test]
+fn nth() {
+    do run_json_tests(include_str!("css-parsing-tests/An+B.json")) |input| {
+        parse_nth(tokenize(input).transform(|(c, _)| c).to_owned_vec())
+    }
+}
+
+
 impl ToJson for Result<Rule, SyntaxError> {
     fn to_json(&self) -> json::Json {
         match *self {
