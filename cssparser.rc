@@ -7,10 +7,15 @@
 
 extern mod extra;
 
-pub mod tokenizer;
-pub mod parser;
-pub mod ast;
-pub mod color;
+pub use ast::*;
+pub use tokenizer::*;
+pub use parser::*;
+pub use color::*;
+
+mod ast;
+mod tokenizer;
+mod parser;
+mod color;
 
 #[cfg(test)]
 mod tests;

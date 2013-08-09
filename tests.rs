@@ -6,10 +6,7 @@ use std::{io, os, str, run, task};
 use extra::{tempfile, json};
 use extra::json::ToJson;
 
-use ast::*;
-use tokenizer::*;
-use parser::*;
-use color::*;
+use super::*;
 
 
 fn write_whole_file(path: &Path, data: &str) {
@@ -55,7 +52,7 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
 }
 
 
-fn run_json_tests(json_data: &str, parse: &fn (input: ~str) -> json::Json) {
+fn run_json_tests<T: ToJson>(json_data: &str, parse: &fn (input: ~str) -> T) {
     let items = match json::from_str(json_data) {
         Ok(json::List(items)) => items,
         _ => fail!("Invalid JSON")
@@ -67,7 +64,7 @@ fn run_json_tests(json_data: &str, parse: &fn (input: ~str) -> json::Json) {
             (&None, json::String(string)) => input = Some(string),
             (&Some(_), expected) => {
                 let input = input.take_unwrap();
-                let result = parse(input.to_owned());
+                let result = parse(input.to_owned()).to_json();
                 assert_json_eq(result, expected, input);
             },
             _ => fail!("Unexpected JSON")
@@ -79,15 +76,7 @@ fn run_json_tests(json_data: &str, parse: &fn (input: ~str) -> json::Json) {
 #[test]
 fn component_value_list() {
     do run_json_tests(include_str!("css-parsing-tests/component_value_list.json")) |input| {
-        let parser = &mut Parser::from_str(input);
-        let mut results = ~[];
-        loop {
-            match next_component_value(parser) {
-                Some((c, _)) => results.push(c),
-                None => break,
-            }
-        }
-        results.to_json()
+        tokenize(input).transform(|(c, _)| c).to_owned_vec()
     }
 }
 
@@ -95,8 +84,7 @@ fn component_value_list() {
 #[test]
 fn one_component_value() {
     do run_json_tests(include_str!("css-parsing-tests/one_component_value.json")) |input| {
-        let iter = &mut ComponentValueIterator::from_str(input);
-        result_to_json(parse_one_component_value(iter).chain(|(c, _)| Ok(c)))
+        parse_one_component_value(tokenize(input))
     }
 }
 
@@ -104,15 +92,7 @@ fn one_component_value() {
 #[test]
 fn declaration_list() {
     do run_json_tests(include_str!("css-parsing-tests/declaration_list.json")) |input| {
-        let iter = &mut ComponentValueIterator::from_str(input);
-        let mut declarations = ~[];
-        loop {
-            match parse_declaration_or_at_rule(iter) {
-                None => break,
-                Some(result) => declarations.push(result_to_json(result)),
-            }
-        }
-        json::List(declarations)
+        parse_declaration_list(tokenize(input)).to_owned_vec()
     }
 }
 
@@ -120,7 +100,7 @@ fn declaration_list() {
 #[test]
 fn one_declaration() {
     do run_json_tests(include_str!("css-parsing-tests/one_declaration.json")) |input| {
-        result_to_json(parse_one_declaration(&mut ComponentValueIterator::from_str(input)))
+        parse_one_declaration(tokenize(input))
     }
 }
 
@@ -128,15 +108,15 @@ fn one_declaration() {
 #[test]
 fn rule_list() {
     do run_json_tests(include_str!("css-parsing-tests/rule_list.json")) |input| {
-        let iter = &mut ComponentValueIterator::from_str(input);
-        let mut rules = ~[];
-        loop {
-            match parse_rule(iter) {
-                None => break,
-                Some(result) => rules.push(result_to_json(result)),
-            }
-        }
-        json::List(rules)
+        parse_rule_list(tokenize(input)).to_owned_vec()
+    }
+}
+
+
+#[test]
+fn stylesheet() {
+    do run_json_tests(include_str!("css-parsing-tests/stylesheet.json")) |input| {
+        parse_stylesheet_rules(tokenize(input)).to_owned_vec()
     }
 }
 
@@ -144,15 +124,15 @@ fn rule_list() {
 #[test]
 fn one_rule() {
     do run_json_tests(include_str!("css-parsing-tests/one_rule.json")) |input| {
-        result_to_json(parse_one_rule(&mut ComponentValueIterator::from_str(input)))
+        parse_one_rule(tokenize(input))
     }
 }
 
 
 fn run_color_tests(json_data: &str, to_json: &fn(result: Option<Color>) -> json::Json) {
     do run_json_tests(json_data) |input| {
-        match parse_one_component_value(&mut ComponentValueIterator::from_str(input)) {
-            Ok((component_value, _location)) => to_json(parse_color(&component_value)),
+        match parse_one_component_value(tokenize(input)) {
+            Ok(component_value) => to_json(parse_color(&component_value)),
             Err(_reason) => json::Null,
         }
     }
@@ -165,10 +145,10 @@ fn color3() {
 }
 
 
-//#[test]
-//fn color3_hsl() {
-//    run_color_tests(include_str!("css-parsing-tests/color3_hsl.json"), |c| c.to_json())
-//}
+#[test]
+fn color3_hsl() {
+    run_color_tests(include_str!("css-parsing-tests/color3_hsl.json"), |c| c.to_json())
+}
 
 
 /// color3_keywords.json is different: R, G and B are in 0..255 rather than 0..1
@@ -184,10 +164,53 @@ fn color3_keywords() {
 }
 
 
-fn result_to_json<A:ToJson, B:ToJson>(result: Result<A, B>) -> json::Json {
-    match result {
-        Ok(ref a) => a.to_json(),
-        Err(ref b) => b.to_json(),
+impl ToJson for Result<Rule, SyntaxError> {
+    fn to_json(&self) -> json::Json {
+        match *self {
+            Ok(ref a) => a.to_json(),
+            Err(ref b) => b.to_json(),
+        }
+    }
+}
+
+
+impl ToJson for Result<DeclarationListItem, SyntaxError> {
+    fn to_json(&self) -> json::Json {
+        match *self {
+            Ok(ref a) => a.to_json(),
+            Err(ref b) => b.to_json(),
+        }
+    }
+}
+
+
+impl ToJson for Result<Declaration, SyntaxError> {
+    fn to_json(&self) -> json::Json {
+        match *self {
+            Ok(ref a) => a.to_json(),
+            Err(ref b) => b.to_json(),
+        }
+    }
+}
+
+
+impl ToJson for Result<ComponentValue, SyntaxError> {
+    fn to_json(&self) -> json::Json {
+        match *self {
+            Ok(ref a) => a.to_json(),
+            Err(ref b) => b.to_json(),
+        }
+    }
+}
+
+
+impl ToJson for SyntaxError {
+    fn to_json(&self) -> json::Json {
+        json::List(~[json::String(~"error"), json::String(match self.reason {
+            ErrEmptyInput => ~"empty",
+            ErrExtraInput => ~"extra-input",
+            _ => ~"invalid",
+        })])
     }
 }
 
@@ -198,17 +221,6 @@ impl ToJson for Color {
             RGBA(r, g, b, a) => (~[r, g, b, a]).to_json(),
             CurrentColor => json::String(~"currentColor"),
         }
-    }
-}
-
-
-impl ToJson for ErrorReason {
-    fn to_json(&self) -> json::Json {
-        json::List(~[json::String(~"error"), json::String(match *self {
-            ErrEmptyInput => ~"empty",
-            ErrExtraInput => ~"extra-input",
-            _ => ~"invalid",
-        })])
     }
 }
 
@@ -247,8 +259,7 @@ impl ToJson for AtRule {
         match *self {
             AtRule{name: ref name, prelude: ref prelude, block: ref block, _}
             => json::List(~[json::String(~"at-rule"), name.to_json(),
-                            json::List(list_to_json(prelude)),
-                            block.map(list_to_json).to_json()])
+                            prelude.to_json(), block.map(list_to_json).to_json()])
         }
     }
 }
@@ -259,7 +270,7 @@ impl ToJson for QualifiedRule {
         match *self {
             QualifiedRule{prelude: ref prelude, block: ref block, _}
             => json::List(~[json::String(~"qualified rule"),
-                            json::List(list_to_json(prelude)), json::List(list_to_json(block))])
+                            prelude.to_json(), json::List(list_to_json(block))])
         }
     }
 }
@@ -270,7 +281,7 @@ impl ToJson for Declaration {
         match *self {
             Declaration{name: ref name, value: ref value, important: ref important, _}
             =>  json::List(~[json::String(~"declaration"), name.to_json(),
-                             json::List(list_to_json(value)), important.to_json()])
+                             value.to_json(), important.to_json()])
         }
     }
 }
@@ -313,7 +324,7 @@ impl ToJson for ComponentValue {
             Colon => JString(~":"),
             Semicolon => JString(~";"),
             Comma => JString(~","),
-            IncludeMath => JString(~"~="),
+            IncludeMatch => JString(~"~="),
             DashMatch => JString(~"|="),
             PrefixMatch => JString(~"^="),
             SuffixMatch => JString(~"$="),
@@ -323,11 +334,11 @@ impl ToJson for ComponentValue {
             CDC => JString(~"-->"),
 
             Function(ref name, ref arguments)
-            => JList(~[JString(~"function"), name.to_json()] + list_to_json(arguments)),
+            => JList(~[JString(~"function"), name.to_json()] + arguments.map(|a| a.to_json())),
             ParenthesisBlock(ref content)
-            => JList(~[JString(~"()")] + list_to_json(content)),
+            => JList(~[JString(~"()")] + content.map(|c| c.to_json())),
             SquareBracketBlock(ref content)
-            => JList(~[JString(~"[]")] + list_to_json(content)),
+            => JList(~[JString(~"[]")] + content.map(|c| c.to_json())),
             CurlyBracketBlock(ref content)
             => JList(~[JString(~"{}")] + list_to_json(content)),
 
