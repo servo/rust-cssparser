@@ -59,7 +59,7 @@ fn run_json_tests<T: ToJson>(json_data: &str, parse: &fn (input: ~str) -> T) {
     };
     assert!(items.len() % 2 == 0);
     let mut input: Option<~str> = None;
-    for item in items.consume_iter() {
+    for item in items.move_iter() {
         match (&input, item) {
             (&None, json::String(string)) => input = Some(string),
             (&Some(_), expected) => {
@@ -76,7 +76,7 @@ fn run_json_tests<T: ToJson>(json_data: &str, parse: &fn (input: ~str) -> T) {
 #[test]
 fn component_value_list() {
     do run_json_tests(include_str!("css-parsing-tests/component_value_list.json")) |input| {
-        tokenize(input).transform(|(c, _)| c).to_owned_vec()
+        tokenize(input).map(|(c, _)| c).to_owned_vec()
     }
 }
 
@@ -167,7 +167,7 @@ fn color3_keywords() {
 #[test]
 fn nth() {
     do run_json_tests(include_str!("css-parsing-tests/An+B.json")) |input| {
-        parse_nth(tokenize(input).transform(|(c, _)| c).to_owned_vec())
+        parse_nth(tokenize(input).map(|(c, _)| c).to_owned_vec())
     }
 }
 
