@@ -129,11 +129,11 @@ impl ToStr for SyntaxError {
 
 
 pub trait SkipWhitespaceIterable<'self> {
-    pub fn skip_whitespace(self) -> SkipWhitespaceIterator<'self>;
+    fn skip_whitespace(self) -> SkipWhitespaceIterator<'self>;
 }
 
 impl<'self> SkipWhitespaceIterable<'self> for &'self [ComponentValue] {
-    pub fn skip_whitespace(self) -> SkipWhitespaceIterator<'self> {
+    fn skip_whitespace(self) -> SkipWhitespaceIterator<'self> {
         SkipWhitespaceIterator{ iter_with_whitespace: self.iter() }
     }
 }
@@ -153,11 +153,11 @@ impl<'self> Iterator<&'self ComponentValue> for SkipWhitespaceIterator<'self> {
 
 
 pub trait MoveSkipWhitespaceIterable {
-    pub fn move_skip_whitespace(self) -> MoveSkipWhitespaceIterator;
+    fn move_skip_whitespace(self) -> MoveSkipWhitespaceIterator;
 }
 
 impl MoveSkipWhitespaceIterable for ~[ComponentValue] {
-    pub fn move_skip_whitespace(self) -> MoveSkipWhitespaceIterator {
+    fn move_skip_whitespace(self) -> MoveSkipWhitespaceIterator {
         MoveSkipWhitespaceIterator{ iter_with_whitespace: self.move_iter() }
     }
 }
