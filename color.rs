@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 use std::libc::c_float;
 use std::ascii::to_ascii_lower;
 
@@ -76,7 +80,7 @@ fn parse_color_hash(value: &str) -> Option<Color> {
 
 
 #[inline]
-fn parse_color_function(name: &str, arguments: &[(ComponentValue, SourceLocation)])
+fn parse_color_function(name: &str, arguments: &[ComponentValue])
                         -> Option<Color> {
     let lower_name = to_ascii_lower(name);
 
@@ -87,9 +91,7 @@ fn parse_color_function(name: &str, arguments: &[(ComponentValue, SourceLocation
         else if "hsla" == lower_name { (false, true) }
         else { return None };
 
-    let mut iter = do arguments.iter().filter_map |&(ref c, _)| {
-        if c != &WhiteSpace { Some(c) } else { None }
-    };
+    let mut iter = arguments.skip_whitespace();
     macro_rules! expect_comma(
         () => ( if iter.next() != Some(&Comma) { return None } );
     )

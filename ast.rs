@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::str::ToStr;
+use std::vec;
 
 
 #[deriving(Eq)]
@@ -20,13 +21,16 @@ pub struct SourceLocation {
 }
 
 
+pub type Node = (ComponentValue, SourceLocation);  // TODO this is not a good name
+
+
 #[deriving(Eq)]
 pub enum ComponentValue {
-    // Preserved tokens. Same as in the tokenizer.
+    // Preserved tokens.
     Ident(~str),
     AtKeyword(~str),
     Hash(~str),
-    IDHash(~str),  // Hash token that is a valid ID selector.
+    IDHash(~str),  // Hash that is a valid ID selector.
     String(~str),
     URL(~str),
     Delim(char),
@@ -39,7 +43,7 @@ pub enum ComponentValue {
     Colon,  // :
     Semicolon,  // ;
     Comma,  // ,
-    IncludeMath, // ~=
+    IncludeMatch, // ~=
     DashMatch, // |=
     PrefixMatch, // ^=
     SuffixMatch, // $=
@@ -49,12 +53,12 @@ pub enum ComponentValue {
     CDC,  // -->
 
     // Function
-    Function(~str, ~[(ComponentValue, SourceLocation)]),  // name, arguments
+    Function(~str, ~[ComponentValue]),  // name, arguments
 
     // Simple block
-    ParenthesisBlock(~[(ComponentValue, SourceLocation)]),  // (…)
-    SquareBracketBlock(~[(ComponentValue, SourceLocation)]),  // […]
-    CurlyBracketBlock(~[(ComponentValue, SourceLocation)]),  // {…}
+    ParenthesisBlock(~[ComponentValue]),  // (…)
+    SquareBracketBlock(~[ComponentValue]),  // […]
+    CurlyBracketBlock(~[Node]),  // {…}
 
     // These are always invalid
     BadURL,
@@ -69,23 +73,23 @@ pub enum ComponentValue {
 pub struct Declaration {
     location: SourceLocation,
     name: ~str,
-    value: ~[(ComponentValue, SourceLocation)],
+    value: ~[ComponentValue],
     important: bool,
 }
 
 #[deriving(Eq)]
 pub struct QualifiedRule {
     location: SourceLocation,
-    prelude: ~[(ComponentValue, SourceLocation)],
-    block: ~[(ComponentValue, SourceLocation)],
+    prelude: ~[ComponentValue],
+    block: ~[Node],
 }
 
 #[deriving(Eq)]
 pub struct AtRule {
     location: SourceLocation,
     name: ~str,
-    prelude: ~[(ComponentValue, SourceLocation)],
-    block: Option<~[(ComponentValue, SourceLocation)]>,
+    prelude: ~[ComponentValue],
+    block: Option<~[Node]>,
 }
 
 #[deriving(Eq)]
@@ -102,6 +106,12 @@ pub enum Rule {
 }
 
 #[deriving(Eq)]
+pub struct SyntaxError {
+    location: SourceLocation,
+    reason: ErrorReason,
+}
+
+#[deriving(Eq)]
 pub enum ErrorReason {
     ErrEmptyInput,  // Parsing a single "thing", found only whitespace.
     ErrExtraInput,  // Found more non-whitespace after parsing a single "thing".
@@ -111,6 +121,56 @@ pub enum ErrorReason {
     // This is meant to be extended
 }
 
-impl ToStr for ErrorReason {
-    fn to_str(&self) -> ~str { fmt!("%?", self) }
+impl ToStr for SyntaxError {
+    fn to_str(&self) -> ~str {
+        fmt!("%u:%u %?", self.location.line, self.location.column, self.reason)
+    }
+}
+
+
+pub trait SkipWhitespaceIterable<'self> {
+    pub fn skip_whitespace(self) -> SkipWhitespaceIterator<'self>;
+}
+
+impl<'self> SkipWhitespaceIterable<'self> for &'self [ComponentValue] {
+    pub fn skip_whitespace(self) -> SkipWhitespaceIterator<'self> {
+        SkipWhitespaceIterator{ iter_with_whitespace: self.iter() }
+    }
+}
+
+pub struct SkipWhitespaceIterator<'self> {
+    iter_with_whitespace: vec::VecIterator<'self, ComponentValue>,
+}
+
+impl<'self> Iterator<&'self ComponentValue> for SkipWhitespaceIterator<'self> {
+    fn next(&mut self) -> Option<&'self ComponentValue> {
+        for component_value in self.iter_with_whitespace {
+            if component_value != &WhiteSpace { return Some(component_value) }
+        }
+        None
+    }
+}
+
+
+pub trait MoveSkipWhitespaceIterable {
+    pub fn move_skip_whitespace(self) -> MoveSkipWhitespaceIterator;
+}
+
+impl MoveSkipWhitespaceIterable for ~[ComponentValue] {
+    pub fn move_skip_whitespace(self) -> MoveSkipWhitespaceIterator {
+        MoveSkipWhitespaceIterator{ iter_with_whitespace: self.move_iter() }
+    }
+}
+
+pub struct MoveSkipWhitespaceIterator {
+    iter_with_whitespace: vec::MoveIterator<ComponentValue>,
+}
+
+impl Iterator<ComponentValue> for MoveSkipWhitespaceIterator {
+    fn next(&mut self) -> Option<ComponentValue> {
+        for component_value in self.iter_with_whitespace {
+            if component_value != WhiteSpace { return Some(component_value) }
+        }
+        None
+    }
 }

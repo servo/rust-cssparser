@@ -3,161 +3,93 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // http://dev.w3.org/csswg/css-syntax/#parsing
-//
-// The input to the tree construction stage is a sequence of tokens
-// from the tokenization stage.
-// The output is a tree of items with a stylesheet at the root
-// and all other nodes being at-rules, style rules, or declarations.
+
+/// The input to these functions needs to implement Iterator<(ComponentValue, SourceLocation)>.
+/// The input is consumed to avoid doing a lot of copying.
+/// A conforming input can be obtained:
+///
+/// * From a string in CSS syntax, with tokenize()
+/// * From a ~[(ComponentValue, SourceLocation)] vector
+///   (as found in "nested" component values such as CurlyBracketBlock),
+///   with v.consume_iter()
 
 
 use std::iterator::Iterator;
-use std::vec;
 use std::ascii::eq_ignore_ascii_case;
 
 use ast::*;
-use tokenizer::*;
 
 
-// TODO: Use a trait?
-enum ComponentValueIterator {
-    ParserIter(~Parser),
-    VectorIter(vec::ConsumeIterator<(ComponentValue, SourceLocation)>),
+/// Parse top-level of a CSS stylesheet.
+/// Return a Iterator<Result<Rule, SyntaxError>>
+#[inline]
+pub fn parse_stylesheet_rules<T: Iterator<Node>>(iter: T) -> StylesheetParser<T> {
+    StylesheetParser{ iter: iter }
 }
 
 
-impl ComponentValueIterator {
-    #[inline]
-    pub fn from_str(input: ~str) -> ComponentValueIterator {
-        ComponentValueIterator::from_parser(~Parser::from_str(input))
-    }
-
-    #[inline]
-    pub fn from_parser(parser: ~Parser) -> ComponentValueIterator {
-        ParserIter(parser)
-    }
-
-    #[inline]
-    pub fn from_vector(values: ~[(ComponentValue, SourceLocation)]) -> ComponentValueIterator {
-        VectorIter(values.consume_iter())
-    }
-
-    #[inline]
-    pub fn next_non_whitespace(&mut self) -> Option<(ComponentValue, SourceLocation)> {
-        for (component_value, location) in *self {
-            if component_value != WhiteSpace { return Some((component_value, location)) }
-        }
-        None
-    }
+/// Parse a non-top level list of rules eg. the content of an @media rule.
+/// Return a Iterator<Result<Rule, SyntaxError>>
+#[inline]
+pub fn parse_rule_list<T: Iterator<Node>>(iter: T) -> RuleListParser<T> {
+    RuleListParser{ iter: iter }
 }
 
 
-impl Iterator<(ComponentValue, SourceLocation)> for ComponentValueIterator {
-    fn next(&mut self) -> Option<(ComponentValue, SourceLocation)> {
-        match self {
-            &ParserIter(ref mut parser) => next_component_value(*parser),
-            &VectorIter(ref mut iter) => iter.next()
-        }
-    }
+/// Parse a list of declarations and at-rules,
+/// like @page in CSS 2.1, all declaration lists in level 3
+/// Return a Iterator<Result<DeclarationListItem, SyntaxError>>
+#[inline]
+pub fn parse_declaration_list<T: Iterator<Node>>(iter: T) -> DeclarationListParser<T> {
+    DeclarationListParser{ iter: iter }
 }
 
 
-// Work around "error: cannot borrow `*iter` as mutable more than once at a time"
-// when using a normal for loop.
-macro_rules! for_iter(
-    ($iter: expr, $pattern: pat, $loop_body: expr) => (
-        loop {
-            match $iter.next() { None => break, Some($pattern) => $loop_body }
-        }
-    );
-)
-
-
-/// Call repeatedly for the top-level of a CSS stylesheet
-pub fn parse_stylesheet_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ErrorReason>> {
-    for_iter!(iter, (component_value, location), {
-        match component_value {
-            WhiteSpace | CDO | CDC => (),
-            AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
-            _ => return Some(match parse_qualified_rule(iter, (component_value, location)) {
-                Ok(rule) => Ok(QualifiedRule(rule)),
-                Err(reason) => Err(reason),
-            }),
-        }
-    })
-    None
-}
-
-
-/// Call repeatedly for a non-top level list of rules eg. the content of an @media rule.
-/// Same as parse_stylesheet() except for the handling of top-level CDO and CDC
-pub fn parse_rule(iter: &mut ComponentValueIterator) -> Option<Result<Rule, ErrorReason>> {
-    for_iter!(iter, (component_value, location), {
-        match component_value {
-            WhiteSpace => (),
-            AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
-            _ => return Some(match parse_qualified_rule(iter, (component_value, location)) {
-                Ok(rule) => Ok(QualifiedRule(rule)),
-                Err(reason) => Err(reason),
-            }),
-        }
-    })
-    None
-}
-
-
+/// Parse a single rule.
 /// Used eg. for CSSRuleList.insertRule()
-pub fn parse_one_rule(iter: &mut ComponentValueIterator) -> Result<Rule, ErrorReason> {
-    match parse_rule(iter) {
-        None => Err(ErrEmptyInput),
-        Some(result) => if result.is_err() || iter.next_non_whitespace().is_none() { result }
-                        else { Err(ErrExtraInput) }
+pub fn parse_one_rule<T: Iterator<Node>>(iter: T) -> Result<Rule, SyntaxError> {
+    let mut parser = RuleListParser{ iter: iter };
+    match parser.next() {
+        None => error(START_LOCATION, ErrEmptyInput),
+        Some(result) => {
+            if result.is_err() { result }
+            else { match next_non_whitespace(&mut parser.iter) {
+                None => result,
+                Some((_component_value, location)) => error(location, ErrExtraInput),
+            }}
+        }
     }
 }
 
 
-/// Call repeatedly of a list of declarations.
-/// @page in CSS 2.1, all declaration lists in level 3
-pub fn parse_declaration_or_at_rule(iter: &mut ComponentValueIterator)
-                                      -> Option<Result<DeclarationListItem, ErrorReason>> {
-    for_iter!(iter, (component_value, location), {
-        match component_value {
-            WhiteSpace | Semicolon => (),
-            AtKeyword(name) => return Some(Ok(Decl_AtRule(parse_at_rule(iter, name, location)))),
-            _ => return Some(match parse_declaration(iter, (component_value, location)) {
-                Ok(declaration) => Ok(Declaration(declaration)),
-                Err(reason) => {
-                    // Find the end of the declaration
-                    for (v, _) in *iter { if v == Semicolon { break } }
-                    Err(reason)
-                }
-            }),
-        }
-    })
-    None
-}
-
-
+/// Parse a single declaration (not an at-rule)
 /// Used eg. in @supports
-pub fn parse_one_declaration(iter: &mut ComponentValueIterator) -> Result<Declaration, ErrorReason> {
-    match iter.next_non_whitespace() {
-        None => Err(ErrEmptyInput),
-        Some(item) => {
-            let result = parse_declaration(iter, item);
-            if result.is_err() || iter.next_non_whitespace().is_none() { result }
-            else { Err(ErrExtraInput) }
+pub fn parse_one_declaration<T: Iterator<Node>>(mut iter: T) -> Result<Declaration, SyntaxError> {
+    match next_non_whitespace(&mut iter) {
+        None => error(START_LOCATION, ErrEmptyInput),
+        Some((component_value, location)) => {
+            let result = parse_declaration(&mut iter, component_value, location);
+            if result.is_err() { result }
+            else { match next_non_whitespace(&mut iter) {
+                None => result,
+                Some((_component_value, location)) => error(location, ErrExtraInput),
+            }}
         }
     }
 }
 
 
+/// Parse a single component value.
 /// Used eg. in attr(foo, color)
-pub fn parse_one_component_value(iter: &mut ComponentValueIterator)
-                                 -> Result<(ComponentValue, SourceLocation), ErrorReason> {
-    match iter.next_non_whitespace() {
-        None => Err(ErrEmptyInput),
-        Some(item) => {
-            if iter.next_non_whitespace().is_none() { Ok(item) }
-            else { Err(ErrExtraInput) }
+pub fn parse_one_component_value<T: Iterator<Node>>(mut iter: T)
+                                -> Result<ComponentValue, SyntaxError> {
+    match next_non_whitespace(&mut iter) {
+        None => error(START_LOCATION, ErrEmptyInput),
+        Some((component_value, _location)) => {
+            match next_non_whitespace(&mut iter) {
+                None => Ok(component_value),
+                Some((_component_value, location)) => error(location, ErrExtraInput),
+            }
         }
     }
 }
@@ -166,62 +98,140 @@ pub fn parse_one_component_value(iter: &mut ComponentValueIterator)
 //  ***********  End of public API  ***********
 
 
-fn parse_at_rule(iter: &mut ComponentValueIterator, name: ~str, location: SourceLocation)
+struct StylesheetParser<T>{ iter: T }
+struct RuleListParser<T>{ iter: T }
+struct DeclarationListParser<T>{ iter: T }
+
+
+// Work around "error: cannot borrow `*iter` as mutable more than once at a time"
+// when using a normal for loop.
+macro_rules! for_iter(
+    ($iter: ident, $pattern: pat, $loop_body: expr) => (
+        loop {
+            match $iter.next() { None => break, Some($pattern) => $loop_body }
+        }
+    );
+)
+
+
+impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for StylesheetParser<T> {
+    fn next(&mut self) -> Option<Result<Rule, SyntaxError>> {
+        let iter = &mut self.iter;
+        for_iter!(iter, (component_value, location), {
+            match component_value {
+                WhiteSpace | CDO | CDC => (),
+                AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
+                _ => return Some(match parse_qualified_rule(iter, component_value, location) {
+                    Ok(rule) => Ok(QualifiedRule(rule)),
+                    Err(e) => Err(e),
+                }),
+            }
+        })
+        None
+    }
+}
+
+
+impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for RuleListParser<T> {
+    fn next(&mut self) -> Option<Result<Rule, SyntaxError>> {
+        let iter = &mut self.iter;
+        for_iter!(iter, (component_value, location), {
+            match component_value {
+                WhiteSpace => (),
+                AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
+                _ => return Some(match parse_qualified_rule(iter, component_value, location) {
+                    Ok(rule) => Ok(QualifiedRule(rule)),
+                    Err(e) => Err(e),
+                }),
+            }
+        })
+        None
+    }
+}
+
+
+impl<T: Iterator<Node>> Iterator<Result<DeclarationListItem, SyntaxError>>
+for DeclarationListParser<T> {
+    fn next(&mut self) -> Option<Result<DeclarationListItem, SyntaxError>> {
+        let iter = &mut self.iter;
+        for_iter!(iter, (component_value, location), {
+            match component_value {
+                WhiteSpace | Semicolon => (),
+                AtKeyword(name)
+                => return Some(Ok(Decl_AtRule(parse_at_rule(iter, name, location)))),
+                _ => return Some(match parse_declaration(iter, component_value, location) {
+                    Ok(declaration) => Ok(Declaration(declaration)),
+                    Err(e) => {
+                        // Find the end of the declaration
+                        for (v, _) in *iter { if v == Semicolon { break } }
+                        Err(e)
+                    }
+                }),
+            }
+        })
+        None
+    }
+}
+
+
+fn parse_at_rule<T: Iterator<Node>>(iter: &mut T, name: ~str, location: SourceLocation)
                  -> AtRule {
     let mut prelude = ~[];
     let mut block = None;
-    for_iter!(iter, (component_value, location), {
+    for_iter!(iter, (component_value, _location), {
         match component_value {
             CurlyBracketBlock(content) => { block = Some(content); break },
             Semicolon => break,
-            component_value => prelude.push((component_value, location)),
+            component_value => prelude.push(component_value),
         }
     })
     AtRule {location: location, name: name, prelude: prelude, block: block}
 }
 
 
-fn parse_qualified_rule(iter: &mut ComponentValueIterator, first: (ComponentValue, SourceLocation))
-                          -> Result<QualifiedRule, ErrorReason> {
+fn parse_qualified_rule<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
+                                           location: SourceLocation)
+                                           -> Result<QualifiedRule, SyntaxError> {
     match first {
-        (CurlyBracketBlock(content), location)
+        CurlyBracketBlock(content)
         => return Ok(QualifiedRule { location: location, prelude: ~[], block: content }),
         _ => (),
     }
     let mut prelude = ~[first];
-    for_iter!(iter, (component_value, location), {
+    for_iter!(iter, (component_value, _location), {
         match component_value {
             CurlyBracketBlock(content)
             => return Ok(QualifiedRule {location: location, prelude: prelude, block: content}),
-            component_value => prelude.push((component_value, location)),
+            component_value => prelude.push(component_value),
         }
     })
-    Err(ErrMissingQualifiedRuleBlock)
+    error(location, ErrMissingQualifiedRuleBlock)
 }
 
 
-fn parse_declaration(iter: &mut ComponentValueIterator, first: (ComponentValue, SourceLocation))
-                       -> Result<Declaration, ErrorReason> {
-    let (name, location) = match first {
-        (Ident(name), location) => (name, location),
-        _ => return Err(ErrInvalidDeclarationSyntax)
+fn parse_declaration<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
+                                        location: SourceLocation)
+                                        -> Result<Declaration, SyntaxError> {
+    let name = match first {
+        Ident(name) => name,
+        _ => return error(location, ErrInvalidDeclarationSyntax)
     };
-    match iter.next_non_whitespace() {
+    match next_non_whitespace(iter) {
         Some((Colon, _)) => (),
-        _ => return Err(ErrInvalidDeclarationSyntax),
+        _ => return error(location, ErrInvalidDeclarationSyntax),
     }
     let mut value = ~[];
     let mut important = false;
-    for_iter!(iter, (component_value, location), {
+    for_iter!(iter, (component_value, _location), {
         match component_value {
             Semicolon => break,
             Delim('!') => if parse_declaration_important(iter) {
                 important = true;
                 break
             } else {
-                return Err(ErrInvalidBangImportantSyntax)
+                return error(location, ErrInvalidBangImportantSyntax)
             },
-            component_value => value.push((component_value, location)),
+            component_value => value.push(component_value),
         }
     })
     Ok(Declaration{location: location, name: name, value: value, important: important})
@@ -229,15 +239,34 @@ fn parse_declaration(iter: &mut ComponentValueIterator, first: (ComponentValue, 
 
 
 #[inline]
-fn parse_declaration_important(iter: &mut ComponentValueIterator) -> bool {
-    let ident_value = match iter.next_non_whitespace() {
+fn parse_declaration_important<T: Iterator<Node>>(iter: &mut T) -> bool {
+    let ident_value = match next_non_whitespace(iter) {
         Some((Ident(value), _)) => value,
         _ => return false,
     };
     if !eq_ignore_ascii_case(ident_value, "important") { return false }
-    match iter.next_non_whitespace() {
+    match next_non_whitespace(iter) {
         Some((Semicolon, _)) => true,
         None => true,
         _ => false
     }
 }
+
+
+#[inline]
+fn next_non_whitespace<T: Iterator<Node>>(iter: &mut T) -> Option<Node> {
+    for (component_value, location) in *iter {
+        if component_value != WhiteSpace { return Some((component_value, location)) }
+    }
+    None
+}
+
+
+#[inline]
+fn error<T>(location: SourceLocation, reason: ErrorReason) -> Result<T, SyntaxError> {
+    Err(SyntaxError{location: location, reason: reason})
+}
+
+
+// When parsing one thing on an empty input
+static START_LOCATION: SourceLocation = SourceLocation{ line: 1, column: 1 };
