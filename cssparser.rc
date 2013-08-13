@@ -13,11 +13,11 @@ pub use parser::*;
 pub use color::*;
 pub use nth::*;
 
-mod ast;
-mod tokenizer;
-mod parser;
-mod color;
-mod nth;
+pub mod ast;
+pub mod tokenizer;
+pub mod parser;
+pub mod color;
+pub mod nth;
 
 #[cfg(test)]
 mod tests;
