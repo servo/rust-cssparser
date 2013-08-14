@@ -24,7 +24,7 @@ pub fn tokenize(input: &str) -> Tokenizer {
 
 impl Iterator<Node> for Tokenizer {
     #[inline]
-    pub fn next(&mut self) -> Option<Node> { next_component_value(self) }
+    fn next(&mut self) -> Option<Node> { next_component_value(self) }
 }
 
 
