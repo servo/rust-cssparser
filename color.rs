@@ -22,12 +22,14 @@ pub enum Color {
 
 
 // Return None on invalid/unsupported value (not a color)
-pub fn parse_color(component_value: &ComponentValue) -> Option<Color> {
-    match *component_value {
-        Hash(ref value) | IDHash(ref value) => parse_color_hash(*value),
-        Ident(ref value) => parse_color_keyword(*value),
-        Function(ref name, ref arguments) => parse_color_function(*name, *arguments),
-        _ => None
+impl Color {
+    pub fn parse(component_value: &ComponentValue) -> Option<Color> {
+        match *component_value {
+            Hash(ref value) | IDHash(ref value) => parse_color_hash(*value),
+            Ident(ref value) => parse_color_keyword(*value),
+            Function(ref name, ref arguments) => parse_color_function(*name, *arguments),
+            _ => None
+        }
     }
 }
 

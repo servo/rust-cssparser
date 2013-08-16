@@ -138,6 +138,7 @@ impl<'self> SkipWhitespaceIterable<'self> for &'self [ComponentValue] {
     }
 }
 
+#[deriving(Clone)]
 pub struct SkipWhitespaceIterator<'self> {
     iter_with_whitespace: vec::VecIterator<'self, ComponentValue>,
 }
