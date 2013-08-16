@@ -14,11 +14,11 @@ RUST_SRC=$(shell find $(VPATH)/. -type f -name '*.rs') $(COLOR_DATA_RS)
 all:    libcssparser.dummy
 
 libcssparser.dummy: cssparser.rc $(RUST_SRC)
-	$(RUSTC) $(RUSTFLAGS) $<
+	$(RUSTC) $(RUSTFLAGS) $< --out-dir .
 	touch $@
 
 cssparser-test: cssparser.rc $(RUST_SRC)
-	$(RUSTC) $(RUSTFLAGS) $< -o $@ --test
+	$(RUSTC) $(RUSTFLAGS) $< --out-dir . --test
 
 .PHONY: check
 check: cssparser-test
