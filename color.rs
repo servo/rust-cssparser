@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::libc::c_float;
-use std::ascii::to_ascii_lower;
+use std::ascii::StrAsciiExt;
 
 use ast::*;
 use self::color_data::{COLOR_KEYWORDS, COLOR_VALUES};
@@ -34,7 +34,7 @@ pub fn parse_color(component_value: &ComponentValue) -> Option<Color> {
 
 #[inline]
 fn parse_color_keyword(value: &str) -> Option<Color> {
-    let lower_value = to_ascii_lower(value);
+    let lower_value = value.to_ascii_lower();
     match COLOR_KEYWORDS.bsearch_elem(&lower_value.as_slice()) {
         Some(index) => Some(COLOR_VALUES[index]),
         None => if "currentcolor" == lower_value { Some(CurrentColor) }
@@ -82,7 +82,7 @@ fn parse_color_hash(value: &str) -> Option<Color> {
 #[inline]
 fn parse_color_function(name: &str, arguments: &[ComponentValue])
                         -> Option<Color> {
-    let lower_name = to_ascii_lower(name);
+    let lower_name = name.to_ascii_lower();
 
     let (is_rgb, has_alpha) =
         if "rgba" == lower_name { (true, true) }

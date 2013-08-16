@@ -15,7 +15,7 @@
 
 
 use std::iterator::Iterator;
-use std::ascii::eq_ignore_ascii_case;
+use std::ascii::StrAsciiExt;
 
 use ast::*;
 
@@ -244,7 +244,7 @@ fn parse_declaration_important<T: Iterator<Node>>(iter: &mut T) -> bool {
         Some((Ident(value), _)) => value,
         _ => return false,
     };
-    if !eq_ignore_ascii_case(ident_value, "important") { return false }
+    if !ident_value.eq_ignore_ascii_case("important") { return false }
     match next_non_whitespace(iter) {
         Some((Semicolon, _)) => true,
         None => true,
