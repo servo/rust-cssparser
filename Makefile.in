@@ -18,7 +18,7 @@ libcssparser.dummy: cssparser.rc $(RUST_SRC)
 	touch $@
 
 cssparser-test: cssparser.rc $(RUST_SRC)
-	$(RUSTC) $(RUSTFLAGS) $< --out-dir . --test
+	$(RUSTC) $(RUSTFLAGS) $< -o $@ --test
 
 .PHONY: check
 check: cssparser-test
