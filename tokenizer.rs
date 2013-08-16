@@ -5,7 +5,7 @@
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 
 use std::{str, u32, i64, f64};
-use std::ascii::eq_ignore_ascii_case;
+use std::ascii::StrAsciiExt;
 
 use ast::*;
 
@@ -361,7 +361,7 @@ fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
 fn consume_ident_like(tokenizer: &mut Tokenizer) -> ComponentValue {
     let value = consume_name(tokenizer);
     if !tokenizer.is_eof() && tokenizer.current_char() == '(' {
-        if eq_ignore_ascii_case(value, "url") { consume_url(tokenizer) }
+        if value.eq_ignore_ascii_case("url") { consume_url(tokenizer) }
         else { Function(value, consume_block(tokenizer, CloseParenthesis)) }
     } else {
         Ident(value)
