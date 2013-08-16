@@ -132,7 +132,7 @@ fn one_rule() {
 fn run_color_tests(json_data: &str, to_json: &fn(result: Option<Color>) -> json::Json) {
     do run_json_tests(json_data) |input| {
         match parse_one_component_value(tokenize(input)) {
-            Ok(component_value) => to_json(parse_color(&component_value)),
+            Ok(component_value) => to_json(Color::parse(&component_value)),
             Err(_reason) => json::Null,
         }
     }
