@@ -35,8 +35,8 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
     if !almost_equals(&results, &expected) {
         let temp = tempfile::mkdtemp(&os::tmpdir(), "rust-cssparser-tests").unwrap();
         let temp_ = temp.clone();
-        let results = json::to_pretty_str(&results) + "\n";
-        let expected = json::to_pretty_str(&expected) + "\n";
+        let results = results.to_pretty_str() + "\n";
+        let expected = expected.to_pretty_str() + "\n";
         do task::try {
             let result_path = temp.push("results.json");
             let expected_path = temp.push("expected.json");
