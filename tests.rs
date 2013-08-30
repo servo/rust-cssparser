@@ -156,7 +156,8 @@ fn color3_hsl() {
 fn color3_keywords() {
     do run_color_tests(include_str!("css-parsing-tests/color3_keywords.json")) |c| {
         match c {
-            Some(RGBA(r, g, b, a)) => (~[r * 255., g * 255., b * 255., a]).to_json(),
+            Some(RGBA(RGBA { red: r, green: g, blue: b, alpha: a }))
+            => (~[r * 255., g * 255., b * 255., a]).to_json(),
             Some(CurrentColor) => json::String(~"currentColor"),
             None => json::Null,
         }
@@ -226,7 +227,7 @@ impl ToJson for SyntaxError {
 impl ToJson for Color {
     fn to_json(&self) -> json::Json {
         match *self {
-            RGBA(r, g, b, a) => (~[r, g, b, a]).to_json(),
+            RGBA(RGBA { red: r, green: g, blue: b, alpha: a }) => (~[r, g, b, a]).to_json(),
             CurrentColor => json::String(~"currentColor"),
         }
     }

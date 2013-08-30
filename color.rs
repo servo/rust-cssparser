@@ -15,9 +15,17 @@ mod color_data;
 pub type ColorFloat = c_float;
 
 
+pub struct RGBA {
+    // All in 0..1
+    red: ColorFloat,
+    green: ColorFloat,
+    blue: ColorFloat,
+    alpha: ColorFloat,
+}
+
 pub enum Color {
     CurrentColor,
-    RGBA(ColorFloat, ColorFloat, ColorFloat, ColorFloat),  // 0..1
+    RGBA(RGBA),
 }
 
 
@@ -38,7 +46,7 @@ impl Color {
 fn parse_color_keyword(value: &str) -> Option<Color> {
     let lower_value = value.to_ascii_lower();
     match COLOR_KEYWORDS.bsearch_elem(&lower_value.as_slice()) {
-        Some(index) => Some(COLOR_VALUES[index]),
+        Some(index) => Some(RGBA(COLOR_VALUES[index])),
         None => if "currentcolor" == lower_value { Some(CurrentColor) }
                 else { None }
     }
@@ -60,8 +68,10 @@ fn parse_color_hash(value: &str) -> Option<Color> {
     )
     macro_rules! to_rgba(
         ($r: expr, $g: expr, $b: expr,) => {
-            Some(RGBA($r as ColorFloat / 255., $g as ColorFloat / 255.,
-                      $b as ColorFloat / 255., 1.))
+            Some(RGBA(RGBA { red: $r as ColorFloat / 255.,
+                             green: $g as ColorFloat / 255.,
+                             blue: $b as ColorFloat / 255.,
+                             alpha: 1. }))
         };
     )
 
@@ -170,5 +180,9 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
     } else {
         1.
     };
-    if iter.next().is_none() { Some(RGBA(red, green, blue, alpha)) } else { None }
+    if iter.next().is_none() {
+        Some(RGBA(RGBA { red: red, green: green, blue: blue, alpha: alpha }))
+    } else {
+        None
+    }
 }
