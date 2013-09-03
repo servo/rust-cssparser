@@ -15,6 +15,7 @@ mod color_data;
 pub type ColorFloat = c_float;
 
 
+#[deriving(Clone, Eq)]
 pub struct RGBA {
     // All in 0..1
     red: ColorFloat,
@@ -23,6 +24,7 @@ pub struct RGBA {
     alpha: ColorFloat,
 }
 
+#[deriving(Clone, Eq)]
 pub enum Color {
     CurrentColor,
     RGBA(RGBA),
