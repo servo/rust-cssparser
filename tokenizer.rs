@@ -544,13 +544,13 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> ComponentValue {
         question_marks += 1;
         tokenizer.position += 1
     }
-    let start: char;
-    let end: char;
+    let start;
+    let end;
     if question_marks > 0 {
-        start = char_from_hex(hex + "0".repeat(question_marks));
-        end = char_from_hex(hex + "F".repeat(question_marks));
+        start = u32::from_str_radix(hex + "0".repeat(question_marks), 16).unwrap();
+        end = u32::from_str_radix(hex + "F".repeat(question_marks), 16).unwrap();
     } else {
-        start = char_from_hex(hex);
+        start = u32::from_str_radix(hex, 16).unwrap();
         hex = ~"";
         if !tokenizer.is_eof() && tokenizer.current_char() == '-' {
             tokenizer.position += 1;
@@ -563,19 +563,10 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> ComponentValue {
                 }
             }
         }
-        end = if hex.len() > 0 { char_from_hex(hex) } else { start }
+        end = if hex.len() > 0 { u32::from_str_radix(hex, 16).unwrap() } else { start }
     }
-    if start > MAX_UNICODE || end < start {
-        EmptyUnicodeRange
-    } else {
-        let end = if end <= MAX_UNICODE { end } else { MAX_UNICODE };
-//        UnicodeRange {start: start, end: end}
-        UnicodeRange(start, end)
-    }
+    UnicodeRange {start: start, end: end}
 }
-
-
-static MAX_UNICODE: char = '\U0010FFFF';
 
 
 // Assumes that the U+005C REVERSE SOLIDUS (\) has already been consumed
@@ -602,16 +593,11 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
                     _ => ()
                 }
             }
-            let c = char_from_hex(hex);
+            let c = u32::from_str_radix(hex, 16).unwrap() as char as char;
+            static MAX_UNICODE: char = '\U0010FFFF';
             if '\x00' < c && c <= MAX_UNICODE { c }
             else { '\uFFFD' }  // Replacement character
         },
         c => c
     }
-}
-
-
-#[inline]
-fn char_from_hex(hex: &str) -> char {
-    u32::from_str_radix(hex, 16).unwrap() as char
 }
