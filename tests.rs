@@ -325,9 +325,8 @@ impl ToJson for ComponentValue {
             Dimension(ref value, ref unit)
             => JList(~[JString(~"dimension")] + numeric(value) + ~[unit.to_json()]),
 
-            // TODO:
-            UnicodeRange(_start, _end) => fail!(),
-            EmptyUnicodeRange => fail!(),
+            UnicodeRange { start: s, end: e }
+            => JList(~[JString(~"unicode-range"), s.to_json(), e.to_json()]),
 
             WhiteSpace => JString(~" "),
             Colon => JString(~":"),
