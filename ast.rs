@@ -37,8 +37,7 @@ pub enum ComponentValue {
     Number(NumericValue),
     Percentage(NumericValue),
     Dimension(NumericValue, ~str),
-    UnicodeRange(char, char), // UnicodeRange {start: char, end: char},
-    EmptyUnicodeRange,
+    UnicodeRange { start: u32, end: u32 },
     WhiteSpace,
     Colon,  // :
     Semicolon,  // ;
