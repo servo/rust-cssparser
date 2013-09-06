@@ -4,7 +4,7 @@
 
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 
-use std::{str, u32, i64, f64};
+use std::{char, str, u32, i64, f64};
 use std::ascii::StrAsciiExt;
 
 use ast::*;
@@ -593,10 +593,14 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
                     _ => ()
                 }
             }
-            let c = u32::from_str_radix(hex, 16).unwrap() as char as char;
-            static MAX_UNICODE: char = '\U0010FFFF';
-            if '\x00' < c && c <= MAX_UNICODE { c }
-            else { '\uFFFD' }  // Replacement character
+            static REPLACEMENT_CHAR: char = '\uFFFD';
+            let c = u32::from_str_radix(hex, 16).unwrap();
+            if c != 0 {
+                let c = char::from_u32(c);
+                c.unwrap_or_default(REPLACEMENT_CHAR)
+            } else {
+                REPLACEMENT_CHAR
+            }
         },
         c => c
     }
