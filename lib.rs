@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #[link(name = "cssparser", vers = "0.1")];
-#[crate_type = "lib"];
 
 extern mod extra;
 
