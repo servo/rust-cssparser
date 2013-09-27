@@ -2,7 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::i32;
 use std::ascii::StrAsciiExt;
 
 use ast::*;
@@ -108,7 +107,7 @@ fn parse_n_dash_digits(string: &str) -> Option<i32> {
     && string.starts_with("n-")
     && string.slice_from(2).iter().all(|c| match c { '0'..'9' => true, _ => false })
     {
-        let result = i32::from_str(string.slice_from(1));  // Include the minus sign
+        let result = from_str(string.slice_from(1));  // Include the minus sign
         assert!(result.is_some());
         result
     }

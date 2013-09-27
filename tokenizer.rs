@@ -4,7 +4,7 @@
 
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 
-use std::{char, str, u32, i64, f64};
+use std::{char, str, num};
 use std::ascii::StrAsciiExt;
 
 use ast::*;
@@ -440,12 +440,12 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> ComponentValue {
         int_value: if is_integer { Some(
             // Remove any + sign as int::from_str() does not parse them.
             if representation[0] != '+' as u8 {
-                i64::from_str(representation)
+                from_str(representation)
             } else {
-                i64::from_str(representation.slice_from(1))
+                from_str(representation.slice_from(1))
             }.unwrap()
         )} else { None },
-        value: f64::from_str(representation).unwrap(),
+        value: from_str(representation).unwrap(),
         representation: representation,
     };
     if !tokenizer.is_eof() && tokenizer.current_char() == '%' {
@@ -547,10 +547,10 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> ComponentValue {
     let start;
     let end;
     if question_marks > 0 {
-        start = u32::from_str_radix(hex + "0".repeat(question_marks), 16).unwrap();
-        end = u32::from_str_radix(hex + "F".repeat(question_marks), 16).unwrap();
+        start = num::from_str_radix(hex + "0".repeat(question_marks), 16).unwrap();
+        end = num::from_str_radix(hex + "F".repeat(question_marks), 16).unwrap();
     } else {
-        start = u32::from_str_radix(hex, 16).unwrap();
+        start = num::from_str_radix(hex, 16).unwrap();
         hex = ~"";
         if !tokenizer.is_eof() && tokenizer.current_char() == '-' {
             tokenizer.position += 1;
@@ -563,7 +563,7 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> ComponentValue {
                 }
             }
         }
-        end = if hex.len() > 0 { u32::from_str_radix(hex, 16).unwrap() } else { start }
+        end = if hex.len() > 0 { num::from_str_radix(hex, 16).unwrap() } else { start }
     }
     UnicodeRange {start: start, end: end}
 }
@@ -594,10 +594,10 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
                 }
             }
             static REPLACEMENT_CHAR: char = '\uFFFD';
-            let c = u32::from_str_radix(hex, 16).unwrap();
+            let c: u32 = num::from_str_radix(hex, 16).unwrap();
             if c != 0 {
                 let c = char::from_u32(c);
-                c.unwrap_or_default(REPLACEMENT_CHAR)
+                c.unwrap_or(REPLACEMENT_CHAR)
             } else {
                 REPLACEMENT_CHAR
             }
