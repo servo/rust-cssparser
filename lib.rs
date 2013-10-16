@@ -4,6 +4,8 @@
 
 #[link(name = "cssparser", vers = "0.1")];
 
+#[feature(globs, macro_rules, struct_variant)];
+
 extern mod extra;
 
 pub use ast::*;
