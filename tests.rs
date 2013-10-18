@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::{io, os, str, run, task};
+use std::{io, str, run, task};
 use extra::{tempfile, json};
 use extra::json::ToJson;
 
@@ -33,19 +33,19 @@ fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
 
 fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
     if !almost_equals(&results, &expected) {
-        let temp = tempfile::mkdtemp(&os::tmpdir(), "rust-cssparser-tests").unwrap();
-        let temp_ = temp.clone();
+        let temp = tempfile::TempDir::new("rust-cssparser-tests").unwrap();
         let results = results.to_pretty_str() + "\n";
         let expected = expected.to_pretty_str() + "\n";
         do task::try {
-            let result_path = temp.push("results.json");
-            let expected_path = temp.push("expected.json");
+            let mut result_path = temp.path().clone();
+            result_path.push("results.json");
+            let mut expected_path = temp.path().clone();
+            expected_path.push("expected.json");
             write_whole_file(&result_path, results);
             write_whole_file(&expected_path, expected);
-            run::process_status("colordiff", [~"-u1000", result_path.to_str(),
-                                              expected_path.to_str()]);
+            run::process_status("colordiff", [~"-u1000", result_path.display().to_str(),
+                                              expected_path.display().to_str()]);
         };
-        os::remove_dir_recursive(&temp_);
 
         fail!(message)
     }
@@ -268,7 +268,7 @@ impl ToJson for AtRule {
         match *self {
             AtRule{name: ref name, prelude: ref prelude, block: ref block, _}
             => json::List(~[json::String(~"at-rule"), name.to_json(),
-                            prelude.to_json(), block.map(list_to_json).to_json()])
+                            prelude.to_json(), block.as_ref().map(list_to_json).to_json()])
         }
     }
 }
