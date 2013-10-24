@@ -2,7 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::libc::c_float;
 use std::ascii::StrAsciiExt;
 
 use ast::*;
@@ -11,17 +10,14 @@ use self::color_data::{COLOR_KEYWORDS, COLOR_VALUES};
 mod color_data;
 
 
-// Try to match rust-azure’s AzFloat
-pub type ColorFloat = c_float;
-
-
 #[deriving(Clone, Eq)]
 pub struct RGBA {
     // All in 0..1
-    red: ColorFloat,
-    green: ColorFloat,
-    blue: ColorFloat,
-    alpha: ColorFloat,
+    // Use f32 to try and match rust-azure’s AzFloat
+    red: f32,
+    green: f32,
+    blue: f32,
+    alpha: f32,
 }
 
 #[deriving(Clone, Eq)]
@@ -70,9 +66,9 @@ fn parse_color_hash(value: &str) -> Option<Color> {
     )
     macro_rules! to_rgba(
         ($r: expr, $g: expr, $b: expr,) => {
-            Some(RGBA(RGBA { red: $r as ColorFloat / 255.,
-                             green: $g as ColorFloat / 255.,
-                             blue: $b as ColorFloat / 255.,
+            Some(RGBA(RGBA { red: $r as f32 / 255.,
+                             green: $g as f32 / 255.,
+                             blue: $b as f32 / 255.,
                              alpha: 1. }))
         };
     )
@@ -128,25 +124,25 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
         });
     )
 
-    let red: ColorFloat;
-    let green: ColorFloat;
-    let blue: ColorFloat;
+    let red: f32;
+    let green: f32;
+    let blue: f32;
     if is_rgb {
         // Either integers or percentages, but all the same type.
         match iter.next() {
             Some(&Number(ref v)) if v.int_value.is_some() => {
-                red = (v.value as ColorFloat / 255.) as ColorFloat;
+                red = (v.value / 255.) as f32;
                 expect_comma!();
-                green = (expect_integer!() / 255.) as ColorFloat;
+                green = (expect_integer!() / 255.) as f32;
                 expect_comma!();
-                blue = (expect_integer!() / 255.) as ColorFloat;
+                blue = (expect_integer!() / 255.) as f32;
             }
             Some(&Percentage(ref v)) => {
-                red = (v.value as ColorFloat / 100.) as ColorFloat;
+                red = (v.value / 100.) as f32;
                 expect_comma!();
-                green = (expect_percentage!() / 100.) as ColorFloat;
+                green = (expect_percentage!() / 100.) as f32;
                 expect_comma!();
-                blue = (expect_percentage!() / 100.) as ColorFloat;
+                blue = (expect_percentage!() / 100.) as f32;
             }
             _ => return None
         };
@@ -171,14 +167,14 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
         let m2 = if lightness <= 0.5 { lightness * (saturation + 1.) }
                  else { lightness + saturation - lightness * saturation };
         let m1 = lightness * 2. - m2;
-        red = hue_to_rgb(m1, m2, hue + 1. / 3.) as ColorFloat;
-        green = hue_to_rgb(m1, m2, hue) as ColorFloat;
-        blue = hue_to_rgb(m1, m2, hue - 1. / 3.) as ColorFloat;
+        red = hue_to_rgb(m1, m2, hue + 1. / 3.) as f32;
+        green = hue_to_rgb(m1, m2, hue) as f32;
+        blue = hue_to_rgb(m1, m2, hue - 1. / 3.) as f32;
     }
 
     let alpha = if has_alpha {
         expect_comma!();
-        (expect_number!()).max(&0.).min(&1.) as ColorFloat
+        (expect_number!()).max(&0.).min(&1.) as f32
     } else {
         1.
     };
