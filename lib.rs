@@ -4,7 +4,7 @@
 
 #[link(name = "cssparser", vers = "0.1")];
 
-#[feature(globs, macro_rules, struct_variant)];
+#[feature(globs, macro_rules)];
 
 extern mod extra;
 
