@@ -49,7 +49,7 @@ Parsing CSS involves a series of steps:
   It does however provide some helper functions to parse [CSS colors](color.rs)
   and [An+B](nth.rs) (the argument to `:nth-child()` and related selectors.
 
-  See [Servo’s `style` module](https://github.com/mozilla/servo/tree/master/src/components/script/style)
+  See [Servo’s `style` crate](https://github.com/mozilla/servo/tree/master/src/components/style)
   for an example of a parser based on rust-cssparser.
 
 
