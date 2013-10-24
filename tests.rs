@@ -9,6 +9,7 @@ use extra::{tempfile, json};
 use extra::json::ToJson;
 
 use super::*;
+use ast::*;
 
 
 fn write_whole_file(path: &Path, data: &str) {
