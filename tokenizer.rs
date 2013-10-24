@@ -565,7 +565,7 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> ComponentValue {
         }
         end = if hex.len() > 0 { num::from_str_radix(hex, 16).unwrap() } else { start }
     }
-    UnicodeRange {start: start, end: end}
+    UnicodeRange(start, end)
 }
 
 

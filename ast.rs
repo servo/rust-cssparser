@@ -36,7 +36,7 @@ pub enum ComponentValue {
     Number(NumericValue),
     Percentage(NumericValue),
     Dimension(NumericValue, ~str),
-    UnicodeRange { start: u32, end: u32 },
+    UnicodeRange(u32, u32),  // (start, end) of range
     WhiteSpace,
     Colon,  // :
     Semicolon,  // ;
@@ -121,7 +121,7 @@ pub enum ErrorReason {
 
 impl ToStr for SyntaxError {
     fn to_str(&self) -> ~str {
-        fmt!("%u:%u %?", self.location.line, self.location.column, self.reason)
+        format!("{}:{} {:?}", self.location.line, self.location.column, self.reason)
     }
 }
 
