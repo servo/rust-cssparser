@@ -121,7 +121,7 @@ pub enum ErrorReason {
 
 impl ToStr for SyntaxError {
     fn to_str(&self) -> ~str {
-        fmt!("%u:%u %?", self.location.line, self.location.column, self.reason)
+        format!("{:u}:{:u} {:?}", self.location.line, self.location.column, self.reason)
     }
 }
 
