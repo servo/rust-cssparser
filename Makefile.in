@@ -22,7 +22,7 @@ cssparser-test: lib.rs $(RUST_SRC)
 
 .PHONY: check
 check: cssparser-test
-	./cssparser-test
+	./cssparser-test $(TEST)
 
 .PHONY: check-debug
 check-debug: cssparser-tests
