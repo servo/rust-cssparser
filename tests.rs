@@ -2,7 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::{io, str, run, task};
+use std::{str, run, task};
+use std::rt::io;
+use std::rt::io::Writer;
 use extra::{tempfile, json};
 use extra::json::ToJson;
 
@@ -10,9 +12,9 @@ use super::*;
 
 
 fn write_whole_file(path: &Path, data: &str) {
-    match io::file_writer(path, [io::Create]) {
-        Ok(writer) => writer.write_str(data),
-        Err(message) => fail!(message),
+    match io::file::open(path, io::Create, io::Write) {
+        Some(mut writer) => writer.write(data.as_bytes()),
+        None => fail!("could not open file"),
     }
 }
 
