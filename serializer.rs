@@ -165,39 +165,41 @@ impl<'self, I: Iterator<&'self ComponentValue>> ToCss for I {
         )
         loop { match self.next() { None => break, Some(component_value) => {
             let (a, b) = (previous, component_value);
-            if (
-                matches!(*a, Hash(*) | IDHash(*) | AtKeyword(*)) &&
-                matches!(*b, Number(*) | Percentage(*) | Ident(*) | Dimension(*) |
-                            UnicodeRange(*) | URL(*) | Function(*))
-            ) || (
-                matches!(*a, Number(*) | Ident(*) | Dimension(*)) &&
-                matches!(*b, Number(*) | Ident(*) | Dimension(*))
-            ) || (
-                matches!(*a, Number(*) | Ident(*) | Dimension(*)) &&
-                matches!(*b, Percentage(*) | UnicodeRange(*) | URL(*) | Function(*))
-            ) || (
-                matches!(*a, Ident(*)) &&
-                matches!(*b, ParenthesisBlock(*))
-            ) || (
-                matches!(*a, Delim('#') | Delim('@')) &&
-                !matches!(*b, WhiteSpace)
-            ) || (
-                matches!(*a, Delim('-') | Delim('+') | Delim('.') | Delim('<') |
-                             Delim('>') | Delim('!')) &&
-                !matches!(*b, WhiteSpace)
-            ) || (
-                !matches!(*a, WhiteSpace) &&
-                matches!(*b, Delim('-') | Delim('+') | Delim('.') | Delim('<') |
-                             Delim('>') | Delim('!'))
-            ) || (
-                matches!(*a, Delim('/')) &&
-                matches!(*b, Delim('*'))
-            ) || (
-                matches!(*a, Delim('*')) &&
-                matches!(*b, Delim('/'))
-            ) {
-                css.push_str("/**/")
-            }
+// FIXME: this is incorrect.
+// See https://github.com/mozilla-servo/rust-cssparser/issues/24
+//            if (
+//                matches!(*a, Hash(*) | IDHash(*) | AtKeyword(*)) &&
+//                matches!(*b, Number(*) | Percentage(*) | Ident(*) | Dimension(*) |
+//                            UnicodeRange(*) | URL(*) | Function(*))
+//            ) || (
+//                matches!(*a, Number(*) | Ident(*) | Dimension(*)) &&
+//                matches!(*b, Number(*) | Ident(*) | Dimension(*))
+//            ) || (
+//                matches!(*a, Number(*) | Ident(*) | Dimension(*)) &&
+//                matches!(*b, Percentage(*) | UnicodeRange(*) | URL(*) | Function(*))
+//            ) || (
+//                matches!(*a, Ident(*)) &&
+//                matches!(*b, ParenthesisBlock(*))
+//            ) || (
+//                matches!(*a, Delim('#') | Delim('@')) &&
+//                !matches!(*b, WhiteSpace)
+//            ) || (
+//                matches!(*a, Delim('-') | Delim('+') | Delim('.') | Delim('<') |
+//                             Delim('>') | Delim('!')) &&
+//                !matches!(*b, WhiteSpace)
+//            ) || (
+//                !matches!(*a, WhiteSpace) &&
+//                matches!(*b, Delim('-') | Delim('+') | Delim('.') | Delim('<') |
+//                             Delim('>') | Delim('!'))
+//            ) || (
+//                matches!(*a, Delim('/')) &&
+//                matches!(*b, Delim('*'))
+//            ) || (
+//                matches!(*a, Delim('*')) &&
+//                matches!(*b, Delim('/'))
+//            ) {
+//                css.push_str("/**/")
+//            }
             component_value.to_css_push(css);
             previous = component_value;
         }}}
