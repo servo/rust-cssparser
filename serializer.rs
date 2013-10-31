@@ -164,7 +164,7 @@ impl<'self, I: Iterator<&'self ComponentValue>> ToCss for I {
             );
         )
         loop { match self.next() { None => break, Some(component_value) => {
-            let (a, b) = (previous, component_value);
+            let (_a, _b) = (previous, component_value);
 // FIXME: this is incorrect.
 // See https://github.com/mozilla-servo/rust-cssparser/issues/24
 //            if (
