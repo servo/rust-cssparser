@@ -100,27 +100,20 @@ pub fn serialize_identifier(value: &str, css: &mut ~str) {
     let mut c = iter.next().unwrap();
     if c == '-' {
         c = match iter.next() {
-            None => {
-                css.push_str("\\-");
-                return
-            }
-            Some(c) => {
-                css.push_char('-');
-                c
-            },
+            None => { css.push_str("\\-"); return },
+            Some(c) => { css.push_char('-'); c },
         }
     };
-    match c {
-        'A'..'Z' | 'a'..'z' | '_' => css.push_char(c),
-        _ if c > '\x7F' => css.push_char(c),
-        '\n' => css.push_str("\\A "),
-        '\r' => css.push_str("\\D "),
-        '\x0C' => css.push_str("\\C "),
-        '0'..'9' => css.push_str(format!("\\\\3{} ", c)),
-        _ => { css.push_char('\\'); css.push_char(c) },
-    }
+    serialize_char(c, css, /* is_start = */ true);
     for c in iter {
+        serialize_char(c, css, /* is_start = */ false);
+    }
+
+    #[inline]
+    fn serialize_char(c: char, css: &mut ~str, is_start: bool) {
         match c {
+            '0'..'9' if is_start => css.push_str(format!("\\\\3{} ", c)),
+            '-' if is_start => css.push_str("\\-"),
             '0'..'9' | 'A'..'Z' | 'a'..'z' | '_' | '-' => css.push_char(c),
             _ if c > '\x7F' => css.push_char(c),
             '\n' => css.push_str("\\A "),
