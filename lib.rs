@@ -13,12 +13,14 @@ pub use tokenizer::*;
 pub use parser::*;
 pub use color::*;
 pub use nth::*;
+pub use serializer::{ToCss, serialize_identifier, serialize_string};
 
 pub mod ast;
 pub mod tokenizer;
 pub mod parser;
 pub mod color;
 pub mod nth;
+pub mod serializer;
 
 #[cfg(test)]
 mod tests;

@@ -175,6 +175,18 @@ fn nth() {
 }
 
 
+// FIXME: serializer tests disabled for now
+// https://github.com/mozilla-servo/rust-cssparser/issues/24
+//#[test]
+fn serializer() {
+    do run_json_tests(include_str!("css-parsing-tests/component_value_list.json")) |input| {
+        let component_values = tokenize(input).map(|(c, _)| c).to_owned_vec();
+        let serialized = component_values.iter().to_css();
+        tokenize(serialized).map(|(c, _)| c).to_owned_vec()
+    }
+}
+
+
 impl ToJson for Result<Rule, SyntaxError> {
     fn to_json(&self) -> json::Json {
         match *self {
