@@ -8,19 +8,19 @@
 
 extern mod extra;
 
-pub use ast::*;
-pub use tokenizer::*;
-pub use parser::*;
-pub use color::*;
-pub use nth::*;
+pub use tokenizer::tokenize;
+pub use parser::{parse_stylesheet_rules, parse_rule_list, parse_declaration_list,
+                 parse_one_rule, parse_one_declaration, parse_one_component_value};
+pub use color::{RGBA, Color, CurrentColor};
+pub use nth::parse_nth;
 pub use serializer::{ToCss, serialize_identifier, serialize_string};
 
 pub mod ast;
-pub mod tokenizer;
-pub mod parser;
-pub mod color;
-pub mod nth;
-pub mod serializer;
+mod tokenizer;
+mod parser;
+mod color;
+mod nth;
+mod serializer;
 
 #[cfg(test)]
 mod tests;
