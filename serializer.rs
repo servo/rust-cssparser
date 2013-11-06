@@ -20,7 +20,13 @@ impl ast::ComponentValue {
                 css.push_char('@');
                 serialize_identifier(value.as_slice(), css);
             },
-            Hash(ref value) | IDHash(ref value) => {
+            Hash(ref value) => {
+                css.push_char('#');
+                for c in value.iter() {
+                    serialize_char(c, css, /* is_identifier_start = */ false);
+                }
+            },
+            IDHash(ref value) => {
                 css.push_char('#');
                 serialize_identifier(value.as_slice(), css);
             }
@@ -39,7 +45,16 @@ impl ast::ComponentValue {
             },
             Dimension(ref value, ref unit) => {
                 css.push_str(value.representation);
-                serialize_identifier(unit.as_slice(), css);
+                // Disambiguate with scientific notation.
+                let unit = unit.as_slice();
+                if unit == "e" || unit == "E" || unit.starts_with("e-") || unit.starts_with("E-") {
+                    css.push_str("\\65 ");
+                    for c in unit.slice_from(1).iter() {
+                        serialize_char(c, css, /* is_identifier_start = */ false);
+                    }
+                } else {
+                    serialize_identifier(unit, css)
+                }
             },
 
             UnicodeRange(start, end) => {
@@ -104,32 +119,34 @@ pub fn serialize_identifier(value: &str, css: &mut ~str) {
             Some(c) => { css.push_char('-'); c },
         }
     };
-    serialize_char(c, css, /* is_start = */ true);
+    serialize_char(c, css, /* is_identifier_start = */ true);
     for c in iter {
-        serialize_char(c, css, /* is_start = */ false);
-    }
-
-    #[inline]
-    fn serialize_char(c: char, css: &mut ~str, is_start: bool) {
-        match c {
-            '0'..'9' if is_start => css.push_str(format!("\\\\3{} ", c)),
-            '-' if is_start => css.push_str("\\-"),
-            '0'..'9' | 'A'..'Z' | 'a'..'z' | '_' | '-' => css.push_char(c),
-            _ if c > '\x7F' => css.push_char(c),
-            '\n' => css.push_str("\\A "),
-            '\r' => css.push_str("\\D "),
-            '\x0C' => css.push_str("\\C "),
-            _ => { css.push_char('\\'); css.push_char(c) },
-        }
+        serialize_char(c, css, /* is_identifier_start = */ false);
     }
 }
+
+
+#[inline]
+fn serialize_char(c: char, css: &mut ~str, is_identifier_start: bool) {
+    match c {
+        '0'..'9' if is_identifier_start => css.push_str(format!("\\\\3{} ", c)),
+        '-' if is_identifier_start => css.push_str("\\-"),
+        '0'..'9' | 'A'..'Z' | 'a'..'z' | '_' | '-' => css.push_char(c),
+        _ if c > '\x7F' => css.push_char(c),
+        '\n' => css.push_str("\\A "),
+        '\r' => css.push_str("\\D "),
+        '\x0C' => css.push_str("\\C "),
+        _ => { css.push_char('\\'); css.push_char(c) },
+    }
+}
+
 
 pub fn serialize_string(value: &str, css: &mut ~str) {
     css.push_char('"');
     // TODO: avoid decoding/re-encoding UTF-8?
     for c in value.iter() {
         match c {
-            '"' => css.push_str("\""),
+            '"' => css.push_str("\\\""),
             '\\' => css.push_str("\\\\"),
             '\n' => css.push_str("\\A "),
             '\r' => css.push_str("\\D "),
@@ -163,44 +180,52 @@ impl<'self, I: Iterator<&'self ComponentValue>> ToCss for I {
                 match $value { $($pattern)|+ => true, _ => false }
             );
         )
+        // This does not borrow-check: for component_value in self {
         loop { match self.next() { None => break, Some(component_value) => {
-            let (_a, _b) = (previous, component_value);
-// FIXME: this is incorrect.
-// See https://github.com/mozilla-servo/rust-cssparser/issues/24
-//            if (
-//                matches!(*a, Hash(*) | IDHash(*) | AtKeyword(*)) &&
-//                matches!(*b, Number(*) | Percentage(*) | Ident(*) | Dimension(*) |
-//                            UnicodeRange(*) | URL(*) | Function(*))
-//            ) || (
-//                matches!(*a, Number(*) | Ident(*) | Dimension(*)) &&
-//                matches!(*b, Number(*) | Ident(*) | Dimension(*))
-//            ) || (
-//                matches!(*a, Number(*) | Ident(*) | Dimension(*)) &&
-//                matches!(*b, Percentage(*) | UnicodeRange(*) | URL(*) | Function(*))
-//            ) || (
-//                matches!(*a, Ident(*)) &&
-//                matches!(*b, ParenthesisBlock(*))
-//            ) || (
-//                matches!(*a, Delim('#') | Delim('@')) &&
-//                !matches!(*b, WhiteSpace)
-//            ) || (
-//                matches!(*a, Delim('-') | Delim('+') | Delim('.') | Delim('<') |
-//                             Delim('>') | Delim('!')) &&
-//                !matches!(*b, WhiteSpace)
-//            ) || (
-//                !matches!(*a, WhiteSpace) &&
-//                matches!(*b, Delim('-') | Delim('+') | Delim('.') | Delim('<') |
-//                             Delim('>') | Delim('!'))
-//            ) || (
-//                matches!(*a, Delim('/')) &&
-//                matches!(*b, Delim('*'))
-//            ) || (
-//                matches!(*a, Delim('*')) &&
-//                matches!(*b, Delim('/'))
-//            ) {
-//                css.push_str("/**/")
-//            }
-            component_value.to_css_push(css);
+            let (a, b) = (previous, component_value);
+            if (
+                matches!(*a, Ident(*) | AtKeyword(*) | Hash(*) | IDHash(*) |
+                             Dimension(*) | Delim('#') | Delim('-') | Number(*)) &&
+                matches!(*b, Ident(*) | Function(*) | URL(*) | BadURL(*) |
+                             Number(*) | Percentage(*) | Dimension(*) | UnicodeRange(*))
+            ) || (
+                matches!(*a, Ident(*)) &&
+                matches!(*b, ParenthesisBlock(*))
+            ) || (
+                matches!(*a, Ident(*) | AtKeyword(*) | Hash(*) | IDHash(*) | Dimension(*)) &&
+                matches!(*b, Delim('-') | CDC)
+            ) || (
+                matches!(*a, Delim('#') | Delim('-') | Number(*) | Delim('@')) &&
+                matches!(*b, Ident(*) | Function(*) | URL(*) | BadURL(*))
+            ) || (
+                matches!(*a, Delim('@')) &&
+                matches!(*b, Ident(*) | Function(*) | URL(*) | BadURL(*) |
+                             UnicodeRange(*) | Delim('-'))
+            ) || (
+                matches!(*a, UnicodeRange(*) | Delim('.') | Delim('+')) &&
+                matches!(*b, Number(*) | Percentage(*) | Dimension(*))
+            ) || (
+                matches!(*a, UnicodeRange(*)) &&
+                matches!(*b, Ident(*) | Function(*) | Delim('?'))
+            ) || (match (a, b) { (&Delim(a), &Delim(b)) => matches!((a, b),
+                ('#', '-') |
+                ('$', '=') |
+                ('*', '=') |
+                ('^', '=') |
+                ('~', '=') |
+                ('|', '=') |
+                ('|', '|') |
+                ('/', '*')
+            ), _ => false }) {
+                css.push_str("/**/")
+            }
+            // Skip whitespace when '\n' was previously written at the previous iteration.
+            if !matches!((previous, component_value), (&Delim('\\'), &WhiteSpace)) {
+                component_value.to_css_push(css);
+            }
+            if component_value == &Delim('\\') {
+                css.push_char('\n');
+            }
             previous = component_value;
         }}}
     }
