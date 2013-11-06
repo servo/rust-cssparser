@@ -461,7 +461,11 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
     tokenizer.position += 1;  // Skip the ( of url(
     while !tokenizer.is_eof() {
         match tokenizer.current_char() {
-            '\t' | '\n' | ' ' => tokenizer.position += 1,
+            ' ' | '\t' => tokenizer.position += 1,
+            '\n' => {
+                tokenizer.position += 1;
+                tokenizer.new_line();
+            },
             '"' => return consume_quoted_url(tokenizer, false),
             '\'' => return consume_quoted_url(tokenizer, true),
             ')' => { tokenizer.position += 1; break },
