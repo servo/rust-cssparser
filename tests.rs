@@ -7,6 +7,7 @@ use std::rt::io;
 use std::rt::io::Writer;
 use extra::{tempfile, json};
 use extra::json::ToJson;
+use extra::test;
 
 use super::*;
 use ast::*;
@@ -165,6 +166,27 @@ fn color3_keywords() {
             None => json::Null,
         }
     }
+}
+
+
+#[bench]
+fn bench_color_lookup_red(b: &mut test::BenchHarness) {
+    let ident = parse_one_component_value(tokenize("red")).unwrap();
+    b.iter(|| assert!(Color::parse(&ident).is_some()));
+}
+
+
+#[bench]
+fn bench_color_lookup_lightgoldenrodyellow(b: &mut test::BenchHarness) {
+    let ident = parse_one_component_value(tokenize("lightgoldenrodyellow")).unwrap();
+    b.iter(|| assert!(Color::parse(&ident).is_some()));
+}
+
+
+#[bench]
+fn bench_color_lookup_fail(b: &mut test::BenchHarness) {
+    let ident = parse_one_component_value(tokenize("lightgoldenrodyellowbazinga")).unwrap();
+    b.iter(|| assert!(Color::parse(&ident).is_none()));
 }
 
 
