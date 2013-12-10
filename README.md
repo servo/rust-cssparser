@@ -59,5 +59,4 @@ TODO
 * Detect character encoding & decode from bytes,
   using [rust-encoding](https://github.com/lifthrasiir/rust-encoding).
 * Figure out float and integer overflow in parsing. (Clamp instead?)
-* Serialize tokens back to CSS
 * Make it fast! (Add a fast path in identifier tokenization?)
