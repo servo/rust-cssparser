@@ -98,7 +98,9 @@ pub fn parse_one_component_value<T: Iterator<Node>>(mut iter: T)
 //  ***********  End of public API  ***********
 
 
-struct StylesheetParser<T>{ iter: T }
+// used in from_bytes.rs but not reexported in the crate top-level
+pub struct StylesheetParser<T>{ iter: T }
+
 struct RuleListParser<T>{ iter: T }
 struct DeclarationListParser<T>{ iter: T }
 
