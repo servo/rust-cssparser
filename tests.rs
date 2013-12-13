@@ -9,6 +9,8 @@ use extra::{tempfile, json};
 use extra::json::ToJson;
 use extra::test;
 
+use encoding::label::encoding_from_whatwg_label;
+
 use super::*;
 use ast::*;
 
@@ -56,23 +58,34 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
 }
 
 
-fn run_json_tests<T: ToJson>(json_data: &str, parse: &fn (input: ~str) -> T) {
+fn run_raw_json_tests(json_data: &str, run: &fn (json::Json, json::Json)) {
     let items = match json::from_str(json_data) {
         Ok(json::List(items)) => items,
         _ => fail!("Invalid JSON")
     };
     assert!(items.len() % 2 == 0);
-    let mut input: Option<~str> = None;
+    let mut input = None;
     for item in items.move_iter() {
         match (&input, item) {
-            (&None, json::String(string)) => input = Some(string),
+            (&None, json_obj) => input = Some(json_obj),
             (&Some(_), expected) => {
                 let input = input.take_unwrap();
+                run(input, expected)
+            },
+        };
+    }
+}
+
+
+fn run_json_tests<T: ToJson>(json_data: &str, parse: &fn (input: ~str) -> T) {
+    do run_raw_json_tests(json_data) |input, expected| {
+        match input {
+            json::String(input) => {
                 let result = parse(input.to_owned()).to_json();
                 assert_json_eq(result, expected, input);
             },
             _ => fail!("Unexpected JSON")
-        };
+        }
     }
 }
 
@@ -129,6 +142,43 @@ fn stylesheet() {
 fn one_rule() {
     do run_json_tests(include_str!("css-parsing-tests/one_rule.json")) |input| {
         parse_one_rule(tokenize(input))
+    }
+}
+
+
+#[test]
+fn stylesheet_from_bytes() {
+    do run_raw_json_tests(include_str!("css-parsing-tests/stylesheet_bytes.json"))
+    |input, expected| {
+        let map = match input {
+            json::Object(map) => map,
+            _ => fail!("Unexpected JSON")
+        };
+
+        let result = {
+            let css = get_string(map, &~"css_bytes").unwrap().iter().map(|c| {
+                assert!(c as u32 <= 0xFF);
+                c as u8
+            }).to_owned_vec();
+            let protocol_encoding_label = get_string(map, &~"protocol_encoding");
+            let environment_encoding = get_string(map, &~"environment_encoding")
+                .and_then(encoding_from_whatwg_label);
+
+            let (mut rules, used_encoding) = parse_stylesheet_rules_from_bytes(
+                css, protocol_encoding_label, environment_encoding);
+
+            (rules.to_owned_vec(), used_encoding.name().to_owned()).to_json()
+        };
+        assert_json_eq(result, expected, json::Object(map).to_str());
+    }
+
+    fn get_string<'a>(map: &'a json::Object, key: &~str) -> Option<&'a str> {
+        match map.find(key) {
+            Some(&json::String(ref s)) => Some(s.as_slice()),
+            Some(&json::Null) => None,
+            None => None,
+            _ => fail!("Unexpected JSON"),
+        }
     }
 }
 

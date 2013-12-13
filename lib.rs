@@ -7,10 +7,12 @@
 #[feature(globs, macro_rules)];
 
 extern mod extra;
+extern mod encoding;  // https://github.com/lifthrasiir/rust-encoding
 
 pub use tokenizer::tokenize;
 pub use parser::{parse_stylesheet_rules, parse_rule_list, parse_declaration_list,
                  parse_one_rule, parse_one_declaration, parse_one_component_value};
+pub use from_bytes::{decode_stylesheet_bytes, parse_stylesheet_rules_from_bytes};
 pub use color::{RGBA, Color, CurrentColor};
 pub use nth::parse_nth;
 pub use serializer::{ToCss, serialize_identifier, serialize_string};
@@ -18,6 +20,7 @@ pub use serializer::{ToCss, serialize_identifier, serialize_string};
 pub mod ast;
 mod tokenizer;
 mod parser;
+mod from_bytes;
 mod color;
 mod nth;
 mod serializer;
