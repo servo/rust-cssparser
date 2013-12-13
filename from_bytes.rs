@@ -6,7 +6,7 @@ use std::str;
 
 use encoding::label::encoding_from_whatwg_label;
 use encoding::all::UTF_8;
-use encoding::{EncodingObj, DecodeReplace, decode};
+use encoding::{EncodingRef, DecodeReplace, decode};
 
 use tokenizer::{tokenize, Tokenizer};
 use parser::{parse_stylesheet_rules, StylesheetParser};
@@ -31,8 +31,8 @@ use parser::{parse_stylesheet_rules, StylesheetParser};
 ///     A 2-tuple of a decoded Unicode string
 ///     and the `Encoding` object that was used.
 pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>,
-                               environment_encoding: Option<EncodingObj>)
-                            -> (~str, EncodingObj) {
+                               environment_encoding: Option<EncodingRef>)
+                            -> (~str, EncodingRef) {
     // http://dev.w3.org/csswg/css-syntax/#the-input-byte-stream
     match protocol_encoding_label {
         None => (),
@@ -54,7 +54,7 @@ pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>
                     None => (),
                     Some(fallback) => match fallback.name() {
                         "utf-16be" | "utf-16le"
-                        => return decode_replace(css, UTF_8 as EncodingObj),
+                        => return decode_replace(css, UTF_8 as EncodingRef),
                         _ => return decode_replace(css, fallback),
                     }
                 }
@@ -65,12 +65,12 @@ pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>
         None => (),
         Some(fallback) => return decode_replace(css, fallback)
     }
-    return decode_replace(css, UTF_8 as EncodingObj)
+    return decode_replace(css, UTF_8 as EncodingRef)
 }
 
 
 #[inline]
-fn decode_replace(input: &[u8], fallback_encoding: EncodingObj)-> (~str, EncodingObj) {
+fn decode_replace(input: &[u8], fallback_encoding: EncodingRef)-> (~str, EncodingRef) {
     let (result, used_encoding) = decode(input, DecodeReplace, fallback_encoding);
     (result.unwrap(), used_encoding)
 }
@@ -92,8 +92,8 @@ fn decode_replace(input: &[u8], fallback_encoding: EncodingObj)-> (~str, Encodin
 ///     and the `Encoding` object that was used.
 pub fn parse_stylesheet_rules_from_bytes(
         css_bytes: &[u8], protocol_encoding_label: Option<&str>,
-        environment_encoding: Option<EncodingObj>)
-     -> (StylesheetParser<Tokenizer>, EncodingObj) {
+        environment_encoding: Option<EncodingRef>)
+     -> (StylesheetParser<Tokenizer>, EncodingRef) {
     let (css_unicode, encoding) = decode_stylesheet_bytes(
         css_bytes, protocol_encoding_label, environment_encoding);
     (parse_stylesheet_rules(tokenize(css_unicode)), encoding)
