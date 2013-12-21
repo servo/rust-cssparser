@@ -22,7 +22,7 @@ impl ast::ComponentValue {
             },
             Hash(ref value) => {
                 css.push_char('#');
-                for c in value.iter() {
+                for c in value.chars() {
                     serialize_char(c, css, /* is_identifier_start = */ false);
                 }
             },
@@ -49,7 +49,7 @@ impl ast::ComponentValue {
                 let unit = unit.as_slice();
                 if unit == "e" || unit == "E" || unit.starts_with("e-") || unit.starts_with("E-") {
                     css.push_str("\\65 ");
-                    for c in unit.slice_from(1).iter() {
+                    for c in unit.slice_from(1).chars() {
                         serialize_char(c, css, /* is_identifier_start = */ false);
                     }
                 } else {
@@ -111,7 +111,7 @@ impl ast::ComponentValue {
 
 pub fn serialize_identifier(value: &str, css: &mut ~str) {
     // TODO: avoid decoding/re-encoding UTF-8?
-    let mut iter = value.iter();
+    let mut iter = value.chars();
     let mut c = iter.next().unwrap();
     if c == '-' {
         c = match iter.next() {
@@ -144,7 +144,7 @@ fn serialize_char(c: char, css: &mut ~str, is_identifier_start: bool) {
 pub fn serialize_string(value: &str, css: &mut ~str) {
     css.push_char('"');
     // TODO: avoid decoding/re-encoding UTF-8?
-    for c in value.iter() {
+    for c in value.chars() {
         match c {
             '"' => css.push_str("\\\""),
             '\\' => css.push_str("\\\\"),
@@ -169,7 +169,7 @@ pub trait ToCss {
 }
 
 
-impl<'self, I: Iterator<&'self ComponentValue>> ToCss for I {
+impl<'a, I: Iterator<&'a ComponentValue>> ToCss for I {
     fn to_css_push(&mut self, css: &mut ~str) {
         let mut previous = match self.next() {
             None => return,
@@ -184,29 +184,29 @@ impl<'self, I: Iterator<&'self ComponentValue>> ToCss for I {
         loop { match self.next() { None => break, Some(component_value) => {
             let (a, b) = (previous, component_value);
             if (
-                matches!(*a, Ident(*) | AtKeyword(*) | Hash(*) | IDHash(*) |
-                             Dimension(*) | Delim('#') | Delim('-') | Number(*)) &&
-                matches!(*b, Ident(*) | Function(*) | URL(*) | BadURL(*) |
-                             Number(*) | Percentage(*) | Dimension(*) | UnicodeRange(*))
+                matches!(*a, Ident(..) | AtKeyword(..) | Hash(..) | IDHash(..) |
+                             Dimension(..) | Delim('#') | Delim('-') | Number(..)) &&
+                matches!(*b, Ident(..) | Function(..) | URL(..) | BadURL(..) |
+                             Number(..) | Percentage(..) | Dimension(..) | UnicodeRange(..))
             ) || (
-                matches!(*a, Ident(*)) &&
-                matches!(*b, ParenthesisBlock(*))
+                matches!(*a, Ident(..)) &&
+                matches!(*b, ParenthesisBlock(..))
             ) || (
-                matches!(*a, Ident(*) | AtKeyword(*) | Hash(*) | IDHash(*) | Dimension(*)) &&
+                matches!(*a, Ident(..) | AtKeyword(..) | Hash(..) | IDHash(..) | Dimension(..)) &&
                 matches!(*b, Delim('-') | CDC)
             ) || (
-                matches!(*a, Delim('#') | Delim('-') | Number(*) | Delim('@')) &&
-                matches!(*b, Ident(*) | Function(*) | URL(*) | BadURL(*))
+                matches!(*a, Delim('#') | Delim('-') | Number(..) | Delim('@')) &&
+                matches!(*b, Ident(..) | Function(..) | URL(..) | BadURL(..))
             ) || (
                 matches!(*a, Delim('@')) &&
-                matches!(*b, Ident(*) | Function(*) | URL(*) | BadURL(*) |
-                             UnicodeRange(*) | Delim('-'))
+                matches!(*b, Ident(..) | Function(..) | URL(..) | BadURL(..) |
+                             UnicodeRange(..) | Delim('-'))
             ) || (
-                matches!(*a, UnicodeRange(*) | Delim('.') | Delim('+')) &&
-                matches!(*b, Number(*) | Percentage(*) | Dimension(*))
+                matches!(*a, UnicodeRange(..) | Delim('.') | Delim('+')) &&
+                matches!(*b, Number(..) | Percentage(..) | Dimension(..))
             ) || (
-                matches!(*a, UnicodeRange(*)) &&
-                matches!(*b, Ident(*) | Function(*) | Delim('?'))
+                matches!(*a, UnicodeRange(..)) &&
+                matches!(*b, Ident(..) | Function(..) | Delim('?'))
             ) || (match (a, b) { (&Delim(a), &Delim(b)) => matches!((a, b),
                 ('#', '-') |
                 ('$', '=') |

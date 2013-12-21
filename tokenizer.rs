@@ -46,7 +46,7 @@ fn test_preprocess() {
 }
 
 
-struct Tokenizer {
+pub struct Tokenizer {
     priv input: ~str,
     priv length: uint,  // All counted in bytes, not characters
     priv position: uint,  // All counted in bytes, not characters
@@ -101,7 +101,7 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
     consume_comments(tokenizer);
     if tokenizer.is_eof() {
         if cfg!(test) {
-            assert!(tokenizer.line == tokenizer.input.split_iter('\n').len(),
+            assert!(tokenizer.line == tokenizer.input.split('\n').len(),
                     "The tokenizer is missing a tokenizer.new_line() call somewhere.")
         }
         return None

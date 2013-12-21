@@ -70,7 +70,7 @@ pub fn parse_nth(input: &[ComponentValue]) -> Option<(i32, i32)> {
 
 
 type Nth = Option<(i32, i32)>;
-type Iter<'self> = SkipWhitespaceIterator<'self>;
+type Iter<'a> = SkipWhitespaceIterator<'a>;
 
 fn parse_b(iter: &mut Iter, a: i32) -> Nth {
     match iter.next() {
@@ -105,7 +105,7 @@ fn parse_end(iter: &mut Iter, a: i32, b: i32) -> Nth {
 fn parse_n_dash_digits(string: &str) -> Option<i32> {
     if string.len() >= 3
     && string.starts_with("n-")
-    && string.slice_from(2).iter().all(|c| match c { '0'..'9' => true, _ => false })
+    && string.slice_from(2).chars().all(|c| match c { '0'..'9' => true, _ => false })
     {
         let result = from_str(string.slice_from(1));  // Include the minus sign
         assert!(result.is_some());

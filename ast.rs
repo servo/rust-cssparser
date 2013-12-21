@@ -126,23 +126,23 @@ impl ToStr for SyntaxError {
 }
 
 
-pub trait SkipWhitespaceIterable<'self> {
-    fn skip_whitespace(self) -> SkipWhitespaceIterator<'self>;
+pub trait SkipWhitespaceIterable<'a> {
+    fn skip_whitespace(self) -> SkipWhitespaceIterator<'a>;
 }
 
-impl<'self> SkipWhitespaceIterable<'self> for &'self [ComponentValue] {
-    fn skip_whitespace(self) -> SkipWhitespaceIterator<'self> {
+impl<'a> SkipWhitespaceIterable<'a> for &'a [ComponentValue] {
+    fn skip_whitespace(self) -> SkipWhitespaceIterator<'a> {
         SkipWhitespaceIterator{ iter_with_whitespace: self.iter() }
     }
 }
 
 #[deriving(Clone)]
-pub struct SkipWhitespaceIterator<'self> {
-    iter_with_whitespace: vec::VecIterator<'self, ComponentValue>,
+pub struct SkipWhitespaceIterator<'a> {
+    iter_with_whitespace: vec::VecIterator<'a, ComponentValue>,
 }
 
-impl<'self> Iterator<&'self ComponentValue> for SkipWhitespaceIterator<'self> {
-    fn next(&mut self) -> Option<&'self ComponentValue> {
+impl<'a> Iterator<&'a ComponentValue> for SkipWhitespaceIterator<'a> {
+    fn next(&mut self) -> Option<&'a ComponentValue> {
         for component_value in self.iter_with_whitespace {
             if component_value != &WhiteSpace { return Some(component_value) }
         }

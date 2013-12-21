@@ -3,8 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::{str, run, task};
-use std::rt::io;
-use std::rt::io::Writer;
+use std::io;
+use std::io::{File, Writer};
 use extra::{tempfile, json};
 use extra::json::ToJson;
 use extra::test;
@@ -16,7 +16,7 @@ use ast::*;
 
 
 fn write_whole_file(path: &Path, data: &str) {
-    match io::file::open(path, io::Create, io::Write) {
+    match File::open_mode(path, io::Open, io::Write) {
         Some(mut writer) => writer.write(data.as_bytes()),
         None => fail!("could not open file"),
     }
@@ -42,7 +42,7 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
         let temp = tempfile::TempDir::new("rust-cssparser-tests").unwrap();
         let results = results.to_pretty_str() + "\n";
         let expected = expected.to_pretty_str() + "\n";
-        do task::try {
+        task::try(proc() {
             let mut result_path = temp.path().clone();
             result_path.push("results.json");
             let mut expected_path = temp.path().clone();
@@ -51,14 +51,14 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
             write_whole_file(&expected_path, expected);
             run::process_status("colordiff", [~"-u1000", result_path.display().to_str(),
                                               expected_path.display().to_str()]);
-        };
+        });
 
         fail!(message)
     }
 }
 
 
-fn run_raw_json_tests(json_data: &str, run: &fn (json::Json, json::Json)) {
+fn run_raw_json_tests(json_data: &str, run: |json::Json, json::Json|) {
     let items = match json::from_str(json_data) {
         Ok(json::List(items)) => items,
         _ => fail!("Invalid JSON")
@@ -77,8 +77,8 @@ fn run_raw_json_tests(json_data: &str, run: &fn (json::Json, json::Json)) {
 }
 
 
-fn run_json_tests<T: ToJson>(json_data: &str, parse: &fn (input: ~str) -> T) {
-    do run_raw_json_tests(json_data) |input, expected| {
+fn run_json_tests<T: ToJson>(json_data: &str, parse: |input: ~str| -> T) {
+    run_raw_json_tests(json_data, |input, expected| {
         match input {
             json::String(input) => {
                 let result = parse(input.to_owned()).to_json();
@@ -86,69 +86,69 @@ fn run_json_tests<T: ToJson>(json_data: &str, parse: &fn (input: ~str) -> T) {
             },
             _ => fail!("Unexpected JSON")
         }
-    }
+    });
 }
 
 
 #[test]
 fn component_value_list() {
-    do run_json_tests(include_str!("css-parsing-tests/component_value_list.json")) |input| {
+    run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
         tokenize(input).map(|(c, _)| c).to_owned_vec()
-    }
+    });
 }
 
 
 #[test]
 fn one_component_value() {
-    do run_json_tests(include_str!("css-parsing-tests/one_component_value.json")) |input| {
+    run_json_tests(include_str!("css-parsing-tests/one_component_value.json"), |input| {
         parse_one_component_value(tokenize(input))
-    }
+    });
 }
 
 
 #[test]
 fn declaration_list() {
-    do run_json_tests(include_str!("css-parsing-tests/declaration_list.json")) |input| {
+    run_json_tests(include_str!("css-parsing-tests/declaration_list.json"), |input| {
         parse_declaration_list(tokenize(input)).to_owned_vec()
-    }
+    });
 }
 
 
 #[test]
 fn one_declaration() {
-    do run_json_tests(include_str!("css-parsing-tests/one_declaration.json")) |input| {
+    run_json_tests(include_str!("css-parsing-tests/one_declaration.json"), |input| {
         parse_one_declaration(tokenize(input))
-    }
+    });
 }
 
 
 #[test]
 fn rule_list() {
-    do run_json_tests(include_str!("css-parsing-tests/rule_list.json")) |input| {
+    run_json_tests(include_str!("css-parsing-tests/rule_list.json"), |input| {
         parse_rule_list(tokenize(input)).to_owned_vec()
-    }
+    });
 }
 
 
 #[test]
 fn stylesheet() {
-    do run_json_tests(include_str!("css-parsing-tests/stylesheet.json")) |input| {
+    run_json_tests(include_str!("css-parsing-tests/stylesheet.json"), |input| {
         parse_stylesheet_rules(tokenize(input)).to_owned_vec()
-    }
+    });
 }
 
 
 #[test]
 fn one_rule() {
-    do run_json_tests(include_str!("css-parsing-tests/one_rule.json")) |input| {
+    run_json_tests(include_str!("css-parsing-tests/one_rule.json"), |input| {
         parse_one_rule(tokenize(input))
-    }
+    });
 }
 
 
 #[test]
 fn stylesheet_from_bytes() {
-    do run_raw_json_tests(include_str!("css-parsing-tests/stylesheet_bytes.json"))
+    run_raw_json_tests(include_str!("css-parsing-tests/stylesheet_bytes.json"),
     |input, expected| {
         let map = match input {
             json::Object(map) => map,
@@ -156,7 +156,7 @@ fn stylesheet_from_bytes() {
         };
 
         let result = {
-            let css = get_string(map, &~"css_bytes").unwrap().iter().map(|c| {
+            let css = get_string(map, &~"css_bytes").unwrap().chars().map(|c| {
                 assert!(c as u32 <= 0xFF);
                 c as u8
             }).to_owned_vec();
@@ -170,7 +170,7 @@ fn stylesheet_from_bytes() {
             (rules.to_owned_vec(), used_encoding.name().to_owned()).to_json()
         };
         assert_json_eq(result, expected, json::Object(map).to_str());
-    }
+    });
 
     fn get_string<'a>(map: &'a json::Object, key: &~str) -> Option<&'a str> {
         match map.find(key) {
@@ -183,13 +183,13 @@ fn stylesheet_from_bytes() {
 }
 
 
-fn run_color_tests(json_data: &str, to_json: &fn(result: Option<Color>) -> json::Json) {
-    do run_json_tests(json_data) |input| {
+fn run_color_tests(json_data: &str, to_json: |result: Option<Color>| -> json::Json) {
+    run_json_tests(json_data, |input| {
         match parse_one_component_value(tokenize(input)) {
             Ok(component_value) => to_json(Color::parse(&component_value)),
             Err(_reason) => json::Null,
         }
-    }
+    });
 }
 
 
@@ -208,14 +208,14 @@ fn color3_hsl() {
 /// color3_keywords.json is different: R, G and B are in 0..255 rather than 0..1
 #[test]
 fn color3_keywords() {
-    do run_color_tests(include_str!("css-parsing-tests/color3_keywords.json")) |c| {
+    run_color_tests(include_str!("css-parsing-tests/color3_keywords.json"), |c| {
         match c {
             Some(RGBA(RGBA { red: r, green: g, blue: b, alpha: a }))
             => (~[r * 255., g * 255., b * 255., a]).to_json(),
             Some(CurrentColor) => json::String(~"currentColor"),
             None => json::Null,
         }
-    }
+    });
 }
 
 
@@ -242,19 +242,19 @@ fn bench_color_lookup_fail(b: &mut test::BenchHarness) {
 
 #[test]
 fn nth() {
-    do run_json_tests(include_str!("css-parsing-tests/An+B.json")) |input| {
+    run_json_tests(include_str!("css-parsing-tests/An+B.json"), |input| {
         parse_nth(tokenize(input).map(|(c, _)| c).to_owned_vec())
-    }
+    });
 }
 
 
 #[test]
 fn serializer() {
-    do run_json_tests(include_str!("css-parsing-tests/component_value_list.json")) |input| {
+    run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
         let component_values = tokenize(input).map(|(c, _)| c).to_owned_vec();
         let serialized = component_values.iter().to_css();
         tokenize(serialized).map(|(c, _)| c).to_owned_vec()
-    }
+    });
 }
 
 
@@ -351,7 +351,7 @@ fn list_to_json(list: &~[(ComponentValue, SourceLocation)]) -> ~[json::Json] {
 impl ToJson for AtRule {
     fn to_json(&self) -> json::Json {
         match *self {
-            AtRule{name: ref name, prelude: ref prelude, block: ref block, _}
+            AtRule{name: ref name, prelude: ref prelude, block: ref block, ..}
             => json::List(~[json::String(~"at-rule"), name.to_json(),
                             prelude.to_json(), block.as_ref().map(list_to_json).to_json()])
         }
@@ -362,7 +362,7 @@ impl ToJson for AtRule {
 impl ToJson for QualifiedRule {
     fn to_json(&self) -> json::Json {
         match *self {
-            QualifiedRule{prelude: ref prelude, block: ref block, _}
+            QualifiedRule{prelude: ref prelude, block: ref block, ..}
             => json::List(~[json::String(~"qualified rule"),
                             prelude.to_json(), json::List(list_to_json(block))])
         }
@@ -373,7 +373,7 @@ impl ToJson for QualifiedRule {
 impl ToJson for Declaration {
     fn to_json(&self) -> json::Json {
         match *self {
-            Declaration{name: ref name, value: ref value, important: ref important, _}
+            Declaration{name: ref name, value: ref value, important: ref important, ..}
             =>  json::List(~[json::String(~"declaration"), name.to_json(),
                              value.to_json(), important.to_json()])
         }
