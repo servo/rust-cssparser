@@ -2,12 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::{str, run, task};
-use std::io;
-use std::io::{File, Writer};
+use std::{io, str, task};
+use std::io::{File, Process, Writer};
 use extra::{tempfile, json};
 use extra::json::ToJson;
-use extra::test;
+use test;
 
 use encoding::label::encoding_from_whatwg_label;
 
@@ -17,8 +16,8 @@ use ast::*;
 
 fn write_whole_file(path: &Path, data: &str) {
     match File::open_mode(path, io::Open, io::Write) {
-        Some(mut writer) => writer.write(data.as_bytes()),
-        None => fail!("could not open file"),
+        Ok(mut writer) => { writer.write(data.as_bytes()); },
+        _ => fail!("could not open file"),
     }
 }
 
@@ -49,8 +48,8 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
             expected_path.push("expected.json");
             write_whole_file(&result_path, results);
             write_whole_file(&expected_path, expected);
-            run::process_status("colordiff", [~"-u1000", result_path.display().to_str(),
-                                              expected_path.display().to_str()]);
+            Process::status("colordiff", [~"-u1000", result_path.display().to_str(),
+                                          expected_path.display().to_str()]);
         });
 
         fail!(message)

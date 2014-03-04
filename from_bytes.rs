@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use std::cmp;
 use std::str;
 
 use encoding::label::encoding_from_whatwg_label;
@@ -44,7 +45,7 @@ pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>
     if css.starts_with("@charset \"".as_bytes()) {
         // 10 is "@charset \"".len()
         // 100 is arbitrary so that no encoding label is more than 100-10 bytes.
-        match css.slice(10, css.len().min(&100)).position_elem(&('"' as u8)) {
+        match css.slice(10, cmp::min(css.len(), 100)).position_elem(&('"' as u8)) {
             None => (),
             Some(label_length)
             => if css.slice_from(10 + label_length).starts_with("\";".as_bytes()) {
