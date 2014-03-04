@@ -5,8 +5,8 @@
 #[crate_id = "github.com/mozilla-servo/rust-cssparser#cssparser:0.1"];
 #[feature(globs, macro_rules)];
 
-extern mod extra;
-extern mod encoding;  // https://github.com/lifthrasiir/rust-encoding
+extern crate extra;
+extern crate encoding;  // https://github.com/lifthrasiir/rust-encoding
 
 pub use tokenizer::tokenize;
 pub use parser::{parse_stylesheet_rules, parse_rule_list, parse_declaration_list,
