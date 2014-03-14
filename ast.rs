@@ -95,7 +95,7 @@ pub struct AtRule {
 pub enum DeclarationListItem {
     Declaration(Declaration),
     // A better idea for a name that means "at-rule" but is not "AtRule"?
-    Decl_AtRule(AtRule),
+    DeclAtRule(AtRule),
 }
 
 #[deriving(Eq)]

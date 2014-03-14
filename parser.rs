@@ -160,7 +160,7 @@ for DeclarationListParser<T> {
             match component_value {
                 WhiteSpace | Semicolon => (),
                 AtKeyword(name)
-                => return Some(Ok(Decl_AtRule(parse_at_rule(iter, name, location)))),
+                => return Some(Ok(DeclAtRule(parse_at_rule(iter, name, location)))),
                 _ => return Some(match parse_declaration(iter, component_value, location) {
                     Ok(declaration) => Ok(Declaration(declaration)),
                     Err(e) => {
