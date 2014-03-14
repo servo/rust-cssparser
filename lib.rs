@@ -8,6 +8,9 @@
 extern crate extra;
 extern crate encoding;  // https://github.com/lifthrasiir/rust-encoding
 
+#[cfg(test)]
+extern crate test;
+
 pub use tokenizer::tokenize;
 pub use parser::{parse_stylesheet_rules, parse_rule_list, parse_declaration_list,
                  parse_one_rule, parse_one_declaration, parse_one_component_value};
