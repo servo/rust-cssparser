@@ -23,7 +23,7 @@ pub fn parse_nth(input: &[ComponentValue]) -> Option<(i32, i32)> {
                 match unit {
                     "n" => parse_b(iter, a as i32),
                     "n-" => parse_signless_b(iter, a as i32, -1),
-                    _ => match(parse_n_dash_digits(unit)) {
+                    _ => match parse_n_dash_digits(unit) {
                         Some(b) => parse_end(iter, a as i32, b),
                         _ => None
                     },
@@ -40,11 +40,11 @@ pub fn parse_nth(input: &[ComponentValue]) -> Option<(i32, i32)> {
                 "-n" => parse_b(iter, -1),
                 "n-" => parse_signless_b(iter, 1, -1),
                 "-n-" => parse_signless_b(iter, -1, -1),
-                _ if ident.starts_with("-") => match(parse_n_dash_digits(ident.slice_from(1))) {
+                _ if ident.starts_with("-") => match parse_n_dash_digits(ident.slice_from(1)) {
                     Some(b) => parse_end(iter, -1, b),
                     _ => None
                 },
-                _ =>  match(parse_n_dash_digits(ident)) {
+                _ =>  match parse_n_dash_digits(ident) {
                     Some(b) => parse_end(iter, 1, b),
                     _ => None
                 },
@@ -56,7 +56,7 @@ pub fn parse_nth(input: &[ComponentValue]) -> Option<(i32, i32)> {
                 match ident {
                     "n" => parse_b(iter, 1),
                     "n-" => parse_signless_b(iter, 1, -1),
-                    _ => match(parse_n_dash_digits(ident)) {
+                    _ => match parse_n_dash_digits(ident) {
                         Some(b) => parse_end(iter, 1, b),
                         _ => None
                     },

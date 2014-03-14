@@ -185,9 +185,8 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
             }
         },
         '.' => {
-            if (
-                tokenizer.position + 1 < tokenizer.length
-                && is_match!(tokenizer.char_at(1), '0'..'9')
+            if tokenizer.position + 1 < tokenizer.length
+                && is_match!(tokenizer.char_at(1), '0'..'9'
             ) {
                 consume_numeric(tokenizer)
             } else {
