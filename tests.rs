@@ -332,7 +332,7 @@ impl ToJson for DeclarationListItem {
     fn to_json(&self) -> json::Json {
         match *self {
             Declaration(ref declaration) => declaration.to_json(),
-            Decl_AtRule(ref at_rule) => at_rule.to_json(),
+            DeclAtRule(ref at_rule) => at_rule.to_json(),
         }
     }
 }
