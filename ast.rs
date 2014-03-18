@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use std::fmt;
 use std::vec;
 
 
@@ -94,7 +95,7 @@ pub struct AtRule {
 pub enum DeclarationListItem {
     Declaration(Declaration),
     // A better idea for a name that means "at-rule" but is not "AtRule"?
-    Decl_AtRule(AtRule),
+    DeclAtRule(AtRule),
 }
 
 #[deriving(Eq)]
@@ -119,9 +120,9 @@ pub enum ErrorReason {
     // This is meant to be extended
 }
 
-impl ToStr for SyntaxError {
-    fn to_str(&self) -> ~str {
-        format!("{:u}:{:u} {:?}", self.location.line, self.location.column, self.reason)
+impl fmt::Show for SyntaxError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f.buf, "{:u}:{:u} {:?}", self.location.line, self.location.column, self.reason)
     }
 }
 
@@ -138,7 +139,7 @@ impl<'a> SkipWhitespaceIterable<'a> for &'a [ComponentValue] {
 
 #[deriving(Clone)]
 pub struct SkipWhitespaceIterator<'a> {
-    iter_with_whitespace: vec::VecIterator<'a, ComponentValue>,
+    iter_with_whitespace: vec::Items<'a, ComponentValue>,
 }
 
 impl<'a> Iterator<&'a ComponentValue> for SkipWhitespaceIterator<'a> {
@@ -162,7 +163,7 @@ impl MoveSkipWhitespaceIterable for ~[ComponentValue] {
 }
 
 pub struct MoveSkipWhitespaceIterator {
-    iter_with_whitespace: vec::MoveIterator<ComponentValue>,
+    iter_with_whitespace: vec::MoveItems<ComponentValue>,
 }
 
 impl Iterator<ComponentValue> for MoveSkipWhitespaceIterator {
