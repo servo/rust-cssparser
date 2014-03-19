@@ -29,4 +29,4 @@ check-debug: cssparser-tests
 
 .PHONY: clean
 clean:
-	rm -f *.o *.a *.so *.dylib *.dll *.dummy *-test
+	rm -f *.o *.a *.so *.dylib *.rlib *.dll *.dummy *-test
