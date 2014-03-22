@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::fmt;
-use std::vec;
+use std::slice;
 
 
 #[deriving(Eq)]
@@ -139,7 +139,7 @@ impl<'a> SkipWhitespaceIterable<'a> for &'a [ComponentValue] {
 
 #[deriving(Clone)]
 pub struct SkipWhitespaceIterator<'a> {
-    iter_with_whitespace: vec::Items<'a, ComponentValue>,
+    iter_with_whitespace: slice::Items<'a, ComponentValue>,
 }
 
 impl<'a> Iterator<&'a ComponentValue> for SkipWhitespaceIterator<'a> {
@@ -163,7 +163,7 @@ impl MoveSkipWhitespaceIterable for ~[ComponentValue] {
 }
 
 pub struct MoveSkipWhitespaceIterator {
-    iter_with_whitespace: vec::MoveItems<ComponentValue>,
+    iter_with_whitespace: slice::MoveItems<ComponentValue>,
 }
 
 impl Iterator<ComponentValue> for MoveSkipWhitespaceIterator {

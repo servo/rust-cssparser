@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::ascii::StrAsciiExt;
-use std::cmp;
 
 use ast::*;
 
@@ -298,9 +297,9 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
         let hue = expect_number!() / 360.;
         let hue = hue - hue.floor();
         expect_comma!();
-        let saturation = cmp::min(cmp::max((expect_percentage!() / 100.), 0.), 1.);
+        let saturation = (expect_percentage!() / 100.).min(0.).max(1.);
         expect_comma!();
-        let lightness = cmp::min(cmp::max((expect_percentage!() / 100.), 0.), 1.);
+        let lightness = (expect_percentage!() / 100.).min(0.).max(1.);
 
         // http://www.w3.org/TR/css3-color/#hsl-color
         fn hue_to_rgb(m1: f64, m2: f64, mut h: f64) -> f64 {
@@ -322,7 +321,7 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
 
     let alpha = if has_alpha {
         expect_comma!();
-        cmp::min(cmp::max((expect_number!()), 0.), 1.) as f32
+        (expect_number!()).min(0.).max(1.) as f32
     } else {
         1.
     };
