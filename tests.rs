@@ -3,9 +3,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::{io, str, task};
-use std::io::{File, Process, Writer};
-use extra::{tempfile, json};
-use extra::json::ToJson;
+use std::io::{File, Process, Writer, TempDir};
+use serialize::{json};
+use serialize::json::ToJson;
 use test;
 
 use encoding::label::encoding_from_whatwg_label;
@@ -38,7 +38,7 @@ fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
 
 fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
     if !almost_equals(&results, &expected) {
-        let temp = tempfile::TempDir::new("rust-cssparser-tests").unwrap();
+        let temp = TempDir::new("rust-cssparser-tests").unwrap();
         let results = results.to_pretty_str() + "\n";
         let expected = expected.to_pretty_str() + "\n";
         task::try(proc() {
@@ -382,8 +382,8 @@ impl ToJson for Declaration {
 
 impl ToJson for ComponentValue {
     fn to_json(&self) -> json::Json {
-        use JList = extra::json::List;
-        use JString = extra::json::String;
+        use JList = serialize::json::List;
+        use JString = serialize::json::String;
 
         fn numeric(value: &NumericValue) -> ~[json::Json] {
             match *value {
