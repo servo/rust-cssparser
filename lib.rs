@@ -4,6 +4,9 @@
 
 #[crate_id = "github.com/mozilla-servo/rust-cssparser#cssparser:0.1"];
 #[feature(globs, macro_rules)];
+#[crate_type = "lib"];
+#[crate_type = "dylib"];
+#[crate_type = "rlib"];
 
 extern crate encoding;  // https://github.com/lifthrasiir/rust-encoding
 
