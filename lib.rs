@@ -16,8 +16,10 @@ extern crate test;
 #[cfg(test)]
 extern crate serialize;
 
-pub use tokenizer::tokenize;
-pub use parser::{parse_stylesheet_rules, parse_rule_list, parse_declaration_list,
+pub use tokenizer::{tokenize, Tokenizer};
+pub use parser::{parse_stylesheet_rules, StylesheetParser,
+                 parse_rule_list, RuleListParser,
+                 parse_declaration_list, DeclarationListParser,
                  parse_one_rule, parse_one_declaration, parse_one_component_value};
 pub use from_bytes::{decode_stylesheet_bytes, parse_stylesheet_rules_from_bytes};
 pub use color::{RGBA, Color, CurrentColor};

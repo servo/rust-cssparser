@@ -16,7 +16,7 @@ use ast::*;
 
 fn write_whole_file(path: &Path, data: &str) {
     match File::open_mode(path, io::Open, io::Write) {
-        Ok(mut writer) => { writer.write(data.as_bytes()); },
+        Ok(mut writer) => { writer.write(data.as_bytes()).unwrap(); },
         _ => fail!("could not open file"),
     }
 }
@@ -48,9 +48,11 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
             expected_path.push("expected.json");
             write_whole_file(&result_path, results);
             write_whole_file(&expected_path, expected);
-            Process::status("colordiff", [~"-u1000", result_path.display().to_str(),
-                                          expected_path.display().to_str()]);
-        });
+            Process::status(
+                "colordiff",
+                [~"-u1000", result_path.display().to_str(), expected_path.display().to_str()]
+            ).unwrap();
+        }).unwrap();
 
         fail!(message)
     }
