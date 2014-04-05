@@ -11,10 +11,10 @@ use ast::*;
 pub struct RGBA {
     // All in 0..1
     // Use f32 to try and match rust-azure’s AzFloat
-    red: f32,
-    green: f32,
-    blue: f32,
-    alpha: f32,
+    pub red: f32,
+    pub green: f32,
+    pub blue: f32,
+    pub alpha: f32,
 }
 
 #[deriving(Clone, Eq)]
