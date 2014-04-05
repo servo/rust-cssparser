@@ -92,7 +92,7 @@ fn run_json_tests<T: ToJson>(json_data: &str, parse: |input: ~str| -> T) {
 #[test]
 fn component_value_list() {
     run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
-        tokenize(input).map(|(c, _)| c).to_owned_vec()
+        tokenize(input).map(|(c, _)| c).collect::<~[ComponentValue]>()
     });
 }
 
@@ -108,7 +108,7 @@ fn one_component_value() {
 #[test]
 fn declaration_list() {
     run_json_tests(include_str!("css-parsing-tests/declaration_list.json"), |input| {
-        parse_declaration_list(tokenize(input)).to_owned_vec()
+        parse_declaration_list(tokenize(input)).collect::<~[Result<DeclarationListItem, SyntaxError>]>()
     });
 }
 
@@ -124,7 +124,7 @@ fn one_declaration() {
 #[test]
 fn rule_list() {
     run_json_tests(include_str!("css-parsing-tests/rule_list.json"), |input| {
-        parse_rule_list(tokenize(input)).to_owned_vec()
+        parse_rule_list(tokenize(input)).collect::<~[Result<Rule, SyntaxError>]>()
     });
 }
 
@@ -132,7 +132,7 @@ fn rule_list() {
 #[test]
 fn stylesheet() {
     run_json_tests(include_str!("css-parsing-tests/stylesheet.json"), |input| {
-        parse_stylesheet_rules(tokenize(input)).to_owned_vec()
+        parse_stylesheet_rules(tokenize(input)).collect::<~[Result<Rule, SyntaxError>]>()
     });
 }
 
@@ -158,7 +158,7 @@ fn stylesheet_from_bytes() {
             let css = get_string(map, &~"css_bytes").unwrap().chars().map(|c| {
                 assert!(c as u32 <= 0xFF);
                 c as u8
-            }).to_owned_vec();
+            }).collect::<~[u8]>();
             let protocol_encoding_label = get_string(map, &~"protocol_encoding");
             let environment_encoding = get_string(map, &~"environment_encoding")
                 .and_then(encoding_from_whatwg_label);
@@ -166,7 +166,7 @@ fn stylesheet_from_bytes() {
             let (mut rules, used_encoding) = parse_stylesheet_rules_from_bytes(
                 css, protocol_encoding_label, environment_encoding);
 
-            (rules.to_owned_vec(), used_encoding.name().to_owned()).to_json()
+            (rules.collect::<~[Result<Rule, SyntaxError>]>(), used_encoding.name().to_owned()).to_json()
         };
         assert_json_eq(result, expected, json::Object(map).to_str());
     });
@@ -242,7 +242,7 @@ fn bench_color_lookup_fail(b: &mut test::BenchHarness) {
 #[test]
 fn nth() {
     run_json_tests(include_str!("css-parsing-tests/An+B.json"), |input| {
-        parse_nth(tokenize(input).map(|(c, _)| c).to_owned_vec())
+        parse_nth(tokenize(input).map(|(c, _)| c).collect::<~[ComponentValue]>())
     });
 }
 
@@ -250,9 +250,9 @@ fn nth() {
 #[test]
 fn serializer() {
     run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
-        let component_values = tokenize(input).map(|(c, _)| c).to_owned_vec();
+        let component_values = tokenize(input).map(|(c, _)| c).collect::<~[ComponentValue]>();
         let serialized = component_values.iter().to_css();
-        tokenize(serialized).map(|(c, _)| c).to_owned_vec()
+        tokenize(serialized).map(|(c, _)| c).collect::<~[ComponentValue]>()
     });
 }
 
@@ -339,11 +339,11 @@ impl ToJson for DeclarationListItem {
 
 
 fn list_to_json(list: &~[(ComponentValue, SourceLocation)]) -> ~[json::Json] {
-    list.map(|tuple| {
+    list.iter().map(|tuple| {
         match *tuple {
             (ref c, _) => c.to_json()
         }
-    })
+    }).collect()
 }
 
 
@@ -426,11 +426,12 @@ impl ToJson for ComponentValue {
             CDC => JString(~"-->"),
 
             Function(ref name, ref arguments)
-            => JList(~[JString(~"function"), name.to_json()] + arguments.map(|a| a.to_json())),
+            => JList(~[JString(~"function"), name.to_json()] +
+                     arguments.iter().map(|a| a.to_json()).collect::<~[json::Json]>()),
             ParenthesisBlock(ref content)
-            => JList(~[JString(~"()")] + content.map(|c| c.to_json())),
+            => JList(~[JString(~"()")] + content.iter().map(|c| c.to_json()).collect::<~[json::Json]>()),
             SquareBracketBlock(ref content)
-            => JList(~[JString(~"[]")] + content.map(|c| c.to_json())),
+            => JList(~[JString(~"[]")] + content.iter().map(|c| c.to_json()).collect::<~[json::Json]>()),
             CurlyBracketBlock(ref content)
             => JList(~[JString(~"{}")] + list_to_json(content)),
 
