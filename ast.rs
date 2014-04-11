@@ -8,16 +8,16 @@ use std::slice;
 
 #[deriving(Eq)]
 pub struct NumericValue {
-    representation: ~str,
-    value: f64,
-    int_value: Option<i64>,
+    pub representation: ~str,
+    pub value: f64,
+    pub int_value: Option<i64>,
 }
 
 
 #[deriving(Eq)]
 pub struct SourceLocation {
-    line: uint,  // First line is 1
-    column: uint,  // First character of a line is at column 1
+    pub line: uint,  // First line is 1
+    pub column: uint,  // First character of a line is at column 1
 }
 
 
@@ -70,25 +70,25 @@ pub enum ComponentValue {
 
 #[deriving(Eq)]
 pub struct Declaration {
-    location: SourceLocation,
-    name: ~str,
-    value: ~[ComponentValue],
-    important: bool,
+    pub location: SourceLocation,
+    pub name: ~str,
+    pub value: ~[ComponentValue],
+    pub important: bool,
 }
 
 #[deriving(Eq)]
 pub struct QualifiedRule {
-    location: SourceLocation,
-    prelude: ~[ComponentValue],
-    block: ~[Node],
+    pub location: SourceLocation,
+    pub prelude: ~[ComponentValue],
+    pub block: ~[Node],
 }
 
 #[deriving(Eq)]
 pub struct AtRule {
-    location: SourceLocation,
-    name: ~str,
-    prelude: ~[ComponentValue],
-    block: Option<~[Node]>,
+    pub location: SourceLocation,
+    pub name: ~str,
+    pub prelude: ~[ComponentValue],
+    pub block: Option<~[Node]>,
 }
 
 #[deriving(Eq)]
@@ -106,8 +106,8 @@ pub enum Rule {
 
 #[deriving(Eq)]
 pub struct SyntaxError {
-    location: SourceLocation,
-    reason: ErrorReason,
+    pub location: SourceLocation,
+    pub reason: ErrorReason,
 }
 
 #[deriving(Eq)]
@@ -139,7 +139,7 @@ impl<'a> SkipWhitespaceIterable<'a> for &'a [ComponentValue] {
 
 #[deriving(Clone)]
 pub struct SkipWhitespaceIterator<'a> {
-    iter_with_whitespace: slice::Items<'a, ComponentValue>,
+    pub iter_with_whitespace: slice::Items<'a, ComponentValue>,
 }
 
 impl<'a> Iterator<&'a ComponentValue> for SkipWhitespaceIterator<'a> {

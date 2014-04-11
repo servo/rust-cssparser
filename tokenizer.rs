@@ -47,11 +47,11 @@ fn test_preprocess() {
 
 
 pub struct Tokenizer {
-    priv input: ~str,
-    priv length: uint,  // All counted in bytes, not characters
-    priv position: uint,  // All counted in bytes, not characters
-    priv line: uint,
-    priv last_line_start: uint,  // All counted in bytes, not characters
+    input: ~str,
+    length: uint,  // All counted in bytes, not characters
+    position: uint,  // All counted in bytes, not characters
+    line: uint,
+    last_line_start: uint,  // All counted in bytes, not characters
 }
 
 
