@@ -20,6 +20,10 @@ use std::ascii::StrAsciiExt;
 use ast::*;
 
 
+pub struct StylesheetParser<T>{ priv iter: T }
+pub struct RuleListParser<T>{ priv iter: T }
+pub struct DeclarationListParser<T>{ priv iter: T }
+
 /// Parse top-level of a CSS stylesheet.
 /// Return a Iterator<Result<Rule, SyntaxError>>
 #[inline]
@@ -96,13 +100,6 @@ pub fn parse_one_component_value<T: Iterator<Node>>(mut iter: T)
 
 
 //  ***********  End of public API  ***********
-
-
-// used in from_bytes.rs but not reexported in the crate top-level
-pub struct StylesheetParser<T>{ iter: T }
-
-struct RuleListParser<T>{ iter: T }
-struct DeclarationListParser<T>{ iter: T }
 
 
 // Work around "error: cannot borrow `*iter` as mutable more than once at a time"
