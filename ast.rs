@@ -4,11 +4,12 @@
 
 use std::fmt;
 use std::slice;
+use std::vec;
 
 
 #[deriving(Eq)]
 pub struct NumericValue {
-    pub representation: ~str,
+    pub representation: StrBuf,
     pub value: f64,
     pub int_value: Option<i64>,
 }
@@ -27,16 +28,16 @@ pub type Node = (ComponentValue, SourceLocation);  // TODO this is not a good na
 #[deriving(Eq)]
 pub enum ComponentValue {
     // Preserved tokens.
-    Ident(~str),
-    AtKeyword(~str),
-    Hash(~str),
-    IDHash(~str),  // Hash that is a valid ID selector.
-    String(~str),
-    URL(~str),
+    Ident(StrBuf),
+    AtKeyword(StrBuf),
+    Hash(StrBuf),
+    IDHash(StrBuf),  // Hash that is a valid ID selector.
+    String(StrBuf),
+    URL(StrBuf),
     Delim(char),
     Number(NumericValue),
     Percentage(NumericValue),
-    Dimension(NumericValue, ~str),
+    Dimension(NumericValue, StrBuf),
     UnicodeRange(u32, u32),  // (start, end) of range
     WhiteSpace,
     Colon,  // :
@@ -52,12 +53,12 @@ pub enum ComponentValue {
     CDC,  // -->
 
     // Function
-    Function(~str, ~[ComponentValue]),  // name, arguments
+    Function(StrBuf, Vec<ComponentValue>),  // name, arguments
 
     // Simple block
-    ParenthesisBlock(~[ComponentValue]),  // (…)
-    SquareBracketBlock(~[ComponentValue]),  // […]
-    CurlyBracketBlock(~[Node]),  // {…}
+    ParenthesisBlock(Vec<ComponentValue>),  // (…)
+    SquareBracketBlock(Vec<ComponentValue>),  // […]
+    CurlyBracketBlock(Vec<Node>),  // {…}
 
     // These are always invalid
     BadURL,
@@ -71,24 +72,24 @@ pub enum ComponentValue {
 #[deriving(Eq)]
 pub struct Declaration {
     pub location: SourceLocation,
-    pub name: ~str,
-    pub value: ~[ComponentValue],
+    pub name: StrBuf,
+    pub value: Vec<ComponentValue>,
     pub important: bool,
 }
 
 #[deriving(Eq)]
 pub struct QualifiedRule {
     pub location: SourceLocation,
-    pub prelude: ~[ComponentValue],
-    pub block: ~[Node],
+    pub prelude: Vec<ComponentValue>,
+    pub block: Vec<Node>,
 }
 
 #[deriving(Eq)]
 pub struct AtRule {
     pub location: SourceLocation,
-    pub name: ~str,
-    pub prelude: ~[ComponentValue],
-    pub block: Option<~[Node]>,
+    pub name: StrBuf,
+    pub prelude: Vec<ComponentValue>,
+    pub block: Option<Vec<Node>>,
 }
 
 #[deriving(Eq)]
@@ -156,14 +157,14 @@ pub trait MoveSkipWhitespaceIterable {
     fn move_skip_whitespace(self) -> MoveSkipWhitespaceIterator;
 }
 
-impl MoveSkipWhitespaceIterable for ~[ComponentValue] {
+impl MoveSkipWhitespaceIterable for Vec<ComponentValue> {
     fn move_skip_whitespace(self) -> MoveSkipWhitespaceIterator {
         MoveSkipWhitespaceIterator{ iter_with_whitespace: self.move_iter() }
     }
 }
 
 pub struct MoveSkipWhitespaceIterator {
-    iter_with_whitespace: slice::MoveItems<ComponentValue>,
+    iter_with_whitespace: vec::MoveItems<ComponentValue>,
 }
 
 impl Iterator<ComponentValue> for MoveSkipWhitespaceIterator {

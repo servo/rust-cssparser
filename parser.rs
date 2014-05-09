@@ -20,9 +20,9 @@ use std::ascii::StrAsciiExt;
 use ast::*;
 
 
-pub struct StylesheetParser<T>{ priv iter: T }
-pub struct RuleListParser<T>{ priv iter: T }
-pub struct DeclarationListParser<T>{ priv iter: T }
+pub struct StylesheetParser<T>{ iter: T }
+pub struct RuleListParser<T>{ iter: T }
+pub struct DeclarationListParser<T>{ iter: T }
 
 /// Parse top-level of a CSS stylesheet.
 /// Return a Iterator<Result<Rule, SyntaxError>>
@@ -173,9 +173,9 @@ for DeclarationListParser<T> {
 }
 
 
-fn parse_at_rule<T: Iterator<Node>>(iter: &mut T, name: ~str, location: SourceLocation)
+fn parse_at_rule<T: Iterator<Node>>(iter: &mut T, name: StrBuf, location: SourceLocation)
                  -> AtRule {
-    let mut prelude = ~[];
+    let mut prelude = Vec::new();
     let mut block = None;
     for_iter!(iter, (component_value, _location), {
         match component_value {
@@ -193,10 +193,10 @@ fn parse_qualified_rule<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
                                            -> Result<QualifiedRule, SyntaxError> {
     match first {
         CurlyBracketBlock(content)
-        => return Ok(QualifiedRule { location: location, prelude: ~[], block: content }),
+        => return Ok(QualifiedRule { location: location, prelude: Vec::new(), block: content }),
         _ => (),
     }
-    let mut prelude = ~[first];
+    let mut prelude = vec!(first);
     for_iter!(iter, (component_value, _location), {
         match component_value {
             CurlyBracketBlock(content)
@@ -219,7 +219,7 @@ fn parse_declaration<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
         Some((Colon, _)) => (),
         _ => return error(location, ErrInvalidDeclarationSyntax),
     }
-    let mut value = ~[];
+    let mut value = Vec::new();
     let mut important = false;
     for_iter!(iter, (component_value, _location), {
         match component_value {
@@ -243,7 +243,7 @@ fn parse_declaration_important<T: Iterator<Node>>(iter: &mut T) -> bool {
         Some((Ident(value), _)) => value,
         _ => return false,
     };
-    if !ident_value.eq_ignore_ascii_case("important") { return false }
+    if !ident_value.as_slice().eq_ignore_ascii_case("important") { return false }
     match next_non_whitespace(iter) {
         Some((Semicolon, _)) => true,
         None => true,

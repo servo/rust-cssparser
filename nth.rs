@@ -116,7 +116,7 @@ fn parse_n_dash_digits(string: &str) -> Option<i32> {
 
 #[inline]
 fn has_sign(value: &NumericValue) -> bool {
-    match value.representation[0] as char {
+    match value.representation.as_bytes()[0] as char {
         '+' | '-' => true,
         _ => false
     }
