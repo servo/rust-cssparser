@@ -28,9 +28,10 @@ pub enum Color {
 impl Color {
     pub fn parse(component_value: &ComponentValue) -> Option<Color> {
         match *component_value {
-            Hash(ref value) | IDHash(ref value) => parse_color_hash(*value),
-            Ident(ref value) => parse_color_keyword(*value),
-            Function(ref name, ref arguments) => parse_color_function(*name, *arguments),
+            Hash(ref value) | IDHash(ref value) => parse_color_hash(value.as_slice()),
+            Ident(ref value) => parse_color_keyword(value.as_slice()),
+            Function(ref name, ref arguments)
+                => parse_color_function(name.as_slice(), arguments.as_slice()),
             _ => None
         }
     }

@@ -13,6 +13,10 @@ use encoding::label::encoding_from_whatwg_label;
 use super::*;
 use ast::*;
 
+macro_rules! JString {
+    ($e: expr) => { json::String($e.to_owned()) }
+}
+
 
 fn write_whole_file(path: &Path, data: &str) {
     match File::open_mode(path, io::Open, io::Write) {
@@ -29,7 +33,7 @@ fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
         (&json::Boolean(a), &json::Boolean(b)) => a == b,
         (&json::List(ref a), &json::List(ref b))
             => a.iter().zip(b.iter()).all(|(ref a, ref b)| almost_equals(*a, *b)),
-        (&json::Object(_), &json::Object(_)) => fail!(~"Not implemented"),
+        (&json::Object(_), &json::Object(_)) => fail!("Not implemented"),
         (&json::Null, &json::Null) => true,
         _ => false,
     }
@@ -50,7 +54,8 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: ~str) {
             write_whole_file(&expected_path, expected);
             Process::status(
                 "colordiff",
-                [~"-u1000", result_path.display().to_str(), expected_path.display().to_str()]
+                ["-u1000".to_owned(), result_path.display().to_str(),
+                 expected_path.display().to_str()]
             ).unwrap();
         }).unwrap();
 
@@ -157,12 +162,12 @@ fn stylesheet_from_bytes() {
         };
 
         let result = {
-            let css = get_string(map, &~"css_bytes").unwrap().chars().map(|c| {
+            let css = get_string(map, &"css_bytes".to_owned()).unwrap().chars().map(|c| {
                 assert!(c as u32 <= 0xFF);
                 c as u8
             }).collect::<~[u8]>();
-            let protocol_encoding_label = get_string(map, &~"protocol_encoding");
-            let environment_encoding = get_string(map, &~"environment_encoding")
+            let protocol_encoding_label = get_string(map, &"protocol_encoding".to_owned());
+            let environment_encoding = get_string(map, &"environment_encoding".to_owned())
                 .and_then(encoding_from_whatwg_label);
 
             let (mut rules, used_encoding) = parse_stylesheet_rules_from_bytes(
@@ -213,7 +218,7 @@ fn color3_keywords() {
         match c {
             Some(RGBA(RGBA { red: r, green: g, blue: b, alpha: a }))
             => (~[r * 255., g * 255., b * 255., a]).to_json(),
-            Some(CurrentColor) => json::String(~"currentColor"),
+            Some(CurrentColor) => JString!("currentColor"),
             None => json::Null,
         }
     });
@@ -221,21 +226,21 @@ fn color3_keywords() {
 
 
 #[bench]
-fn bench_color_lookup_red(b: &mut test::BenchHarness) {
+fn bench_color_lookup_red(b: &mut test::Bencher) {
     let ident = parse_one_component_value(tokenize("red")).unwrap();
     b.iter(|| assert!(Color::parse(&ident).is_some()));
 }
 
 
 #[bench]
-fn bench_color_lookup_lightgoldenrodyellow(b: &mut test::BenchHarness) {
+fn bench_color_lookup_lightgoldenrodyellow(b: &mut test::Bencher) {
     let ident = parse_one_component_value(tokenize("lightgoldenrodyellow")).unwrap();
     b.iter(|| assert!(Color::parse(&ident).is_some()));
 }
 
 
 #[bench]
-fn bench_color_lookup_fail(b: &mut test::BenchHarness) {
+fn bench_color_lookup_fail(b: &mut test::Bencher) {
     let ident = parse_one_component_value(tokenize("lightgoldenrodyellowbazinga")).unwrap();
     b.iter(|| assert!(Color::parse(&ident).is_none()));
 }
@@ -254,7 +259,7 @@ fn serializer() {
     run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
         let component_values = tokenize(input).map(|(c, _)| c).collect::<~[ComponentValue]>();
         let serialized = component_values.iter().to_css();
-        tokenize(serialized).map(|(c, _)| c).collect::<~[ComponentValue]>()
+        tokenize(serialized.as_slice()).map(|(c, _)| c).collect::<~[ComponentValue]>()
     });
 }
 
@@ -301,10 +306,10 @@ impl ToJson for Result<ComponentValue, SyntaxError> {
 
 impl ToJson for SyntaxError {
     fn to_json(&self) -> json::Json {
-        json::List(~[json::String(~"error"), json::String(match self.reason {
-            ErrEmptyInput => ~"empty",
-            ErrExtraInput => ~"extra-input",
-            _ => ~"invalid",
+        json::List(~[JString!("error"), JString!(match self.reason {
+            ErrEmptyInput => "empty",
+            ErrExtraInput => "extra-input",
+            _ => "invalid",
         })])
     }
 }
@@ -314,7 +319,7 @@ impl ToJson for Color {
     fn to_json(&self) -> json::Json {
         match *self {
             RGBA(RGBA { red: r, green: g, blue: b, alpha: a }) => (~[r, g, b, a]).to_json(),
-            CurrentColor => json::String(~"currentColor"),
+            CurrentColor => JString!("currentColor"),
         }
     }
 }
@@ -340,7 +345,7 @@ impl ToJson for DeclarationListItem {
 }
 
 
-fn list_to_json(list: &~[(ComponentValue, SourceLocation)]) -> ~[json::Json] {
+fn list_to_json(list: &Vec<(ComponentValue, SourceLocation)>) -> ~[json::Json] {
     list.iter().map(|tuple| {
         match *tuple {
             (ref c, _) => c.to_json()
@@ -353,7 +358,7 @@ impl ToJson for AtRule {
     fn to_json(&self) -> json::Json {
         match *self {
             AtRule{name: ref name, prelude: ref prelude, block: ref block, ..}
-            => json::List(~[json::String(~"at-rule"), name.to_json(),
+            => json::List(~[JString!("at-rule"), name.to_json(),
                             prelude.to_json(), block.as_ref().map(list_to_json).to_json()])
         }
     }
@@ -364,7 +369,7 @@ impl ToJson for QualifiedRule {
     fn to_json(&self) -> json::Json {
         match *self {
             QualifiedRule{prelude: ref prelude, block: ref block, ..}
-            => json::List(~[json::String(~"qualified rule"),
+            => json::List(~[JString!("qualified rule"),
                             prelude.to_json(), json::List(list_to_json(block))])
         }
     }
@@ -375,7 +380,7 @@ impl ToJson for Declaration {
     fn to_json(&self) -> json::Json {
         match *self {
             Declaration{name: ref name, value: ref value, important: ref important, ..}
-            =>  json::List(~[json::String(~"declaration"), name.to_json(),
+            =>  json::List(~[JString!("declaration"), name.to_json(),
                              value.to_json(), important.to_json()])
         }
     }
@@ -385,63 +390,62 @@ impl ToJson for Declaration {
 impl ToJson for ComponentValue {
     fn to_json(&self) -> json::Json {
         use JList = serialize::json::List;
-        use JString = serialize::json::String;
 
         fn numeric(value: &NumericValue) -> ~[json::Json] {
             match *value {
                 NumericValue{representation: ref r, value: ref v, int_value: ref i}
                 => ~[r.to_json(), v.to_json(),
-                     JString(match *i { Some(_) => ~"integer", _ => ~"number" })]
+                     JString!(match *i { Some(_) => "integer", _ => "number" })]
             }
         }
 
         match *self {
-            Ident(ref value) => JList(~[JString(~"ident"), value.to_json()]),
-            AtKeyword(ref value) => JList(~[JString(~"at-keyword"), value.to_json()]),
-            Hash(ref value) => JList(~[JString(~"hash"), value.to_json(),
-                                       JString(~"unrestricted")]),
-            IDHash(ref value) => JList(~[JString(~"hash"), value.to_json(), JString(~"id")]),
-            String(ref value) => JList(~[JString(~"string"), value.to_json()]),
-            URL(ref value) => JList(~[JString(~"url"), value.to_json()]),
-            Delim('\\') => JString(~"\\"),
-            Delim(value) => JString(str::from_char(value)),
+            Ident(ref value) => JList(~[JString!("ident"), value.to_json()]),
+            AtKeyword(ref value) => JList(~[JString!("at-keyword"), value.to_json()]),
+            Hash(ref value) => JList(~[JString!("hash"), value.to_json(),
+                                       JString!("unrestricted")]),
+            IDHash(ref value) => JList(~[JString!("hash"), value.to_json(), JString!("id")]),
+            String(ref value) => JList(~[JString!("string"), value.to_json()]),
+            URL(ref value) => JList(~[JString!("url"), value.to_json()]),
+            Delim('\\') => JString!("\\"),
+            Delim(value) => json::String(str::from_char(value)),
 
-            Number(ref value) => JList(~[JString(~"number")] + numeric(value)),
-            Percentage(ref value) => JList(~[JString(~"percentage")] + numeric(value)),
+            Number(ref value) => JList(~[JString!("number")] + numeric(value)),
+            Percentage(ref value) => JList(~[JString!("percentage")] + numeric(value)),
             Dimension(ref value, ref unit)
-            => JList(~[JString(~"dimension")] + numeric(value) + ~[unit.to_json()]),
+            => JList(~[JString!("dimension")] + numeric(value) + ~[unit.to_json()]),
 
             UnicodeRange(start, end)
-            => JList(~[JString(~"unicode-range"), start.to_json(), end.to_json()]),
+            => JList(~[JString!("unicode-range"), start.to_json(), end.to_json()]),
 
-            WhiteSpace => JString(~" "),
-            Colon => JString(~":"),
-            Semicolon => JString(~";"),
-            Comma => JString(~","),
-            IncludeMatch => JString(~"~="),
-            DashMatch => JString(~"|="),
-            PrefixMatch => JString(~"^="),
-            SuffixMatch => JString(~"$="),
-            SubstringMatch => JString(~"*="),
-            Column => JString(~"||"),
-            CDO => JString(~"<!--"),
-            CDC => JString(~"-->"),
+            WhiteSpace => JString!(" "),
+            Colon => JString!(":"),
+            Semicolon => JString!(";"),
+            Comma => JString!(","),
+            IncludeMatch => JString!("~="),
+            DashMatch => JString!("|="),
+            PrefixMatch => JString!("^="),
+            SuffixMatch => JString!("$="),
+            SubstringMatch => JString!("*="),
+            Column => JString!("||"),
+            CDO => JString!("<!--"),
+            CDC => JString!("-->"),
 
             Function(ref name, ref arguments)
-            => JList(~[JString(~"function"), name.to_json()] +
+            => JList(~[JString!("function"), name.to_json()] +
                      arguments.iter().map(|a| a.to_json()).collect::<~[json::Json]>()),
             ParenthesisBlock(ref content)
-            => JList(~[JString(~"()")] + content.iter().map(|c| c.to_json()).collect::<~[json::Json]>()),
+            => JList(~[JString!("()")] + content.iter().map(|c| c.to_json()).collect::<~[json::Json]>()),
             SquareBracketBlock(ref content)
-            => JList(~[JString(~"[]")] + content.iter().map(|c| c.to_json()).collect::<~[json::Json]>()),
+            => JList(~[JString!("[]")] + content.iter().map(|c| c.to_json()).collect::<~[json::Json]>()),
             CurlyBracketBlock(ref content)
-            => JList(~[JString(~"{}")] + list_to_json(content)),
+            => JList(~[JString!("{}")] + list_to_json(content)),
 
-            BadURL => JList(~[JString(~"error"), JString(~"bad-url")]),
-            BadString => JList(~[JString(~"error"), JString(~"bad-string")]),
-            CloseParenthesis => JList(~[JString(~"error"), JString(~")")]),
-            CloseSquareBracket => JList(~[JString(~"error"), JString(~"]")]),
-            CloseCurlyBracket => JList(~[JString(~"error"), JString(~"}")]),
+            BadURL => JList(~[JString!("error"), JString!("bad-url")]),
+            BadString => JList(~[JString!("error"), JString!("bad-string")]),
+            CloseParenthesis => JList(~[JString!("error"), JString!(")")]),
+            CloseSquareBracket => JList(~[JString!("error"), JString!("]")]),
+            CloseCurlyBracket => JList(~[JString!("error"), JString!("}")]),
         }
     }
 }

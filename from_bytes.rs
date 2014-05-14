@@ -33,7 +33,7 @@ use parser::{parse_stylesheet_rules, StylesheetParser};
 ///     and the `Encoding` object that was used.
 pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>,
                                environment_encoding: Option<EncodingRef>)
-                            -> (~str, EncodingRef) {
+                            -> (StrBuf, EncodingRef) {
     // http://dev.w3.org/csswg/css-syntax/#the-input-byte-stream
     match protocol_encoding_label {
         None => (),
@@ -71,7 +71,7 @@ pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>
 
 
 #[inline]
-fn decode_replace(input: &[u8], fallback_encoding: EncodingRef)-> (~str, EncodingRef) {
+fn decode_replace(input: &[u8], fallback_encoding: EncodingRef)-> (StrBuf, EncodingRef) {
     let (result, used_encoding) = decode(input, DecodeReplace, fallback_encoding);
     (result.unwrap(), used_encoding)
 }
@@ -97,5 +97,5 @@ pub fn parse_stylesheet_rules_from_bytes(
      -> (StylesheetParser<Tokenizer>, EncodingRef) {
     let (css_unicode, encoding) = decode_stylesheet_bytes(
         css_bytes, protocol_encoding_label, environment_encoding);
-    (parse_stylesheet_rules(tokenize(css_unicode)), encoding)
+    (parse_stylesheet_rules(tokenize(css_unicode.as_slice())), encoding)
 }
