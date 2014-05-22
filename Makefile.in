@@ -6,13 +6,14 @@ CXXFLAGS ?=
 AR ?= ar
 RUSTC ?= rustc
 RUSTFLAGS ?=
+EXT_DEPS ?=
 
 RUST_SRC=$(shell find $(VPATH)/. -type f -name '*.rs')
 
 .PHONY: all
 all:    libcssparser.dummy
 
-libcssparser.dummy: lib.rs $(RUST_SRC)
+libcssparser.dummy: lib.rs $(RUST_SRC) $(EXT_DEPS)
 	$(RUSTC) $(RUSTFLAGS) $< --out-dir .
 	touch $@
 
