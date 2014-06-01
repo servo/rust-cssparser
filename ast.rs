@@ -9,7 +9,7 @@ use std::vec;
 
 #[deriving(Eq)]
 pub struct NumericValue {
-    pub representation: StrBuf,
+    pub representation: String,
     pub value: f64,
     pub int_value: Option<i64>,
 }
@@ -28,16 +28,16 @@ pub type Node = (ComponentValue, SourceLocation);  // TODO this is not a good na
 #[deriving(Eq)]
 pub enum ComponentValue {
     // Preserved tokens.
-    Ident(StrBuf),
-    AtKeyword(StrBuf),
-    Hash(StrBuf),
-    IDHash(StrBuf),  // Hash that is a valid ID selector.
-    String(StrBuf),
-    URL(StrBuf),
+    Ident(String),
+    AtKeyword(String),
+    Hash(String),
+    IDHash(String),  // Hash that is a valid ID selector.
+    String(String),
+    URL(String),
     Delim(char),
     Number(NumericValue),
     Percentage(NumericValue),
-    Dimension(NumericValue, StrBuf),
+    Dimension(NumericValue, String),
     UnicodeRange(u32, u32),  // (start, end) of range
     WhiteSpace,
     Colon,  // :
@@ -53,7 +53,7 @@ pub enum ComponentValue {
     CDC,  // -->
 
     // Function
-    Function(StrBuf, Vec<ComponentValue>),  // name, arguments
+    Function(String, Vec<ComponentValue>),  // name, arguments
 
     // Simple block
     ParenthesisBlock(Vec<ComponentValue>),  // (…)
@@ -72,7 +72,7 @@ pub enum ComponentValue {
 #[deriving(Eq)]
 pub struct Declaration {
     pub location: SourceLocation,
-    pub name: StrBuf,
+    pub name: String,
     pub value: Vec<ComponentValue>,
     pub important: bool,
 }
@@ -87,7 +87,7 @@ pub struct QualifiedRule {
 #[deriving(Eq)]
 pub struct AtRule {
     pub location: SourceLocation,
-    pub name: StrBuf,
+    pub name: String,
     pub prelude: Vec<ComponentValue>,
     pub block: Option<Vec<Node>>,
 }
@@ -123,7 +123,7 @@ pub enum ErrorReason {
 
 impl fmt::Show for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f.buf, "{:u}:{:u} {:?}", self.location.line, self.location.column, self.reason)
+        write!(f, "{:u}:{:u} {:?}", self.location.line, self.location.column, self.reason)
     }
 }
 

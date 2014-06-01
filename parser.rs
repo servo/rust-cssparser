@@ -173,7 +173,7 @@ for DeclarationListParser<T> {
 }
 
 
-fn parse_at_rule<T: Iterator<Node>>(iter: &mut T, name: StrBuf, location: SourceLocation)
+fn parse_at_rule<T: Iterator<Node>>(iter: &mut T, name: String, location: SourceLocation)
                  -> AtRule {
     let mut prelude = Vec::new();
     let mut block = None;

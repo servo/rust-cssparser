@@ -19,7 +19,8 @@ pub fn parse_nth(input: &[ComponentValue]) -> Option<(i32, i32)> {
         },
         Some(&Dimension(ref value, ref unit)) => match value.int_value {
             Some(a) => {
-                let unit: &str = unit.as_slice().to_ascii_lower();
+                let unit = unit.as_slice().to_ascii_lower();
+                let unit = unit.as_slice();
                 match unit {
                     "n" => parse_b(iter, a as i32),
                     "n-" => parse_signless_b(iter, a as i32, -1),
@@ -32,7 +33,8 @@ pub fn parse_nth(input: &[ComponentValue]) -> Option<(i32, i32)> {
             _ => None,
         },
         Some(&Ident(ref value)) => {
-            let ident: &str = value.as_slice().to_ascii_lower();
+            let ident = value.as_slice().to_ascii_lower();
+            let ident = ident.as_slice();
             match ident {
                 "even" => parse_end(iter, 2, 0),
                 "odd" => parse_end(iter, 2, 1),
@@ -52,7 +54,8 @@ pub fn parse_nth(input: &[ComponentValue]) -> Option<(i32, i32)> {
         },
         Some(&Delim('+')) => match iter.iter_with_whitespace.next() {
             Some(&Ident(ref value)) => {
-                let ident: &str = value.as_slice().to_ascii_lower();
+                let ident = value.as_slice().to_ascii_lower();
+                let ident = ident.as_slice();
                 match ident {
                     "n" => parse_b(iter, 1),
                     "n-" => parse_signless_b(iter, 1, -1),

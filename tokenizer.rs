@@ -32,7 +32,7 @@ impl Iterator<Node> for Tokenizer {
 
 
 #[inline]
-fn preprocess(input: &str) -> ~str {
+fn preprocess(input: &str) -> String {
     // TODO: Is this faster if done in one pass?
     input.replace("\r\n", "\n").replace("\r", "\n").replace("\x0C", "\n").replace("\x00", "\uFFFD")
 }
@@ -40,14 +40,14 @@ fn preprocess(input: &str) -> ~str {
 
 #[test]
 fn test_preprocess() {
-    assert!("" == preprocess(""));
+    assert!("" == preprocess("").as_slice());
     assert!("Lorem\n\t\uFFFDipusm\ndoror\uFFFD\n" ==
-            preprocess("Lorem\r\n\t\x00ipusm\ndoror\uFFFD\r"));
+            preprocess("Lorem\r\n\t\x00ipusm\ndoror\uFFFD\r").as_slice());
 }
 
 
 pub struct Tokenizer {
-    input: ~str,
+    input: String,
     length: uint,  // All counted in bytes, not characters
     position: uint,  // All counted in bytes, not characters
     line: uint,
@@ -65,25 +65,25 @@ impl Tokenizer {
 
     #[inline]
     fn char_at(&self, offset: uint) -> char {
-        self.input.char_at(self.position + offset)
+        self.input.as_slice().char_at(self.position + offset)
     }
 
     #[inline]
     fn consume_char(&mut self) -> char {
-        let range = self.input.char_range_at(self.position);
+        let range = self.input.as_slice().char_range_at(self.position);
         self.position = range.next;
         range.ch
     }
 
     #[inline]
     fn starts_with(&self, needle: &str) -> bool {
-        self.input.slice_from(self.position).starts_with(needle)
+        self.input.as_slice().slice_from(self.position).starts_with(needle)
     }
 
     #[inline]
     fn new_line(&mut self) {
         if cfg!(test) {
-            assert!(self.input.char_at(self.position - 1) == '\n')
+            assert!(self.input.as_slice().char_at(self.position - 1) == '\n')
         }
         self.line += 1;
         self.last_line_start = self.position;
@@ -101,7 +101,7 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
     consume_comments(tokenizer);
     if tokenizer.is_eof() {
         if cfg!(test) {
-            assert!(tokenizer.line == tokenizer.input.split('\n').len(),
+            assert!(tokenizer.line == tokenizer.input.as_slice().split('\n').len(),
                     "The tokenizer is missing a tokenizer.new_line() call somewhere.")
         }
         return None
@@ -314,9 +314,9 @@ fn consume_string(tokenizer: &mut Tokenizer, single_quote: bool) -> ComponentVal
 
 
 // Return None on syntax error (ie. unescaped newline)
-fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Option<StrBuf> {
+fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Option<String> {
     tokenizer.position += 1;  // Skip the initial quote
-    let mut string = StrBuf::new();
+    let mut string = String::new();
     while !tokenizer.is_eof() {
         match tokenizer.consume_char() {
             '"' if !single_quote => break,
@@ -348,7 +348,7 @@ fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
         'a'..'z' | 'A'..'Z' | '_' => true,
         '-' => tokenizer.position + 1 < tokenizer.length && match tokenizer.char_at(1) {
             'a'..'z' | 'A'..'Z' | '_' => true,
-            '\\' => !tokenizer.input.slice_from(tokenizer.position + 1).starts_with("\\\n"),
+            '\\' => !tokenizer.input.as_slice().slice_from(tokenizer.position + 1).starts_with("\\\n"),
             c => c > '\x7F',  // Non-ASCII
         },
         '\\' => !tokenizer.starts_with("\\\n"),
@@ -367,8 +367,8 @@ fn consume_ident_like(tokenizer: &mut Tokenizer) -> ComponentValue {
     }
 }
 
-fn consume_name(tokenizer: &mut Tokenizer) -> StrBuf {
-    let mut value = StrBuf::new();
+fn consume_name(tokenizer: &mut Tokenizer) -> String {
+    let mut value = String::new();
     while !tokenizer.is_eof() {
         let c = tokenizer.current_char();
         value.push_char(match c {
@@ -389,7 +389,7 @@ fn consume_name(tokenizer: &mut Tokenizer) -> StrBuf {
 fn consume_numeric(tokenizer: &mut Tokenizer) -> ComponentValue {
     // Parse [+-]?\d*(\.\d+)?([eE][+-]?\d+)?
     // But this is always called so that there is at least one digit in \d*(\.\d+)?
-    let mut representation = StrBuf::new();
+    let mut representation = String::new();
     let mut is_integer = true;
     if is_match!(tokenizer.current_char(), '-' | '+') {
          representation.push_char(tokenizer.consume_char())
@@ -471,7 +471,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
             _ => return consume_unquoted_url(tokenizer),
         }
     }
-    return URL(StrBuf::new());
+    return URL(String::new());
 
     fn consume_quoted_url(tokenizer: &mut Tokenizer, single_quote: bool) -> ComponentValue {
         match consume_quoted_string(tokenizer, single_quote) {
@@ -481,7 +481,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
     }
 
     fn consume_unquoted_url(tokenizer: &mut Tokenizer) -> ComponentValue {
-        let mut string = StrBuf::new();
+        let mut string = String::new();
         while !tokenizer.is_eof() {
             let next_char = match tokenizer.consume_char() {
                 ' ' | '\t' => return consume_url_end(tokenizer, string),
@@ -505,7 +505,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
         URL(string)
     }
 
-    fn consume_url_end(tokenizer: &mut Tokenizer, string: StrBuf) -> ComponentValue {
+    fn consume_url_end(tokenizer: &mut Tokenizer, string: String) -> ComponentValue {
         while !tokenizer.is_eof() {
             match tokenizer.consume_char() {
                 ' ' | '\t' => (),
@@ -535,7 +535,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
 
 fn consume_unicode_range(tokenizer: &mut Tokenizer) -> ComponentValue {
     tokenizer.position += 2;  // Skip U+
-    let mut hex = StrBuf::new();
+    let mut hex = String::new();
     while hex.len() < 6 && !tokenizer.is_eof()
           && is_match!(tokenizer.current_char(), '0'..'9' | 'A'..'F' | 'a'..'f') {
         hex.push_char(tokenizer.consume_char());
@@ -550,8 +550,8 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> ComponentValue {
     let start;
     let end;
     if question_marks > 0 {
-        start = num::from_str_radix(hex.clone().append("0".repeat(question_marks)).as_slice(), 16).unwrap();
-        end = num::from_str_radix(hex.append("F".repeat(question_marks)).as_slice(), 16).unwrap();
+        start = num::from_str_radix(hex.clone().append("0".repeat(question_marks).as_slice()).as_slice(), 16).unwrap();
+        end = num::from_str_radix(hex.append("F".repeat(question_marks).as_slice()).as_slice(), 16).unwrap();
     } else {
         start = num::from_str_radix(hex.as_slice(), 16).unwrap();
         hex.truncate(0);
@@ -580,7 +580,7 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
     let c = tokenizer.consume_char();
     match c {
         '0'..'9' | 'A'..'F' | 'a'..'f' => {
-            let mut hex = StrBuf::from_char(1, c);
+            let mut hex = String::from_char(1, c);
             while hex.len() < 6 && !tokenizer.is_eof() {
                 let c = tokenizer.current_char();
                 match c {
