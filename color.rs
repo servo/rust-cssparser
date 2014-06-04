@@ -241,6 +241,7 @@ fn parse_color_hash(value: &str) -> Option<Color> {
 fn parse_color_function(name: &str, arguments: &[ComponentValue])
                         -> Option<Color> {
     let lower_name = name.to_ascii_lower();
+    let lower_name = lower_name.as_slice();
 
     let (is_rgb, has_alpha) =
         if "rgba" == lower_name { (true, true) }

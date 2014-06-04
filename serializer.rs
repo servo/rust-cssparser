@@ -7,13 +7,13 @@ use ast::*;
 
 
 impl ast::ComponentValue {
-    pub fn to_css(&mut self) -> StrBuf {
-        let mut css = StrBuf::new();
+    pub fn to_css(&mut self) -> String {
+        let mut css = String::new();
         self.to_css_push(&mut css);
         css
     }
 
-    pub fn to_css_push(&self, css: &mut StrBuf) {
+    pub fn to_css_push(&self, css: &mut String) {
         match *self {
             Ident(ref value) => serialize_identifier(value.as_slice(), css),
             AtKeyword(ref value) => {
@@ -58,9 +58,9 @@ impl ast::ComponentValue {
             },
 
             UnicodeRange(start, end) => {
-                css.push_str(format!("U+{:X}", start));
+                css.push_str(format!("U+{:X}", start).as_slice());
                 if end != start {
-                    css.push_str(format!("-{:X}", end));
+                    css.push_str(format!("-{:X}", end).as_slice());
                 }
             }
 
@@ -109,7 +109,7 @@ impl ast::ComponentValue {
 }
 
 
-pub fn serialize_identifier(value: &str, css: &mut StrBuf) {
+pub fn serialize_identifier(value: &str, css: &mut String) {
     // TODO: avoid decoding/re-encoding UTF-8?
     let mut iter = value.chars();
     let mut c = iter.next().unwrap();
@@ -127,9 +127,9 @@ pub fn serialize_identifier(value: &str, css: &mut StrBuf) {
 
 
 #[inline]
-fn serialize_char(c: char, css: &mut StrBuf, is_identifier_start: bool) {
+fn serialize_char(c: char, css: &mut String, is_identifier_start: bool) {
     match c {
-        '0'..'9' if is_identifier_start => css.push_str(format!("\\\\3{} ", c)),
+        '0'..'9' if is_identifier_start => css.push_str(format!("\\\\3{} ", c).as_slice()),
         '-' if is_identifier_start => css.push_str("\\-"),
         '0'..'9' | 'A'..'Z' | 'a'..'z' | '_' | '-' => css.push_char(c),
         _ if c > '\x7F' => css.push_char(c),
@@ -141,7 +141,7 @@ fn serialize_char(c: char, css: &mut StrBuf, is_identifier_start: bool) {
 }
 
 
-pub fn serialize_string(value: &str, css: &mut StrBuf) {
+pub fn serialize_string(value: &str, css: &mut String) {
     css.push_char('"');
     // TODO: avoid decoding/re-encoding UTF-8?
     for c in value.chars() {
@@ -159,18 +159,18 @@ pub fn serialize_string(value: &str, css: &mut StrBuf) {
 
 
 pub trait ToCss {
-    fn to_css(&mut self) -> StrBuf {
-        let mut css = StrBuf::new();
+    fn to_css(&mut self) -> String {
+        let mut css = String::new();
         self.to_css_push(&mut css);
         css
     }
 
-    fn to_css_push(&mut self, css: &mut StrBuf);
+    fn to_css_push(&mut self, css: &mut String);
 }
 
 
 impl<'a, I: Iterator<&'a ComponentValue>> ToCss for I {
-    fn to_css_push(&mut self, css: &mut StrBuf) {
+    fn to_css_push(&mut self, css: &mut String) {
         let mut previous = match self.next() {
             None => return,
             Some(first) => { first.to_css_push(css); first }

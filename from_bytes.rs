@@ -33,7 +33,7 @@ use parser::{parse_stylesheet_rules, StylesheetParser};
 ///     and the `Encoding` object that was used.
 pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>,
                                environment_encoding: Option<EncodingRef>)
-                            -> (StrBuf, EncodingRef) {
+                            -> (String, EncodingRef) {
     // http://dev.w3.org/csswg/css-syntax/#the-input-byte-stream
     match protocol_encoding_label {
         None => (),
@@ -50,8 +50,8 @@ pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>
             Some(label_length)
             => if css.slice_from(10 + label_length).starts_with("\";".as_bytes()) {
                 let label = css.slice(10, 10 + label_length);
-                let label = str::from_chars(label.iter().map(|&b| b as char).collect::<~[char]>());
-                match encoding_from_whatwg_label(label) {
+                let label = str::from_chars(label.iter().map(|&b| b as char).collect::<Vec<char>>().as_slice());
+                match encoding_from_whatwg_label(label.as_slice()) {
                     None => (),
                     Some(fallback) => match fallback.name() {
                         "utf-16be" | "utf-16le"
@@ -71,7 +71,7 @@ pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>
 
 
 #[inline]
-fn decode_replace(input: &[u8], fallback_encoding: EncodingRef)-> (StrBuf, EncodingRef) {
+fn decode_replace(input: &[u8], fallback_encoding: EncodingRef)-> (String, EncodingRef) {
     let (result, used_encoding) = decode(input, DecodeReplace, fallback_encoding);
     (result.unwrap(), used_encoding)
 }
