@@ -7,7 +7,7 @@ use std::ascii::StrAsciiExt;
 use ast::*;
 
 
-#[deriving(Clone, Eq)]
+#[deriving(Clone, PartialEq)]
 pub struct RGBA {
     // All in 0..1
     // Use f32 to try and match rust-azure’s AzFloat
@@ -17,7 +17,7 @@ pub struct RGBA {
     pub alpha: f32,
 }
 
-#[deriving(Clone, Eq)]
+#[deriving(Clone, PartialEq)]
 pub enum Color {
     CurrentColor,
     RGBA(RGBA),
