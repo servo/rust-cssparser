@@ -167,6 +167,7 @@ fn parse_color_keyword(value: &str) -> Option<Color> {
         "pink" => (255., 192., 203.),
         "plum" => (221., 160., 221.),
         "powderblue" => (176., 224., 230.),
+        "rebeccapurple" => (102., 51., 153.),
         "rosybrown" => (188., 143., 143.),
         "royalblue" => (65., 105., 225.),
         "saddlebrown" => (139., 69., 19.),
