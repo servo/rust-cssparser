@@ -7,7 +7,7 @@ use std::slice;
 use std::vec;
 
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 pub struct NumericValue {
     pub representation: String,
     pub value: f64,
@@ -15,7 +15,7 @@ pub struct NumericValue {
 }
 
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 pub struct SourceLocation {
     pub line: uint,  // First line is 1
     pub column: uint,  // First character of a line is at column 1
@@ -25,7 +25,7 @@ pub struct SourceLocation {
 pub type Node = (ComponentValue, SourceLocation);  // TODO this is not a good name
 
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 pub enum ComponentValue {
     // Preserved tokens.
     Ident(String),
@@ -69,7 +69,7 @@ pub enum ComponentValue {
 }
 
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 pub struct Declaration {
     pub location: SourceLocation,
     pub name: String,
@@ -77,14 +77,14 @@ pub struct Declaration {
     pub important: bool,
 }
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 pub struct QualifiedRule {
     pub location: SourceLocation,
     pub prelude: Vec<ComponentValue>,
     pub block: Vec<Node>,
 }
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 pub struct AtRule {
     pub location: SourceLocation,
     pub name: String,
@@ -92,26 +92,26 @@ pub struct AtRule {
     pub block: Option<Vec<Node>>,
 }
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 pub enum DeclarationListItem {
     Declaration(Declaration),
     // A better idea for a name that means "at-rule" but is not "AtRule"?
     DeclAtRule(AtRule),
 }
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 pub enum Rule {
     QualifiedRule(QualifiedRule),
     AtRule(AtRule),
 }
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 pub struct SyntaxError {
     pub location: SourceLocation,
     pub reason: ErrorReason,
 }
 
-#[deriving(Eq)]
+#[deriving(PartialEq)]
 pub enum ErrorReason {
     ErrEmptyInput,  // Parsing a single "thing", found only whitespace.
     ErrExtraInput,  // Found more non-whitespace after parsing a single "thing".
