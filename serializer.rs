@@ -129,7 +129,7 @@ pub fn serialize_identifier(value: &str, css: &mut String) {
 #[inline]
 fn serialize_char(c: char, css: &mut String, is_identifier_start: bool) {
     match c {
-        '0'..'9' if is_identifier_start => css.push_str(format!("\\\\3{} ", c).as_slice()),
+        '0'..'9' if is_identifier_start => css.push_str(format!("\\3{} ", c).as_slice()),
         '-' if is_identifier_start => css.push_str("\\-"),
         '0'..'9' | 'A'..'Z' | 'a'..'z' | '_' | '-' => css.push_char(c),
         _ if c > '\x7F' => css.push_char(c),
