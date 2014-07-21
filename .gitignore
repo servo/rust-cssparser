@@ -8,3 +8,4 @@
 *.dummy
 *-test
 Makefile
+/target
