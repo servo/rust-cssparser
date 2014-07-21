@@ -58,7 +58,5 @@ Parsing CSS involves a series of steps:
 TODO
 ----
 
-* Detect character encoding & decode from bytes,
-  using [rust-encoding](https://github.com/lifthrasiir/rust-encoding).
 * Figure out float and integer overflow in parsing. (Clamp instead?)
 * Make it fast! (Add a fast path in identifier tokenization?)
