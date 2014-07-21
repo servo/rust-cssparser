@@ -205,10 +205,10 @@ fn parse_color_hash(value: &str) -> Option<Color> {
     macro_rules! from_hex(
         ($c: expr) => {{
             let c = $c;
-            match c as char {
-                '0' .. '9' => c - ('0' as u8),
-                'a' .. 'f' => c - ('a' as u8) + 10,
-                'A' .. 'F' => c - ('A' as u8) + 10,
+            match c {
+                '0' .. '9' => c as u8 - ('0' as u8),
+                'a' .. 'f' => c as u8 - ('a' as u8) + 10,
+                'A' .. 'F' => c as u8 - ('A' as u8) + 10,
                 _ => return None  // Not a valid color
             }
         }};
@@ -224,14 +224,14 @@ fn parse_color_hash(value: &str) -> Option<Color> {
 
     match value.len() {
         6 => to_rgba!(
-            from_hex!(value[0]) * 16 + from_hex!(value[1]),
-            from_hex!(value[2]) * 16 + from_hex!(value[3]),
-            from_hex!(value[4]) * 16 + from_hex!(value[5]),
+            from_hex!(value.char_at(0)) * 16 + from_hex!(value.char_at(1)),
+            from_hex!(value.char_at(2)) * 16 + from_hex!(value.char_at(3)),
+            from_hex!(value.char_at(4)) * 16 + from_hex!(value.char_at(5)),
         ),
         3 => to_rgba!(
-            from_hex!(value[0]) * 17,
-            from_hex!(value[1]) * 17,
-            from_hex!(value[2]) * 17,
+            from_hex!(value.char_at(0)) * 17,
+            from_hex!(value.char_at(1)) * 17,
+            from_hex!(value.char_at(2)) * 17,
         ),
         _ => None
     }

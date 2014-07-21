@@ -2,8 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::{io, str, task};
+use std::io;
 use std::io::{File, Command, Writer, TempDir};
+use std::task;
 use serialize::{json};
 use serialize::json::ToJson;
 use test;
@@ -49,7 +50,9 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: String) {
         let temp = TempDir::new("rust-cssparser-tests").unwrap();
         let results = results.to_pretty_str().append("\n");
         let expected = expected.to_pretty_str().append("\n");
-        task::try(proc() {
+        // NB: The task try is to prevent error message generation from
+        // stopping us, we don't care about the result.
+        let _ = task::try(proc() {
             let mut result_path = temp.path().clone();
             result_path.push("results.json");
             let mut expected_path = temp.path().clone();
@@ -58,10 +61,10 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: String) {
             write_whole_file(&expected_path, expected.as_slice());
             Command::new("colordiff")
                 .arg("-u1000")
-                .arg(result_path.display().to_str())
-                .arg(expected_path.display().to_str())
-                .status().unwrap();
-        }).unwrap();
+                .arg(result_path.display().to_string())
+                .arg(expected_path.display().to_string())
+                .status().unwrap()
+        });
 
         fail!(message)
     }
@@ -166,12 +169,12 @@ fn stylesheet_from_bytes() {
         };
 
         let result = {
-            let css = get_string(map, &"css_bytes".to_string()).unwrap().chars().map(|c| {
+            let css = get_string(&map, &"css_bytes".to_string()).unwrap().chars().map(|c| {
                 assert!(c as u32 <= 0xFF);
                 c as u8
             }).collect::<Vec<u8>>();
-            let protocol_encoding_label = get_string(map, &"protocol_encoding".to_string());
-            let environment_encoding = get_string(map, &"environment_encoding".to_string())
+            let protocol_encoding_label = get_string(&map, &"protocol_encoding".to_string());
+            let environment_encoding = get_string(&map, &"environment_encoding".to_string())
                 .and_then(encoding_from_whatwg_label);
 
             let (mut rules, used_encoding) = parse_stylesheet_rules_from_bytes(
@@ -179,7 +182,7 @@ fn stylesheet_from_bytes() {
 
             (rules.collect::<Vec<Result<Rule, SyntaxError>>>(), used_encoding.name().to_string()).to_json()
         };
-        assert_json_eq(result, expected, json::Object(map).to_str());
+        assert_json_eq(result, expected, json::Object(map).to_string());
     });
 
     fn get_string<'a>(map: &'a json::Object, key: &String) -> Option<&'a str> {
@@ -410,7 +413,7 @@ impl ToJson for ComponentValue {
             String(ref value) => JList!(JString!("string"), value.to_json()),
             URL(ref value) => JList!(JString!("url"), value.to_json()),
             Delim('\\') => JString!("\\"),
-            Delim(value) => json::String(str::from_char(value)),
+            Delim(value) => json::String(String::from_char(1, value)),
 
             Number(ref value) => json::List(vec!(JString!("number")) + numeric(value)),
             Percentage(ref value) => json::List(vec!(JString!("percentage")) + numeric(value)),
