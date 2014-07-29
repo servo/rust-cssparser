@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::ascii::StrAsciiExt;
+use std::fmt;
 
 use ast::*;
 
@@ -15,6 +16,12 @@ pub struct RGBA {
     pub green: f32,
     pub blue: f32,
     pub alpha: f32,
+}
+
+impl fmt::Show for RGBA {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(r={} g={} b={} a={})", self.red, self.green, self.blue, self.alpha)
+    }
 }
 
 #[deriving(Clone, PartialEq)]
