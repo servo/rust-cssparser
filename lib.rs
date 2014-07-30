@@ -3,8 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #![crate_name = "cssparser"]
-#![crate_type = "lib"]
-#![crate_type = "dylib"]
 #![crate_type = "rlib"]
 
 #![feature(globs, macro_rules)]
