@@ -4,7 +4,7 @@
 
 // http://dev.w3.org/csswg/css-syntax/#parsing
 
-/// The input to these functions needs to implement Iterator<(ComponentValue, SourceLocation)>.
+/// The input to these functions needs to implement `Iterator<(ComponentValue, SourceLocation)>`.
 /// The input is consumed to avoid doing a lot of copying.
 /// A conforming input can be obtained:
 ///
@@ -25,7 +25,7 @@ pub struct RuleListParser<T>{ iter: T }
 pub struct DeclarationListParser<T>{ iter: T }
 
 /// Parse top-level of a CSS stylesheet.
-/// Return a Iterator<Result<Rule, SyntaxError>>
+/// Return a `Iterator<Result<Rule, SyntaxError>>`
 #[inline]
 pub fn parse_stylesheet_rules<T: Iterator<Node>>(iter: T) -> StylesheetParser<T> {
     StylesheetParser{ iter: iter }
@@ -33,7 +33,7 @@ pub fn parse_stylesheet_rules<T: Iterator<Node>>(iter: T) -> StylesheetParser<T>
 
 
 /// Parse a non-top level list of rules eg. the content of an @media rule.
-/// Return a Iterator<Result<Rule, SyntaxError>>
+/// Return a `Iterator<Result<Rule, SyntaxError>>`
 #[inline]
 pub fn parse_rule_list<T: Iterator<Node>>(iter: T) -> RuleListParser<T> {
     RuleListParser{ iter: iter }
@@ -42,7 +42,7 @@ pub fn parse_rule_list<T: Iterator<Node>>(iter: T) -> RuleListParser<T> {
 
 /// Parse a list of declarations and at-rules,
 /// like @page in CSS 2.1, all declaration lists in level 3
-/// Return a Iterator<Result<DeclarationListItem, SyntaxError>>
+/// Return a `Iterator<Result<DeclarationListItem, SyntaxError>>`
 #[inline]
 pub fn parse_declaration_list<T: Iterator<Node>>(iter: T) -> DeclarationListParser<T> {
     DeclarationListParser{ iter: iter }

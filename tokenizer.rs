@@ -10,7 +10,7 @@ use std::ascii::StrAsciiExt;
 use ast::*;
 
 
-/// Returns a Iterator<(ComponentValue, SourceLocation)>
+/// Returns a `Iterator<(ComponentValue, SourceLocation)>`
 pub fn tokenize(input: &str) -> Tokenizer {
     let input = preprocess(input);
     Tokenizer {
