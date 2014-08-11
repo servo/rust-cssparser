@@ -31,22 +31,22 @@ pub enum Color {
 }
 
 
-// Return None on invalid/unsupported value (not a color)
+/// Return `Err(())` on invalid or unsupported value (not a color).
 impl Color {
-    pub fn parse(component_value: &ComponentValue) -> Option<Color> {
+    pub fn parse(component_value: &ComponentValue) -> Result<Color, ()> {
         match *component_value {
             Hash(ref value) | IDHash(ref value) => parse_color_hash(value.as_slice()),
             Ident(ref value) => parse_color_keyword(value.as_slice()),
             Function(ref name, ref arguments)
                 => parse_color_function(name.as_slice(), arguments.as_slice()),
-            _ => None
+            _ => Err(())
         }
     }
 }
 
 
 #[inline]
-fn parse_color_keyword(value: &str) -> Option<Color> {
+fn parse_color_keyword(value: &str) -> Result<Color, ()> {
     let lower_value = value.to_ascii_lower();
     let (r, g, b) = match lower_value.as_slice() {
         "black" => (0., 0., 0.),
@@ -199,16 +199,16 @@ fn parse_color_keyword(value: &str) -> Option<Color> {
         "whitesmoke" => (245., 245., 245.),
         "yellowgreen" => (154., 205., 50.),
 
-        "transparent" => return Some(RGBA(RGBA { red: 0., green: 0., blue: 0., alpha: 0. })),
-        "currentcolor" => return Some(CurrentColor),
-        _ => return None,
+        "transparent" => return Ok(RGBA(RGBA { red: 0., green: 0., blue: 0., alpha: 0. })),
+        "currentcolor" => return Ok(CurrentColor),
+        _ => return Err(()),
     };
-    Some(RGBA(RGBA { red: r / 255., green: g / 255., blue: b / 255., alpha: 1. }))
+    Ok(RGBA(RGBA { red: r / 255., green: g / 255., blue: b / 255., alpha: 1. }))
 }
 
 
 #[inline]
-fn parse_color_hash(value: &str) -> Option<Color> {
+fn parse_color_hash(value: &str) -> Result<Color, ()> {
     macro_rules! from_hex(
         ($c: expr) => {{
             let c = $c;
@@ -216,16 +216,16 @@ fn parse_color_hash(value: &str) -> Option<Color> {
                 '0' .. '9' => c as u8 - ('0' as u8),
                 'a' .. 'f' => c as u8 - ('a' as u8) + 10,
                 'A' .. 'F' => c as u8 - ('A' as u8) + 10,
-                _ => return None  // Not a valid color
+                _ => return Err(())  // Not a valid color
             }
         }};
     )
     macro_rules! to_rgba(
         ($r: expr, $g: expr, $b: expr,) => {
-            Some(RGBA(RGBA { red: $r as f32 / 255.,
-                             green: $g as f32 / 255.,
-                             blue: $b as f32 / 255.,
-                             alpha: 1. }))
+            Ok(RGBA(RGBA { red: $r as f32 / 255.,
+                           green: $g as f32 / 255.,
+                           blue: $b as f32 / 255.,
+                           alpha: 1. }))
         };
     )
 
@@ -240,14 +240,14 @@ fn parse_color_hash(value: &str) -> Option<Color> {
             from_hex!(value.char_at(1)) * 17,
             from_hex!(value.char_at(2)) * 17,
         ),
-        _ => None
+        _ => Err(())
     }
 }
 
 
 #[inline]
 fn parse_color_function(name: &str, arguments: &[ComponentValue])
-                        -> Option<Color> {
+                        -> Result<Color, ()> {
     let lower_name = name.to_ascii_lower();
     let lower_name = lower_name.as_slice();
 
@@ -256,28 +256,28 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
         else if "rgb" == lower_name { (true, false) }
         else if "hsl" == lower_name { (false, false) }
         else if "hsla" == lower_name { (false, true) }
-        else { return None };
+        else { return Err(()) };
 
     let mut iter = arguments.skip_whitespace();
     macro_rules! expect_comma(
-        () => ( match iter.next() { Some(&Comma) => {}, _ => { return None } } );
+        () => ( match iter.next() { Some(&Comma) => {}, _ => { return Err(()) } } );
     )
     macro_rules! expect_percentage(
         () => ( match iter.next() {
             Some(&Percentage(ref v)) => v.value,
-            _ => return None,
+            _ => return Err(()),
         });
     )
     macro_rules! expect_integer(
         () => ( match iter.next() {
             Some(&Number(ref v)) if v.int_value.is_some() => v.value,
-            _ => return None,
+            _ => return Err(()),
         });
     )
     macro_rules! expect_number(
         () => ( match iter.next() {
             Some(&Number(ref v)) => v.value,
-            _ => return None,
+            _ => return Err(()),
         });
     )
 
@@ -301,7 +301,7 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
                 expect_comma!();
                 blue = (expect_percentage!() / 100.) as f32;
             }
-            _ => return None
+            _ => return Err(())
         };
     } else {
         let hue = expect_number!() / 360.;
@@ -336,8 +336,8 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
         1.
     };
     if iter.next().is_none() {
-        Some(RGBA(RGBA { red: red, green: green, blue: blue, alpha: alpha }))
+        Ok(RGBA(RGBA { red: red, green: green, blue: blue, alpha: alpha }))
     } else {
-        None
+        Err(())
     }
 }

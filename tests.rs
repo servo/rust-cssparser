@@ -199,7 +199,7 @@ fn stylesheet_from_bytes() {
 fn run_color_tests(json_data: &str, to_json: |result: Option<Color>| -> json::Json) {
     run_json_tests(json_data, |input| {
         match parse_one_component_value(tokenize(input)) {
-            Ok(component_value) => to_json(Color::parse(&component_value)),
+            Ok(component_value) => to_json(Color::parse(&component_value).ok()),
             Err(_reason) => json::Null,
         }
     });
@@ -235,28 +235,28 @@ fn color3_keywords() {
 #[bench]
 fn bench_color_lookup_red(b: &mut test::Bencher) {
     let ident = parse_one_component_value(tokenize("red")).unwrap();
-    b.iter(|| assert!(Color::parse(&ident).is_some()));
+    b.iter(|| assert!(Color::parse(&ident).is_ok()));
 }
 
 
 #[bench]
 fn bench_color_lookup_lightgoldenrodyellow(b: &mut test::Bencher) {
     let ident = parse_one_component_value(tokenize("lightgoldenrodyellow")).unwrap();
-    b.iter(|| assert!(Color::parse(&ident).is_some()));
+    b.iter(|| assert!(Color::parse(&ident).is_ok()));
 }
 
 
 #[bench]
 fn bench_color_lookup_fail(b: &mut test::Bencher) {
     let ident = parse_one_component_value(tokenize("lightgoldenrodyellowbazinga")).unwrap();
-    b.iter(|| assert!(Color::parse(&ident).is_none()));
+    b.iter(|| assert!(Color::parse(&ident).is_err()));
 }
 
 
 #[test]
 fn nth() {
     run_json_tests(include_str!("css-parsing-tests/An+B.json"), |input| {
-        parse_nth(tokenize(input).map(|(c, _)| c).collect::<Vec<ComponentValue>>().as_slice())
+        parse_nth(tokenize(input).map(|(c, _)| c).collect::<Vec<ComponentValue>>().as_slice()).ok()
     });
 }
 
