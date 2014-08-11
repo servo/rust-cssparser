@@ -307,14 +307,14 @@ fn consume_block_with_location(tokenizer: &mut Tokenizer, ending_token: Componen
 
 fn consume_string(tokenizer: &mut Tokenizer, single_quote: bool) -> ComponentValue {
     match consume_quoted_string(tokenizer, single_quote) {
-        Some(value) => String(value),
-        None => BadString
+        Ok(value) => String(value),
+        Err(()) => BadString
     }
 }
 
 
 // Return None on syntax error (ie. unescaped newline)
-fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Option<String> {
+fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Result<String, ()> {
     tokenizer.position += 1;  // Skip the initial quote
     let mut string = String::new();
     while !tokenizer.is_eof() {
@@ -323,7 +323,7 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Optio
             '\'' if single_quote => break,
             '\n' => {
                 tokenizer.position -= 1;
-                return None;
+                return Err(());
             },
             '\\' => {
                 if !tokenizer.is_eof() {
@@ -338,7 +338,7 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Optio
             c => string.push_char(c),
         }
     }
-    Some(string)
+    Ok(string)
 }
 
 
@@ -475,8 +475,8 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
 
     fn consume_quoted_url(tokenizer: &mut Tokenizer, single_quote: bool) -> ComponentValue {
         match consume_quoted_string(tokenizer, single_quote) {
-            Some(value) => consume_url_end(tokenizer, value),
-            None => consume_bad_url(tokenizer),
+            Ok(value) => consume_url_end(tokenizer, value),
+            Err(()) => consume_bad_url(tokenizer),
         }
     }
 
