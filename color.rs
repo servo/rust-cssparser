@@ -31,7 +31,7 @@ pub enum Color {
 }
 
 
-// Return None on invalid/unsupported value (not a color)
+/// Return `Err(())` on invalid or unsupported value (not a color).
 impl Color {
     pub fn parse(component_value: &ComponentValue) -> Result<Color, ()> {
         match *component_value {

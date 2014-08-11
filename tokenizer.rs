@@ -313,7 +313,7 @@ fn consume_string(tokenizer: &mut Tokenizer, single_quote: bool) -> ComponentVal
 }
 
 
-// Return None on syntax error (ie. unescaped newline)
+/// Return `Err(())` on syntax error (ie. unescaped newline)
 fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Result<String, ()> {
     tokenizer.position += 1;  // Skip the initial quote
     let mut string = String::new();
