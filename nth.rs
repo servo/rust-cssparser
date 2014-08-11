@@ -9,7 +9,7 @@ use ast::*;
 
 /// Parse the *An+B* notation, as found in the `:nth-child()` selector.
 /// The input is typically the arguments of a function component value.
-/// Return `Ok((A, B))`, or `None` for a syntax error.
+/// Return `Ok((A, B))`, or `Err(())` for a syntax error.
 pub fn parse_nth(input: &[ComponentValue]) -> Result<(i32, i32), ()> {
     let iter = &mut input.skip_whitespace();
     match iter.next() {
