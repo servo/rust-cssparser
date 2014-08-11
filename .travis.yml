@@ -10,15 +10,15 @@ install:
 script:
   - cargo build
   - cargo test
-  - rustdoc lib.rs -L target/deps
+  - cargo doc
 
 after_success: |
   [ $TRAVIS_BRANCH = master ] &&
   [ $TRAVIS_PULL_REQUEST = false ] &&
-  echo '<meta http-equiv=refresh content=0;url=cssparser/index.html>' > doc/index.html &&
+  echo '<meta http-equiv=refresh content=0;url=cssparser/index.html>' > target/doc/index.html &&
   sudo pip install ghp-import &&
-  ghp-import -n doc &&
-  git push -fq https://${TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git gh-pages
+  ghp-import -n target/doc &&
+  git push -f https://${TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git gh-pages
 
 env:
   - secure: TDTC2q5Trv22R1pXcMyi2mWToc201aJpCJgLlnwNzkT2bjpQj+0KQvBpI1gIoeQvSL9ud85187C0tdmR7zQmZjBt6mnNCs7EM7QDIPcUcrH0vz8v/RQ+VNxhRAeCwUP4uLEHtnvbi9Q0KXCI1cQivZuMspxVMwvajx/ylcPwb4k=
