@@ -11,16 +11,16 @@ RUSTDOC ?= rustdoc
 RUSTDOC_FLAGS ?=
 RUSTDOC_TARGET ?= doc
 
-RUST_SRC=$(shell find $(VPATH)/. -type f -name '*.rs')
+RUST_SRC=$(shell find $(VPATH)/src -type f -name '*.rs')
 
 .PHONY: all
 all:    libcssparser.dummy
 
-libcssparser.dummy: lib.rs $(RUST_SRC) $(EXT_DEPS)
+libcssparser.dummy: src/lib.rs $(RUST_SRC) $(EXT_DEPS)
 	$(RUSTC) $(RUSTFLAGS) $< --out-dir .
 	touch $@
 
-cssparser-test: lib.rs $(RUST_SRC)
+cssparser-test: src/lib.rs $(RUST_SRC)
 	$(RUSTC) $(RUSTFLAGS) $< -o $@ --test
 
 .PHONY: check
@@ -34,7 +34,7 @@ check-debug: cssparser-tests
 .PHONY: doc
 doc: $(RUSTDOC_TARGET)/cssparser/index.html
 
-$(RUSTDOC_TARGET)/cssparser/index.html: lib.rs $(RUST_SRC) $(EXT_DEPS)
+$(RUSTDOC_TARGET)/cssparser/index.html: src/lib.rs $(RUST_SRC) $(EXT_DEPS)
 	$(RUSTDOC) $(RUSTDOC_FLAGS) $< -o $(RUSTDOC_TARGET)
 
 .PHONY: clean
