@@ -7,7 +7,6 @@ authors = [ "Simon Sapin <simon.sapin@exyr.org>" ]
 [[lib]]
 
 name = "cssparser"
-path = "lib.rs"
 
 [dependencies.encoding]
 
