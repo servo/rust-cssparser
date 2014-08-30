@@ -3,8 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::io;
-use std::io::{File, Command, Writer, TempDir};
-use std::task;
+use std::io::{File, Command, Writer, TempDir, IoResult};
 use serialize::{json};
 use serialize::json::ToJson;
 use test;
@@ -23,11 +22,31 @@ macro_rules! JList {
 }
 
 
-fn write_whole_file(path: &Path, data: &str) {
-    match File::open_mode(path, io::Open, io::Write) {
-        Ok(mut writer) => { writer.write(data.as_bytes()).unwrap(); },
-        _ => fail!("could not open file"),
-    }
+fn write_whole_file(path: &Path, data: &str) -> IoResult<()> {
+    (try!(File::open_mode(path, io::Open, io::Write))).write(data.as_bytes())
+}
+
+
+fn print_json_diff(results: &json::Json, expected: &json::Json) -> IoResult<()> {
+    let temp = match TempDir::new("rust-cssparser-tests") {
+        Some(temp) => temp,
+        None => return Err(io::standard_error(io::OtherIoError)),
+    };
+    let results = results.to_pretty_str().append("\n");
+    let expected = expected.to_pretty_str().append("\n");
+    let mut result_path = temp.path().clone();
+    result_path.push("results.json");
+    let mut expected_path = temp.path().clone();
+    expected_path.push("expected.json");
+    try!(write_whole_file(&result_path, results.as_slice()));
+    try!(write_whole_file(&expected_path, expected.as_slice()));
+    try!(Command::new("colordiff")
+        .arg("-u1000")
+        .arg(result_path.display().to_string())
+        .arg(expected_path.display().to_string())
+        .status()
+        .map_err(|_| io::standard_error(io::OtherIoError)));
+    Ok(())
 }
 
 
@@ -53,25 +72,7 @@ fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
 
 fn assert_json_eq(results: json::Json, expected: json::Json, message: String) {
     if !almost_equals(&results, &expected) {
-        let temp = TempDir::new("rust-cssparser-tests").unwrap();
-        let results = results.to_pretty_str().append("\n");
-        let expected = expected.to_pretty_str().append("\n");
-        // NB: The task try is to prevent error message generation from
-        // stopping us, we don't care about the result.
-        let _ = task::try(proc() {
-            let mut result_path = temp.path().clone();
-            result_path.push("results.json");
-            let mut expected_path = temp.path().clone();
-            expected_path.push("expected.json");
-            write_whole_file(&result_path, results.as_slice());
-            write_whole_file(&expected_path, expected.as_slice());
-            Command::new("colordiff")
-                .arg("-u1000")
-                .arg(result_path.display().to_string())
-                .arg(expected_path.display().to_string())
-                .status().unwrap()
-        });
-
+        let _ = print_json_diff(&results, &expected).unwrap();
         fail!(message)
     }
 }
