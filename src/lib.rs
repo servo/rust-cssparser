@@ -7,6 +7,9 @@
 
 #![feature(globs, macro_rules)]
 
+// Temporary work-around for https://github.com/rust-lang/rust/issues/16597
+#![feature(import_shadowing)]
+
 extern crate encoding;  // https://github.com/lifthrasiir/rust-encoding
 
 extern crate debug;
