@@ -33,9 +33,15 @@ fn write_whole_file(path: &Path, data: &str) {
 
 fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
     match (a, b) {
-        (&json::Number(a), &json::Number(b)) => (a - b).abs() < 1e-6,
-        (&json::String(ref a), &json::String(ref b)) => a == b,
+        (&json::I64(a), _) => almost_equals(&json::F64(a as f64), b),
+        (&json::U64(a), _) => almost_equals(&json::F64(a as f64), b),
+        (_, &json::I64(b)) => almost_equals(a, &json::F64(b as f64)),
+        (_, &json::U64(b)) => almost_equals(a, &json::F64(b as f64)),
+
+        (&json::F64(a), &json::F64(b)) => (a - b).abs() < 1e-6,
+
         (&json::Boolean(a), &json::Boolean(b)) => a == b,
+        (&json::String(ref a), &json::String(ref b)) => a == b,
         (&json::List(ref a), &json::List(ref b))
             => a.iter().zip(b.iter()).all(|(ref a, ref b)| almost_equals(*a, *b)),
         (&json::Object(_), &json::Object(_)) => fail!("Not implemented"),
@@ -82,7 +88,7 @@ fn run_raw_json_tests(json_data: &str, run: |json::Json, json::Json|) {
         match (&input, item) {
             (&None, json_obj) => input = Some(json_obj),
             (&Some(_), expected) => {
-                let input = input.take_unwrap();
+                let input = input.take().unwrap();
                 run(input, expected)
             },
         };
@@ -417,8 +423,8 @@ impl ToJson for ComponentValue {
 
             Number(ref value) => json::List(vec!(JString!("number")) + numeric(value)),
             Percentage(ref value) => json::List(vec!(JString!("percentage")) + numeric(value)),
-            Dimension(ref value, ref unit)
-            => json::List(vec!(JString!("dimension")) + numeric(value) + &[unit.to_json()]),
+            Dimension(ref value, ref unit) => json::List(
+                vec!(JString!("dimension")) + numeric(value) + [unit.to_json()].as_slice()),
 
             UnicodeRange(start, end)
             => JList!(JString!("unicode-range"), start.to_json(), end.to_json()),
