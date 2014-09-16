@@ -37,7 +37,7 @@ Parsing CSS involves a series of steps:
 * Component values can then be parsed into generic rules or declarations.
   The header and body of rules as well as the value of declarations
   are still just lists of component values at this point.
-  See [the `ast` module](ast.rs) for the data structures.
+  See [the `ast` module](src/ast.rs) for the data structures.
 
 * The last step of a full CSS parser is
   parsing the remaining component values
@@ -48,10 +48,10 @@ Parsing CSS involves a series of steps:
   which depends a lot on what you want to do:
   which properties you want to support, what you want to do with selectors, etc.
 
-  It does however provide some helper functions to parse [CSS colors](color.rs)
-  and [An+B](nth.rs) (the argument to `:nth-child()` and related selectors.
+  It does however provide some helper functions to parse [CSS colors](src/color.rs)
+  and [An+B](src/nth.rs) (the argument to `:nth-child()` and related selectors.
 
-  See [Servo’s `style` crate](https://github.com/mozilla/servo/tree/master/src/components/style)
+  See [Servo’s `style` crate](https://github.com/mozilla/servo/tree/master/components/style)
   for an example of a parser based on rust-cssparser.
 
 
