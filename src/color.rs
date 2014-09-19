@@ -30,6 +30,15 @@ pub enum Color {
     RGBAColor(RGBA),
 }
 
+impl fmt::Show for Color {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &CurrentColor => write!(f, "inherit"),
+            &RGBAColor(c) => write!(f, "rgba({}, {}, {}, {})", c.red, c.green, c.blue, c.alpha),
+        };
+        Ok(())
+    }
+}
 
 /// Return `Err(())` on invalid or unsupported value (not a color).
 impl Color {
