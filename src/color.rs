@@ -20,7 +20,11 @@ pub struct RGBA {
 
 impl fmt::Show for RGBA {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(r={} g={} b={} a={})", self.red, self.green, self.blue, self.alpha)
+        if self.alpha == 1f32 {
+            write!(f, "rgb({}, {}, {}", self.red, self.green, self.blue)
+        } else {
+            write!(f, "rgba({} {} {} {})", self.red, self.green, self.blue, self.alpha)
+        }
     }
 }
 
@@ -33,10 +37,9 @@ pub enum Color {
 impl fmt::Show for Color {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &CurrentColor => write!(f, "inherit"),
-            &RGBAColor(c) => write!(f, "rgba({}, {}, {}, {})", c.red, c.green, c.blue, c.alpha),
-        };
-        Ok(())
+            &CurrentColor => write!(f, "currentColor"),
+            &RGBAColor(c) => write!(f, "{}", c),
+        }
     }
 }
 
