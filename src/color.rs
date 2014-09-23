@@ -27,7 +27,7 @@ impl fmt::Show for RGBA {
 #[deriving(Clone, PartialEq)]
 pub enum Color {
     CurrentColor,
-    RGBA(RGBA),
+    RGBAColor(RGBA),
 }
 
 
@@ -199,11 +199,11 @@ fn parse_color_keyword(value: &str) -> Result<Color, ()> {
         "whitesmoke" => (245., 245., 245.),
         "yellowgreen" => (154., 205., 50.),
 
-        "transparent" => return Ok(RGBA(RGBA { red: 0., green: 0., blue: 0., alpha: 0. })),
+        "transparent" => return Ok(RGBAColor(RGBA { red: 0., green: 0., blue: 0., alpha: 0. })),
         "currentcolor" => return Ok(CurrentColor),
         _ => return Err(()),
     };
-    Ok(RGBA(RGBA { red: r / 255., green: g / 255., blue: b / 255., alpha: 1. }))
+    Ok(RGBAColor(RGBA { red: r / 255., green: g / 255., blue: b / 255., alpha: 1. }))
 }
 
 
@@ -222,7 +222,7 @@ fn parse_color_hash(value: &str) -> Result<Color, ()> {
     )
     macro_rules! to_rgba(
         ($r: expr, $g: expr, $b: expr,) => {
-            Ok(RGBA(RGBA { red: $r as f32 / 255.,
+            Ok(RGBAColor(RGBA { red: $r as f32 / 255.,
                            green: $g as f32 / 255.,
                            blue: $b as f32 / 255.,
                            alpha: 1. }))
@@ -336,7 +336,7 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
         1.
     };
     if iter.next().is_none() {
-        Ok(RGBA(RGBA { red: red, green: green, blue: blue, alpha: alpha }))
+        Ok(RGBAColor(RGBA { red: red, green: green, blue: blue, alpha: alpha }))
     } else {
         Err(())
     }

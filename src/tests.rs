@@ -82,7 +82,7 @@ fn run_raw_json_tests(json_data: &str, run: |json::Json, json::Json|) {
     };
     assert!(items.len() % 2 == 0);
     let mut input = None;
-    for item in items.move_iter() {
+    for item in items.into_iter() {
         match (&input, item) {
             (&None, json_obj) => input = Some(json_obj),
             (&Some(_), expected) => {
@@ -189,7 +189,7 @@ fn stylesheet_from_bytes() {
         assert_json_eq(result, expected, json::Object(map).to_string());
     });
 
-    fn get_string<'a>(map: &'a json::Object, key: &String) -> Option<&'a str> {
+    fn get_string<'a>(map: &'a json::JsonObject, key: &String) -> Option<&'a str> {
         match map.find(key) {
             Some(&json::String(ref s)) => Some(s.as_slice()),
             Some(&json::Null) => None,
@@ -227,7 +227,7 @@ fn color3_hsl() {
 fn color3_keywords() {
     run_color_tests(include_str!("css-parsing-tests/color3_keywords.json"), |c| {
         match c {
-            Some(RGBA(RGBA { red: r, green: g, blue: b, alpha: a }))
+            Some(RGBAColor(RGBA { red: r, green: g, blue: b, alpha: a }))
             => vec!(r * 255., g * 255., b * 255., a).to_json(),
             Some(CurrentColor) => JString!("currentColor"),
             None => json::Null,
@@ -329,7 +329,7 @@ impl ToJson for SyntaxError {
 impl ToJson for Color {
     fn to_json(&self) -> json::Json {
         match *self {
-            RGBA(RGBA { red: r, green: g, blue: b, alpha: a }) => vec!(r, g, b, a).to_json(),
+            RGBAColor(RGBA { red: r, green: g, blue: b, alpha: a }) => vec!(r, g, b, a).to_json(),
             CurrentColor => JString!("currentColor"),
         }
     }
@@ -339,8 +339,8 @@ impl ToJson for Color {
 impl ToJson for Rule {
     fn to_json(&self) -> json::Json {
         match *self {
-            QualifiedRule(ref rule) => rule.to_json(),
-            AtRule(ref rule) => rule.to_json(),
+            QualifiedRule_(ref rule) => rule.to_json(),
+            AtRule_(ref rule) => rule.to_json(),
         }
     }
 }
@@ -349,7 +349,7 @@ impl ToJson for Rule {
 impl ToJson for DeclarationListItem {
     fn to_json(&self) -> json::Json {
         match *self {
-            Declaration(ref declaration) => declaration.to_json(),
+            Declaration_(ref declaration) => declaration.to_json(),
             DeclAtRule(ref at_rule) => at_rule.to_json(),
         }
     }
@@ -414,7 +414,7 @@ impl ToJson for ComponentValue {
             Hash(ref value) => JList!(JString!("hash"), value.to_json(),
                                       JString!("unrestricted")),
             IDHash(ref value) => JList!(JString!("hash"), value.to_json(), JString!("id")),
-            String(ref value) => JList!(JString!("string"), value.to_json()),
+            QuotedString(ref value) => JList!(JString!("string"), value.to_json()),
             URL(ref value) => JList!(JString!("url"), value.to_json()),
             Delim('\\') => JString!("\\"),
             Delim(value) => json::String(String::from_char(1, value)),

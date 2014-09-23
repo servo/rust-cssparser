@@ -307,7 +307,7 @@ fn consume_block_with_location(tokenizer: &mut Tokenizer, ending_token: Componen
 
 fn consume_string(tokenizer: &mut Tokenizer, single_quote: bool) -> ComponentValue {
     match consume_quoted_string(tokenizer, single_quote) {
-        Ok(value) => String(value),
+        Ok(value) => QuotedString(value),
         Err(()) => BadString
     }
 }

@@ -22,7 +22,7 @@ pub fn to_css_push(component_value: &ComponentValue, css: &mut String) {
             css.push_char('#');
             serialize_identifier(value.as_slice(), css);
         }
-        String(ref value) => serialize_string(value.as_slice(), css),
+        QuotedString(ref value) => serialize_string(value.as_slice(), css),
         URL(ref value) => {
             css.push_str("url(");
             serialize_string(value.as_slice(), css);

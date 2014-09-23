@@ -32,7 +32,7 @@ pub enum ComponentValue {
     AtKeyword(String),
     Hash(String),
     IDHash(String),  // Hash that is a valid ID selector.
-    String(String),
+    QuotedString(String),
     URL(String),
     Delim(char),
     Number(NumericValue),
@@ -107,15 +107,15 @@ pub struct AtRule {
 
 #[deriving(PartialEq)]
 pub enum DeclarationListItem {
-    Declaration(Declaration),
+    Declaration_(Declaration),
     // A better idea for a name that means "at-rule" but is not "AtRule"?
     DeclAtRule(AtRule),
 }
 
 #[deriving(PartialEq)]
 pub enum Rule {
-    QualifiedRule(QualifiedRule),
-    AtRule(AtRule),
+    QualifiedRule_(QualifiedRule),
+    AtRule_(AtRule),
 }
 
 #[deriving(PartialEq)]
@@ -172,7 +172,7 @@ pub trait MoveSkipWhitespaceIterable {
 
 impl MoveSkipWhitespaceIterable for Vec<ComponentValue> {
     fn move_skip_whitespace(self) -> MoveSkipWhitespaceIterator {
-        MoveSkipWhitespaceIterator{ iter_with_whitespace: self.move_iter() }
+        MoveSkipWhitespaceIterator{ iter_with_whitespace: self.into_iter() }
     }
 }
 

@@ -119,9 +119,9 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for StylesheetParser
         for_iter!(iter, (component_value, location), {
             match component_value {
                 WhiteSpace | CDO | CDC => (),
-                AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
+                AtKeyword(name) => return Some(Ok(AtRule_(parse_at_rule(iter, name, location)))),
                 _ => return Some(match parse_qualified_rule(iter, component_value, location) {
-                    Ok(rule) => Ok(QualifiedRule(rule)),
+                    Ok(rule) => Ok(QualifiedRule_(rule)),
                     Err(e) => Err(e),
                 }),
             }
@@ -137,9 +137,9 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for RuleListParser<T
         for_iter!(iter, (component_value, location), {
             match component_value {
                 WhiteSpace => (),
-                AtKeyword(name) => return Some(Ok(AtRule(parse_at_rule(iter, name, location)))),
+                AtKeyword(name) => return Some(Ok(AtRule_(parse_at_rule(iter, name, location)))),
                 _ => return Some(match parse_qualified_rule(iter, component_value, location) {
-                    Ok(rule) => Ok(QualifiedRule(rule)),
+                    Ok(rule) => Ok(QualifiedRule_(rule)),
                     Err(e) => Err(e),
                 }),
             }
@@ -159,7 +159,7 @@ for DeclarationListParser<T> {
                 AtKeyword(name)
                 => return Some(Ok(DeclAtRule(parse_at_rule(iter, name, location)))),
                 _ => return Some(match parse_declaration(iter, component_value, location) {
-                    Ok(declaration) => Ok(Declaration(declaration)),
+                    Ok(declaration) => Ok(Declaration_(declaration)),
                     Err(e) => {
                         // Find the end of the declaration
                         for (v, _) in *iter { if v == Semicolon { break } }
