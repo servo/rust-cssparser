@@ -21,9 +21,11 @@ pub struct RGBA {
 impl fmt::Show for RGBA {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.alpha == 1f32 {
-            write!(f, "rgb({}, {}, {}", self.red, self.green, self.blue)
+            write!(f, "rgb({}, {}, {})", (self.red * 255.).round(), (self.green * 255.).round(),
+                   (self.blue * 255.).round())
         } else {
-            write!(f, "rgba({} {} {} {})", self.red, self.green, self.blue, self.alpha)
+            write!(f, "rgba({}, {}, {}, {})", (self.red * 255.).round(), (self.green * 255.).round(),
+                   (self.blue * 255.).round(), self.alpha)
         }
     }
 }
