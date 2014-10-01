@@ -20,7 +20,13 @@ pub struct RGBA {
 
 impl fmt::Show for RGBA {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(r={} g={} b={} a={})", self.red, self.green, self.blue, self.alpha)
+        if self.alpha == 1f32 {
+            write!(f, "rgb({}, {}, {})", (self.red * 255.).round(), (self.green * 255.).round(),
+                   (self.blue * 255.).round())
+        } else {
+            write!(f, "rgba({}, {}, {}, {})", (self.red * 255.).round(), (self.green * 255.).round(),
+                   (self.blue * 255.).round(), self.alpha)
+        }
     }
 }
 
@@ -30,6 +36,14 @@ pub enum Color {
     RGBAColor(RGBA),
 }
 
+impl fmt::Show for Color {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &CurrentColor => write!(f, "currentColor"),
+            &RGBAColor(c) => write!(f, "{}", c),
+        }
+    }
+}
 
 /// Return `Err(())` on invalid or unsupported value (not a color).
 impl Color {
