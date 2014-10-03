@@ -10,7 +10,7 @@ use ast::*;
 
 #[deriving(Clone, PartialEq)]
 pub struct RGBA {
-    // All in 0..1
+    // All in 0...1
     // Use f32 to try and match rust-azure’s AzFloat
     pub red: f32,
     pub green: f32,
@@ -227,9 +227,9 @@ fn parse_color_hash(value: &str) -> Result<Color, ()> {
         ($c: expr) => {{
             let c = $c;
             match c {
-                '0' .. '9' => c as u8 - ('0' as u8),
-                'a' .. 'f' => c as u8 - ('a' as u8) + 10,
-                'A' .. 'F' => c as u8 - ('A' as u8) + 10,
+                '0' ... '9' => c as u8 - ('0' as u8),
+                'a' ... 'f' => c as u8 - ('a' as u8) + 10,
+                'A' ... 'F' => c as u8 - ('A' as u8) + 10,
                 _ => return Err(())  // Not a valid color
             }
         }};

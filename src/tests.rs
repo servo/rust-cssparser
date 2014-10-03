@@ -29,8 +29,8 @@ fn write_whole_file(path: &Path, data: &str) -> IoResult<()> {
 
 fn print_json_diff(results: &json::Json, expected: &json::Json) -> IoResult<()> {
     let temp = try!(TempDir::new("rust-cssparser-tests"));
-    let results = results.to_pretty_str().append("\n");
-    let expected = expected.to_pretty_str().append("\n");
+    let results = results.to_pretty_str() + "\n";
+    let expected = expected.to_pretty_str() + "\n";
     let mut result_path = temp.path().clone();
     result_path.push("results.json");
     let mut expected_path = temp.path().clone();

@@ -9,31 +9,31 @@ pub fn to_css_push(component_value: &ComponentValue, css: &mut String) {
     match *component_value {
         Ident(ref value) => serialize_identifier(value.as_slice(), css),
         AtKeyword(ref value) => {
-            css.push_char('@');
+            css.push('@');
             serialize_identifier(value.as_slice(), css);
         },
         Hash(ref value) => {
-            css.push_char('#');
+            css.push('#');
             for c in value.as_slice().chars() {
                 serialize_char(c, css, /* is_identifier_start = */ false);
             }
         },
         IDHash(ref value) => {
-            css.push_char('#');
+            css.push('#');
             serialize_identifier(value.as_slice(), css);
         }
         QuotedString(ref value) => serialize_string(value.as_slice(), css),
         URL(ref value) => {
             css.push_str("url(");
             serialize_string(value.as_slice(), css);
-            css.push_char(')');
+            css.push(')');
         },
-        Delim(value) => css.push_char(value),
+        Delim(value) => css.push(value),
 
         Number(ref value) => css.push_str(value.representation.as_slice()),
         Percentage(ref value) => {
             css.push_str(value.representation.as_slice());
-            css.push_char('%');
+            css.push('%');
         },
         Dimension(ref value, ref unit) => {
             css.push_str(value.representation.as_slice());
@@ -56,10 +56,10 @@ pub fn to_css_push(component_value: &ComponentValue, css: &mut String) {
             }
         }
 
-        WhiteSpace => css.push_char(' '),
-        Colon => css.push_char(':'),
-        Semicolon => css.push_char(';'),
-        Comma => css.push_char(','),
+        WhiteSpace => css.push(' '),
+        Colon => css.push(':'),
+        Semicolon => css.push(';'),
+        Comma => css.push(','),
         IncludeMatch => css.push_str("~="),
         DashMatch => css.push_str("|="),
         PrefixMatch => css.push_str("^="),
@@ -71,31 +71,31 @@ pub fn to_css_push(component_value: &ComponentValue, css: &mut String) {
 
         Function(ref name, ref arguments) => {
             serialize_identifier(name.as_slice(), css);
-            css.push_char('(');
+            css.push('(');
             arguments.iter().to_css_push(css);
-            css.push_char(')');
+            css.push(')');
         },
         ParenthesisBlock(ref content) => {
-            css.push_char('(');
+            css.push('(');
             content.iter().to_css_push(css);
-            css.push_char(')');
+            css.push(')');
         },
         SquareBracketBlock(ref content) => {
-            css.push_char('[');
+            css.push('[');
             content.iter().to_css_push(css);
-            css.push_char(']');
+            css.push(']');
         },
         CurlyBracketBlock(ref content) => {
-            css.push_char('{');
+            css.push('{');
             content.iter().map(|t| match *t { (ref c, _) => c }).to_css_push(css);
-            css.push_char('}');
+            css.push('}');
         },
 
         BadURL => css.push_str("url(<bad url>)"),
         BadString => css.push_str("\"<bad string>\n"),
-        CloseParenthesis => css.push_char(')'),
-        CloseSquareBracket => css.push_char(']'),
-        CloseCurlyBracket => css.push_char('}'),
+        CloseParenthesis => css.push(')'),
+        CloseSquareBracket => css.push(']'),
+        CloseCurlyBracket => css.push('}'),
     }
 }
 
@@ -107,7 +107,7 @@ pub fn serialize_identifier(value: &str, css: &mut String) {
     if c == '-' {
         c = match iter.next() {
             None => { css.push_str("\\-"); return },
-            Some(c) => { css.push_char('-'); c },
+            Some(c) => { css.push('-'); c },
         }
     };
     serialize_char(c, css, /* is_identifier_start = */ true);
@@ -120,20 +120,20 @@ pub fn serialize_identifier(value: &str, css: &mut String) {
 #[inline]
 fn serialize_char(c: char, css: &mut String, is_identifier_start: bool) {
     match c {
-        '0'..'9' if is_identifier_start => css.push_str(format!("\\3{} ", c).as_slice()),
+        '0'...'9' if is_identifier_start => css.push_str(format!("\\3{} ", c).as_slice()),
         '-' if is_identifier_start => css.push_str("\\-"),
-        '0'..'9' | 'A'..'Z' | 'a'..'z' | '_' | '-' => css.push_char(c),
-        _ if c > '\x7F' => css.push_char(c),
+        '0'...'9' | 'A'...'Z' | 'a'...'z' | '_' | '-' => css.push(c),
+        _ if c > '\x7F' => css.push(c),
         '\n' => css.push_str("\\A "),
         '\r' => css.push_str("\\D "),
         '\x0C' => css.push_str("\\C "),
-        _ => { css.push_char('\\'); css.push_char(c) },
+        _ => { css.push('\\'); css.push(c) },
     }
 }
 
 
 pub fn serialize_string(value: &str, css: &mut String) {
-    css.push_char('"');
+    css.push('"');
     // TODO: avoid decoding/re-encoding UTF-8?
     for c in value.chars() {
         match c {
@@ -142,10 +142,10 @@ pub fn serialize_string(value: &str, css: &mut String) {
             '\n' => css.push_str("\\A "),
             '\r' => css.push_str("\\D "),
             '\x0C' => css.push_str("\\C "),
-            _ => css.push_char(c),
+            _ => css.push(c),
         }
     }
-    css.push_char('"');
+    css.push('"');
 }
 
 
@@ -215,7 +215,7 @@ impl<'a, I: Iterator<&'a ComponentValue>> ToCss for I {
                 component_value.to_css_push(css);
             }
             if component_value == &Delim('\\') {
-                css.push_char('\n');
+                css.push('\n');
             }
             previous = component_value;
         }}}
