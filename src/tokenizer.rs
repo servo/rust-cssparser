@@ -164,6 +164,7 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
             }
         },
         ',' => { tokenizer.position += 1; Comma },
+        '/' => { tokenizer.position += 1; Slash },
         '-' => {
             if (
                 tokenizer.position + 1 < tokenizer.length
