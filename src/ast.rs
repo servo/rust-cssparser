@@ -43,6 +43,7 @@ pub enum ComponentValue {
     Colon,  // :
     Semicolon,  // ;
     Comma,  // ,
+    Slash,  // /
     IncludeMatch, // ~=
     DashMatch, // |=
     PrefixMatch, // ^=

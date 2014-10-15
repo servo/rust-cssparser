@@ -60,6 +60,7 @@ pub fn to_css_push(component_value: &ComponentValue, css: &mut String) {
         Colon => css.push(':'),
         Semicolon => css.push(';'),
         Comma => css.push(','),
+        Slash => css.push('/'),
         IncludeMatch => css.push_str("~="),
         DashMatch => css.push_str("|="),
         PrefixMatch => css.push_str("^="),
