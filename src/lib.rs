@@ -9,8 +9,6 @@
 
 extern crate encoding;  // https://github.com/lifthrasiir/rust-encoding
 
-extern crate debug;
-
 #[cfg(test)]
 extern crate test;
 

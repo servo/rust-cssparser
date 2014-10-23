@@ -15,7 +15,7 @@
 
 
 use std::iter::Iterator;
-use std::ascii::StrAsciiExt;
+use std::ascii::AsciiExt;
 
 use ast::*;
 

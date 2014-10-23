@@ -5,7 +5,7 @@
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 
 use std::{char, num};
-use std::ascii::StrAsciiExt;
+use std::ascii::AsciiExt;
 
 use ast::*;
 

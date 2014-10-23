@@ -124,7 +124,7 @@ pub struct SyntaxError {
     pub reason: ErrorReason,
 }
 
-#[deriving(PartialEq)]
+#[deriving(PartialEq, Show)]
 pub enum ErrorReason {
     ErrEmptyInput,  // Parsing a single "thing", found only whitespace.
     ErrExtraInput,  // Found more non-whitespace after parsing a single "thing".
@@ -136,7 +136,7 @@ pub enum ErrorReason {
 
 impl fmt::Show for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:u}:{:u} {:?}", self.location.line, self.location.column, self.reason)
+        write!(f, "{:u}:{:u} {}", self.location.line, self.location.column, self.reason)
     }
 }
 
