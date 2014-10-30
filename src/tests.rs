@@ -60,7 +60,7 @@ fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
         (&json::String(ref a), &json::String(ref b)) => a == b,
         (&json::List(ref a), &json::List(ref b))
             => a.iter().zip(b.iter()).all(|(ref a, ref b)| almost_equals(*a, *b)),
-        (&json::Object(_), &json::Object(_)) => fail!("Not implemented"),
+        (&json::Object(_), &json::Object(_)) => panic!("Not implemented"),
         (&json::Null, &json::Null) => true,
         _ => false,
     }
@@ -70,7 +70,7 @@ fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
 fn assert_json_eq(results: json::Json, expected: json::Json, message: String) {
     if !almost_equals(&results, &expected) {
         let _ = print_json_diff(&results, &expected).unwrap();
-        fail!(message)
+        panic!(message)
     }
 }
 
@@ -78,7 +78,7 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: String) {
 fn run_raw_json_tests(json_data: &str, run: |json::Json, json::Json|) {
     let items = match json::from_str(json_data) {
         Ok(json::List(items)) => items,
-        _ => fail!("Invalid JSON")
+        _ => panic!("Invalid JSON")
     };
     assert!(items.len() % 2 == 0);
     let mut input = None;
@@ -101,7 +101,7 @@ fn run_json_tests<T: ToJson>(json_data: &str, parse: |input: &str| -> T) {
                 let result = parse(input.as_slice()).to_json();
                 assert_json_eq(result, expected, input);
             },
-            _ => fail!("Unexpected JSON")
+            _ => panic!("Unexpected JSON")
         }
     });
 }
@@ -169,7 +169,7 @@ fn stylesheet_from_bytes() {
     |input, expected| {
         let map = match input {
             json::Object(map) => map,
-            _ => fail!("Unexpected JSON")
+            _ => panic!("Unexpected JSON")
         };
 
         let result = {
@@ -194,7 +194,7 @@ fn stylesheet_from_bytes() {
             Some(&json::String(ref s)) => Some(s.as_slice()),
             Some(&json::Null) => None,
             None => None,
-            _ => fail!("Unexpected JSON"),
+            _ => panic!("Unexpected JSON"),
         }
     }
 }
