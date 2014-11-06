@@ -391,7 +391,7 @@ fn list_to_json(list: &Vec<(ComponentValue, SourceLocation)>) -> Vec<json::Json>
 impl ToJson for AtRule {
     fn to_json(&self) -> json::Json {
         match *self {
-            AtRule{name: ref name, prelude: ref prelude, block: ref block, ..}
+            AtRule{ ref name, ref prelude, ref block, ..}
             => json::List(vec!(JString!("at-rule"), name.to_json(),
                                prelude.to_json(), block.as_ref().map(list_to_json).to_json()))
         }
@@ -402,7 +402,7 @@ impl ToJson for AtRule {
 impl ToJson for QualifiedRule {
     fn to_json(&self) -> json::Json {
         match *self {
-            QualifiedRule{prelude: ref prelude, block: ref block, ..}
+            QualifiedRule{ ref prelude, ref block, ..}
             => json::List(vec!(JString!("qualified rule"),
                                prelude.to_json(), json::List(list_to_json(block))))
         }
@@ -413,7 +413,7 @@ impl ToJson for QualifiedRule {
 impl ToJson for Declaration {
     fn to_json(&self) -> json::Json {
         match *self {
-            Declaration{name: ref name, value: ref value, important: ref important, ..}
+            Declaration{ ref name, ref value, ref important, ..}
             =>  json::List(vec!(JString!("declaration"), name.to_json(),
                                 value.to_json(), important.to_json()))
         }
