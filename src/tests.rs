@@ -28,6 +28,8 @@ fn write_whole_file(path: &Path, data: &str) -> IoResult<()> {
 
 
 fn print_json_diff(results: &json::Json, expected: &json::Json) -> IoResult<()> {
+    use std::io::stdio::stdout;
+
     let temp = try!(TempDir::new("rust-cssparser-tests"));
     let results = results.to_pretty_str() + "\n";
     let expected = expected.to_pretty_str() + "\n";
@@ -37,13 +39,13 @@ fn print_json_diff(results: &json::Json, expected: &json::Json) -> IoResult<()> 
     expected_path.push("expected.json");
     try!(write_whole_file(&result_path, results.as_slice()));
     try!(write_whole_file(&expected_path, expected.as_slice()));
-    try!(Command::new("colordiff")
+    stdout().write(try!(Command::new("colordiff")
         .arg("-u1000")
         .arg(result_path.display().to_string())
         .arg(expected_path.display().to_string())
-        .status()
-        .map_err(|_| io::standard_error(io::OtherIoError)));
-    Ok(())
+        .output()
+        .map_err(|_| io::standard_error(io::OtherIoError))
+    ).output.as_slice())
 }
 
 
@@ -69,7 +71,7 @@ fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
 
 fn assert_json_eq(results: json::Json, expected: json::Json, message: String) {
     if !almost_equals(&results, &expected) {
-        let _ = print_json_diff(&results, &expected).unwrap();
+        print_json_diff(&results, &expected).unwrap();
         panic!(message)
     }
 }
