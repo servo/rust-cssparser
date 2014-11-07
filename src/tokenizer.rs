@@ -434,17 +434,23 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> ComponentValue {
             }
         }
     }
-    // TODO: handle overflow
+    let (value, int_value) = {
+        // TODO: handle overflow
+        // Remove any + sign as int::from_str() does not parse them.
+        let repr = if representation.starts_with("+") {
+            representation.slice_from(1)
+        } else {
+            representation.as_slice()
+        };
+        (from_str::<f64>(repr).unwrap(), if is_integer {
+            Some(from_str::<i64>(repr).unwrap())
+        } else {
+            None
+        })
+    };
     let value = NumericValue {
-        int_value: if is_integer { Some(
-            // Remove any + sign as int::from_str() does not parse them.
-            if representation.as_slice().starts_with("+") {
-                from_str(representation.as_slice().slice_from(1))
-            } else {
-                from_str(representation.as_slice())
-            }.unwrap()
-        )} else { None },
-        value: from_str(representation.as_slice()).unwrap(),
+        int_value: int_value,
+        value: value,
         representation: representation,
     };
     if !tokenizer.is_eof() && tokenizer.current_char() == '%' {
