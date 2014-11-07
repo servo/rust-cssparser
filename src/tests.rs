@@ -192,7 +192,7 @@ fn stylesheet_from_bytes() {
     });
 
     fn get_string<'a>(map: &'a json::JsonObject, key: &String) -> Option<&'a str> {
-        match map.find(key) {
+        match map.get(key) {
             Some(&json::String(ref s)) => Some(s.as_slice()),
             Some(&json::Null) => None,
             None => None,
