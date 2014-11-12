@@ -7,7 +7,7 @@ use std::slice;
 use std::vec;
 
 
-#[deriving(PartialEq)]
+#[deriving(PartialEq, Show)]
 pub struct NumericValue {
     pub representation: String,
     pub value: f64,
@@ -15,7 +15,7 @@ pub struct NumericValue {
 }
 
 
-#[deriving(PartialEq)]
+#[deriving(PartialEq, Show)]
 pub struct SourceLocation {
     pub line: uint,  // First line is 1
     pub column: uint,  // First character of a line is at column 1
@@ -25,7 +25,7 @@ pub struct SourceLocation {
 pub type Node = (ComponentValue, SourceLocation);  // TODO this is not a good name
 
 
-#[deriving(PartialEq)]
+#[deriving(PartialEq, Show)]
 pub enum ComponentValue {
     // Preserved tokens.
     Ident(String),
@@ -70,7 +70,7 @@ pub enum ComponentValue {
 
 
 impl ComponentValue {
-    pub fn to_css(&mut self) -> String {
+    pub fn to_css(&self) -> String {
         let mut css = String::new();
         self.to_css_push(&mut css);
         css
