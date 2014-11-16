@@ -4,6 +4,7 @@
 
 use std::io;
 use std::io::{File, Command, Writer, TempDir, IoResult};
+use std::num::Float;
 use serialize::{json};
 use serialize::json::ToJson;
 use test;

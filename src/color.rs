@@ -4,6 +4,7 @@
 
 use std::ascii::AsciiExt;
 use std::fmt;
+use std::num::{Float, FloatMath};
 
 use ast::*;
 
