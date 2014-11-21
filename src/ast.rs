@@ -135,7 +135,7 @@ pub enum ErrorReason {
 
 impl fmt::Show for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:u}:{:u} {}", self.location.line, self.location.column, self.reason)
+        write!(f, "{}:{} {}", self.location.line, self.location.column, self.reason)
     }
 }
 
