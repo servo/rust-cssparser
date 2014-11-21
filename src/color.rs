@@ -6,7 +6,8 @@ use std::ascii::AsciiExt;
 use std::fmt;
 use std::num::{Float, FloatMath};
 
-use ast::*;
+use ast::{ComponentValue, SkipWhitespaceIterable};
+use ast::ComponentValue::{Number, Percentage, Function, Ident, Hash, IDHash, Comma};
 
 
 #[deriving(Clone, PartialEq)]
@@ -34,14 +35,14 @@ impl fmt::Show for RGBA {
 #[deriving(Clone, PartialEq)]
 pub enum Color {
     CurrentColor,
-    RGBAColor(RGBA),
+    RGBA(RGBA),
 }
 
 impl fmt::Show for Color {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &CurrentColor => write!(f, "currentColor"),
-            &RGBAColor(c) => write!(f, "{}", c),
+            &Color::CurrentColor => write!(f, "currentColor"),
+            &Color::RGBA(c) => write!(f, "{}", c),
         }
     }
 }
@@ -214,11 +215,11 @@ fn parse_color_keyword(value: &str) -> Result<Color, ()> {
         "whitesmoke" => (245., 245., 245.),
         "yellowgreen" => (154., 205., 50.),
 
-        "transparent" => return Ok(RGBAColor(RGBA { red: 0., green: 0., blue: 0., alpha: 0. })),
-        "currentcolor" => return Ok(CurrentColor),
+        "transparent" => return Ok(Color::RGBA(RGBA { red: 0., green: 0., blue: 0., alpha: 0. })),
+        "currentcolor" => return Ok(Color::CurrentColor),
         _ => return Err(()),
     };
-    Ok(RGBAColor(RGBA { red: r / 255., green: g / 255., blue: b / 255., alpha: 1. }))
+    Ok(Color::RGBA(RGBA { red: r / 255., green: g / 255., blue: b / 255., alpha: 1. }))
 }
 
 
@@ -237,10 +238,10 @@ fn parse_color_hash(value: &str) -> Result<Color, ()> {
     )
     macro_rules! to_rgba(
         ($r: expr, $g: expr, $b: expr,) => {
-            Ok(RGBAColor(RGBA { red: $r as f32 / 255.,
-                           green: $g as f32 / 255.,
-                           blue: $b as f32 / 255.,
-                           alpha: 1. }))
+            Ok(Color::RGBA(RGBA { red: $r as f32 / 255.,
+                                  green: $g as f32 / 255.,
+                                  blue: $b as f32 / 255.,
+                                  alpha: 1. }))
         };
     )
 
@@ -351,7 +352,7 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
         1.
     };
     if iter.next().is_none() {
-        Ok(RGBAColor(RGBA { red: red, green: green, blue: blue, alpha: alpha }))
+        Ok(Color::RGBA(RGBA { red: red, green: green, blue: blue, alpha: alpha }))
     } else {
         Err(())
     }

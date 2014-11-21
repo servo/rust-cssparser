@@ -6,7 +6,7 @@ use std::cmp;
 
 use encoding::label::encoding_from_whatwg_label;
 use encoding::all::UTF_8;
-use encoding::{EncodingRef, DecodeReplace, decode};
+use encoding::{EncodingRef, DecoderTrap, decode};
 
 use tokenizer::{tokenize, Tokenizer};
 use parser::{parse_stylesheet_rules, StylesheetParser};
@@ -65,7 +65,7 @@ pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>
 
 #[inline]
 fn decode_replace(input: &[u8], fallback_encoding: EncodingRef)-> (String, EncodingRef) {
-    let (result, used_encoding) = decode(input, DecodeReplace, fallback_encoding);
+    let (result, used_encoding) = decode(input, DecoderTrap::Replace, fallback_encoding);
     (result.unwrap(), used_encoding)
 }
 

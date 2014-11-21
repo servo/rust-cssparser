@@ -13,6 +13,7 @@ use encoding::label::encoding_from_whatwg_label;
 
 use super::*;
 use ast::*;
+use ast::ComponentValue::*;
 
 macro_rules! JString {
     ($e: expr) => { json::String($e.to_string()) }
@@ -230,9 +231,9 @@ fn color3_hsl() {
 fn color3_keywords() {
     run_color_tests(include_str!("css-parsing-tests/color3_keywords.json"), |c| {
         match c {
-            Some(RGBAColor(RGBA { red: r, green: g, blue: b, alpha: a }))
+            Some(Color::RGBA(RGBA { red: r, green: g, blue: b, alpha: a }))
             => vec!(r * 255., g * 255., b * 255., a).to_json(),
-            Some(CurrentColor) => JString!("currentColor"),
+            Some(Color::CurrentColor) => JString!("currentColor"),
             None => json::Null,
         }
     });
@@ -280,21 +281,21 @@ fn serializer() {
 
 #[test]
 fn serialize_current_color() {
-    let c = CurrentColor;
+    let c = Color::CurrentColor;
     assert!(format!("{}", c).as_slice() == "currentColor");
 }
 
 
 #[test]
 fn serialize_rgb_full_alpha() {
-    let c = RGBAColor(RGBA { red: 1.0, green: 0.9, blue: 0.8, alpha: 1.0 });
+    let c = Color::RGBA(RGBA { red: 1.0, green: 0.9, blue: 0.8, alpha: 1.0 });
     assert!(format!("{}", c).as_slice() == "rgb(255, 230, 204)");
 }
 
 
 #[test]
 fn serialize_rgba() {
-    let c = RGBAColor(RGBA { red: 0.1, green: 0.2, blue: 0.3, alpha: 0.5 });
+    let c = Color::RGBA(RGBA { red: 0.1, green: 0.2, blue: 0.3, alpha: 0.5 });
     assert!(format!("{}", c).as_slice() == "rgba(26, 51, 77, 0.5)");
 }
 
@@ -342,8 +343,8 @@ impl ToJson for Result<ComponentValue, SyntaxError> {
 impl ToJson for SyntaxError {
     fn to_json(&self) -> json::Json {
         json::List(vec!(JString!("error"), JString!(match self.reason {
-            ErrEmptyInput => "empty",
-            ErrExtraInput => "extra-input",
+            ErrorReason::EmptyInput => "empty",
+            ErrorReason::ExtraInput => "extra-input",
             _ => "invalid",
         })))
     }
@@ -353,8 +354,8 @@ impl ToJson for SyntaxError {
 impl ToJson for Color {
     fn to_json(&self) -> json::Json {
         match *self {
-            RGBAColor(RGBA { red: r, green: g, blue: b, alpha: a }) => vec!(r, g, b, a).to_json(),
-            CurrentColor => JString!("currentColor"),
+            Color::RGBA(RGBA { red: r, green: g, blue: b, alpha: a }) => vec!(r, g, b, a).to_json(),
+            Color::CurrentColor => JString!("currentColor"),
         }
     }
 }
@@ -363,8 +364,8 @@ impl ToJson for Color {
 impl ToJson for Rule {
     fn to_json(&self) -> json::Json {
         match *self {
-            QualifiedRule_(ref rule) => rule.to_json(),
-            AtRule_(ref rule) => rule.to_json(),
+            Rule::QualifiedRule(ref rule) => rule.to_json(),
+            Rule::AtRule(ref rule) => rule.to_json(),
         }
     }
 }
@@ -373,8 +374,8 @@ impl ToJson for Rule {
 impl ToJson for DeclarationListItem {
     fn to_json(&self) -> json::Json {
         match *self {
-            Declaration_(ref declaration) => declaration.to_json(),
-            DeclAtRule(ref at_rule) => at_rule.to_json(),
+            DeclarationListItem::Declaration(ref declaration) => declaration.to_json(),
+            DeclarationListItem::AtRule(ref at_rule) => at_rule.to_json(),
         }
     }
 }

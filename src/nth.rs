@@ -4,7 +4,8 @@
 
 use std::ascii::AsciiExt;
 
-use ast::*;
+use ast::{ComponentValue, NumericValue, SkipWhitespaceIterator, SkipWhitespaceIterable};
+use ast::ComponentValue::{Number, Dimension, Ident, Delim};
 
 
 /// Parse the *An+B* notation, as found in the `:nth-child()` selector.

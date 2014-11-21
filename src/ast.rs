@@ -107,15 +107,14 @@ pub struct AtRule {
 
 #[deriving(PartialEq)]
 pub enum DeclarationListItem {
-    Declaration_(Declaration),
-    // A better idea for a name that means "at-rule" but is not "AtRule"?
-    DeclAtRule(AtRule),
+    Declaration(Declaration),
+    AtRule(AtRule),
 }
 
 #[deriving(PartialEq)]
 pub enum Rule {
-    QualifiedRule_(QualifiedRule),
-    AtRule_(AtRule),
+    QualifiedRule(QualifiedRule),
+    AtRule(AtRule),
 }
 
 #[deriving(PartialEq)]
@@ -126,11 +125,11 @@ pub struct SyntaxError {
 
 #[deriving(PartialEq, Show)]
 pub enum ErrorReason {
-    ErrEmptyInput,  // Parsing a single "thing", found only whitespace.
-    ErrExtraInput,  // Found more non-whitespace after parsing a single "thing".
-    ErrMissingQualifiedRuleBlock,  // EOF in a qualified rule prelude, before '{'
-    ErrInvalidDeclarationSyntax,
-    ErrInvalidBangImportantSyntax,
+    EmptyInput,  // Parsing a single "thing", found only whitespace.
+    ExtraInput,  // Found more non-whitespace after parsing a single "thing".
+    MissingQualifiedRuleBlock,  // EOF in a qualified rule prelude, before '{'
+    InvalidDeclarationSyntax,
+    InvalidBangImportantSyntax,
     // This is meant to be extended
 }
 
@@ -159,7 +158,7 @@ pub struct SkipWhitespaceIterator<'a> {
 impl<'a> Iterator<&'a ComponentValue> for SkipWhitespaceIterator<'a> {
     fn next(&mut self) -> Option<&'a ComponentValue> {
         for component_value in self.iter_with_whitespace {
-            if component_value != &WhiteSpace { return Some(component_value) }
+            if component_value != &ComponentValue::WhiteSpace { return Some(component_value) }
         }
         None
     }
@@ -183,7 +182,7 @@ pub struct MoveSkipWhitespaceIterator {
 impl Iterator<ComponentValue> for MoveSkipWhitespaceIterator {
     fn next(&mut self) -> Option<ComponentValue> {
         for component_value in self.iter_with_whitespace {
-            if component_value != WhiteSpace { return Some(component_value) }
+            if component_value != ComponentValue::WhiteSpace { return Some(component_value) }
         }
         None
     }

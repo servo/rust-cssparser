@@ -8,6 +8,7 @@ use std::{char, num};
 use std::ascii::AsciiExt;
 
 use ast::*;
+use ast::ComponentValue::*;
 
 
 /// Returns a `Iterator<(ComponentValue, SourceLocation)>`

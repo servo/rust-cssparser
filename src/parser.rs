@@ -18,6 +18,8 @@ use std::iter::Iterator;
 use std::ascii::AsciiExt;
 
 use ast::*;
+use ast::ComponentValue::{WhiteSpace, CDC, CDO, Ident, Delim, AtKeyword,
+                          Semicolon, Colon, CurlyBracketBlock};
 
 
 pub struct StylesheetParser<T>{ iter: T }
@@ -54,12 +56,12 @@ pub fn parse_declaration_list<T: Iterator<Node>>(iter: T) -> DeclarationListPars
 pub fn parse_one_rule<T: Iterator<Node>>(iter: T) -> Result<Rule, SyntaxError> {
     let mut parser = RuleListParser{ iter: iter };
     match parser.next() {
-        None => error(START_LOCATION, ErrEmptyInput),
+        None => error(START_LOCATION, ErrorReason::EmptyInput),
         Some(result) => {
             if result.is_err() { result }
             else { match next_non_whitespace(&mut parser.iter) {
                 None => result,
-                Some((_component_value, location)) => error(location, ErrExtraInput),
+                Some((_component_value, location)) => error(location, ErrorReason::ExtraInput),
             }}
         }
     }
@@ -70,13 +72,13 @@ pub fn parse_one_rule<T: Iterator<Node>>(iter: T) -> Result<Rule, SyntaxError> {
 /// Used eg. in @supports
 pub fn parse_one_declaration<T: Iterator<Node>>(mut iter: T) -> Result<Declaration, SyntaxError> {
     match next_non_whitespace(&mut iter) {
-        None => error(START_LOCATION, ErrEmptyInput),
+        None => error(START_LOCATION, ErrorReason::EmptyInput),
         Some((component_value, location)) => {
             let result = parse_declaration(&mut iter, component_value, location);
             if result.is_err() { result }
             else { match next_non_whitespace(&mut iter) {
                 None => result,
-                Some((_component_value, location)) => error(location, ErrExtraInput),
+                Some((_component_value, location)) => error(location, ErrorReason::ExtraInput),
             }}
         }
     }
@@ -88,11 +90,11 @@ pub fn parse_one_declaration<T: Iterator<Node>>(mut iter: T) -> Result<Declarati
 pub fn parse_one_component_value<T: Iterator<Node>>(mut iter: T)
                                 -> Result<ComponentValue, SyntaxError> {
     match next_non_whitespace(&mut iter) {
-        None => error(START_LOCATION, ErrEmptyInput),
+        None => error(START_LOCATION, ErrorReason::EmptyInput),
         Some((component_value, _location)) => {
             match next_non_whitespace(&mut iter) {
                 None => Ok(component_value),
-                Some((_component_value, location)) => error(location, ErrExtraInput),
+                Some((_component_value, location)) => error(location, ErrorReason::ExtraInput),
             }
         }
     }
@@ -119,9 +121,10 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for StylesheetParser
         for_iter!(iter, (component_value, location), {
             match component_value {
                 WhiteSpace | CDO | CDC => (),
-                AtKeyword(name) => return Some(Ok(AtRule_(parse_at_rule(iter, name, location)))),
+                AtKeyword(name) => return Some(Ok(
+                    Rule::AtRule(parse_at_rule(iter, name, location)))),
                 _ => return Some(match parse_qualified_rule(iter, component_value, location) {
-                    Ok(rule) => Ok(QualifiedRule_(rule)),
+                    Ok(rule) => Ok(Rule::QualifiedRule(rule)),
                     Err(e) => Err(e),
                 }),
             }
@@ -137,9 +140,10 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for RuleListParser<T
         for_iter!(iter, (component_value, location), {
             match component_value {
                 WhiteSpace => (),
-                AtKeyword(name) => return Some(Ok(AtRule_(parse_at_rule(iter, name, location)))),
+                AtKeyword(name) => return Some(Ok(
+                    Rule::AtRule(parse_at_rule(iter, name, location)))),
                 _ => return Some(match parse_qualified_rule(iter, component_value, location) {
-                    Ok(rule) => Ok(QualifiedRule_(rule)),
+                    Ok(rule) => Ok(Rule::QualifiedRule(rule)),
                     Err(e) => Err(e),
                 }),
             }
@@ -156,10 +160,10 @@ for DeclarationListParser<T> {
         for_iter!(iter, (component_value, location), {
             match component_value {
                 WhiteSpace | Semicolon => (),
-                AtKeyword(name)
-                => return Some(Ok(DeclAtRule(parse_at_rule(iter, name, location)))),
+                AtKeyword(name) => return Some(Ok(
+                    DeclarationListItem::AtRule(parse_at_rule(iter, name, location)))),
                 _ => return Some(match parse_declaration(iter, component_value, location) {
-                    Ok(declaration) => Ok(Declaration_(declaration)),
+                    Ok(declaration) => Ok(DeclarationListItem::Declaration(declaration)),
                     Err(e) => {
                         // Find the end of the declaration
                         for (v, _) in *iter { if v == Semicolon { break } }
@@ -204,7 +208,7 @@ fn parse_qualified_rule<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
             component_value => prelude.push(component_value),
         }
     })
-    error(location, ErrMissingQualifiedRuleBlock)
+    error(location, ErrorReason::MissingQualifiedRuleBlock)
 }
 
 
@@ -213,11 +217,11 @@ fn parse_declaration<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
                                         -> Result<Declaration, SyntaxError> {
     let name = match first {
         Ident(name) => name,
-        _ => return error(location, ErrInvalidDeclarationSyntax)
+        _ => return error(location, ErrorReason::InvalidDeclarationSyntax)
     };
     match next_non_whitespace(iter) {
         Some((Colon, _)) => (),
-        _ => return error(location, ErrInvalidDeclarationSyntax),
+        _ => return error(location, ErrorReason::InvalidDeclarationSyntax),
     }
     let mut value = Vec::new();
     let mut important = false;
@@ -228,7 +232,7 @@ fn parse_declaration<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
                 important = true;
                 break
             } else {
-                return error(location, ErrInvalidBangImportantSyntax)
+                return error(location, ErrorReason::InvalidBangImportantSyntax)
             },
             component_value => value.push(component_value),
         }

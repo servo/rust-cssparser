@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use ast::*;
+use ast::ComponentValue::*;
 
 
 pub fn to_css_push(component_value: &ComponentValue, css: &mut String) {
