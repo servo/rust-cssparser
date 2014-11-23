@@ -19,8 +19,8 @@ macro_rules! JString {
     ($e: expr) => { json::String($e.to_string()) }
 }
 
-macro_rules! JList {
-    ($($e: expr),*) => { json::List(vec!( $($e),* )) }
+macro_rules! JArray {
+    ($($e: expr),*) => { json::Array(vec!( $($e),* )) }
 }
 
 
@@ -62,7 +62,7 @@ fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
 
         (&json::Boolean(a), &json::Boolean(b)) => a == b,
         (&json::String(ref a), &json::String(ref b)) => a == b,
-        (&json::List(ref a), &json::List(ref b))
+        (&json::Array(ref a), &json::Array(ref b))
             => a.iter().zip(b.iter()).all(|(ref a, ref b)| almost_equals(*a, *b)),
         (&json::Object(_), &json::Object(_)) => panic!("Not implemented"),
         (&json::Null, &json::Null) => true,
@@ -81,7 +81,7 @@ fn assert_json_eq(results: json::Json, expected: json::Json, message: String) {
 
 fn run_raw_json_tests(json_data: &str, run: |json::Json, json::Json|) {
     let items = match json::from_str(json_data) {
-        Ok(json::List(items)) => items,
+        Ok(json::Array(items)) => items,
         _ => panic!("Invalid JSON")
     };
     assert!(items.len() % 2 == 0);
@@ -342,7 +342,7 @@ impl ToJson for Result<ComponentValue, SyntaxError> {
 
 impl ToJson for SyntaxError {
     fn to_json(&self) -> json::Json {
-        json::List(vec!(JString!("error"), JString!(match self.reason {
+        json::Array(vec!(JString!("error"), JString!(match self.reason {
             ErrorReason::EmptyInput => "empty",
             ErrorReason::ExtraInput => "extra-input",
             _ => "invalid",
@@ -394,8 +394,8 @@ impl ToJson for AtRule {
     fn to_json(&self) -> json::Json {
         match *self {
             AtRule{ ref name, ref prelude, ref block, ..}
-            => json::List(vec!(JString!("at-rule"), name.to_json(),
-                               prelude.to_json(), block.as_ref().map(list_to_json).to_json()))
+            => json::Array(vec!(JString!("at-rule"), name.to_json(),
+                                prelude.to_json(), block.as_ref().map(list_to_json).to_json()))
         }
     }
 }
@@ -405,8 +405,8 @@ impl ToJson for QualifiedRule {
     fn to_json(&self) -> json::Json {
         match *self {
             QualifiedRule{ ref prelude, ref block, ..}
-            => json::List(vec!(JString!("qualified rule"),
-                               prelude.to_json(), json::List(list_to_json(block))))
+            => json::Array(vec!(JString!("qualified rule"),
+                                prelude.to_json(), json::Array(list_to_json(block))))
         }
     }
 }
@@ -416,8 +416,8 @@ impl ToJson for Declaration {
     fn to_json(&self) -> json::Json {
         match *self {
             Declaration{ ref name, ref value, ref important, ..}
-            =>  json::List(vec!(JString!("declaration"), name.to_json(),
-                                value.to_json(), important.to_json()))
+            =>  json::Array(vec!(JString!("declaration"), name.to_json(),
+                                 value.to_json(), important.to_json()))
         }
     }
 }
@@ -434,23 +434,23 @@ impl ToJson for ComponentValue {
         }
 
         match *self {
-            Ident(ref value) => JList!(JString!("ident"), value.to_json()),
-            AtKeyword(ref value) => JList!(JString!("at-keyword"), value.to_json()),
-            Hash(ref value) => JList!(JString!("hash"), value.to_json(),
+            Ident(ref value) => JArray!(JString!("ident"), value.to_json()),
+            AtKeyword(ref value) => JArray!(JString!("at-keyword"), value.to_json()),
+            Hash(ref value) => JArray!(JString!("hash"), value.to_json(),
                                       JString!("unrestricted")),
-            IDHash(ref value) => JList!(JString!("hash"), value.to_json(), JString!("id")),
-            QuotedString(ref value) => JList!(JString!("string"), value.to_json()),
-            URL(ref value) => JList!(JString!("url"), value.to_json()),
+            IDHash(ref value) => JArray!(JString!("hash"), value.to_json(), JString!("id")),
+            QuotedString(ref value) => JArray!(JString!("string"), value.to_json()),
+            URL(ref value) => JArray!(JString!("url"), value.to_json()),
             Delim('\\') => JString!("\\"),
             Delim(value) => json::String(String::from_char(1, value)),
 
-            Number(ref value) => json::List(vec!(JString!("number")) + numeric(value)),
-            Percentage(ref value) => json::List(vec!(JString!("percentage")) + numeric(value)),
-            Dimension(ref value, ref unit) => json::List(
+            Number(ref value) => json::Array(vec!(JString!("number")) + numeric(value)),
+            Percentage(ref value) => json::Array(vec!(JString!("percentage")) + numeric(value)),
+            Dimension(ref value, ref unit) => json::Array(
                 vec!(JString!("dimension")) + numeric(value) + [unit.to_json()].as_slice()),
 
             UnicodeRange(start, end)
-            => JList!(JString!("unicode-range"), start.to_json(), end.to_json()),
+            => JArray!(JString!("unicode-range"), start.to_json(), end.to_json()),
 
             WhiteSpace => JString!(" "),
             Colon => JString!(":"),
@@ -466,20 +466,20 @@ impl ToJson for ComponentValue {
             CDC => JString!("-->"),
 
             Function(ref name, ref arguments)
-            => json::List(vec!(JString!("function"), name.to_json()) +
+            => json::Array(vec!(JString!("function"), name.to_json()) +
                      arguments.iter().map(|a| a.to_json()).collect::<Vec<json::Json>>()),
             ParenthesisBlock(ref content)
-            => json::List(vec!(JString!("()")) + content.iter().map(|c| c.to_json()).collect::<Vec<json::Json>>()),
+            => json::Array(vec!(JString!("()")) + content.iter().map(|c| c.to_json()).collect::<Vec<json::Json>>()),
             SquareBracketBlock(ref content)
-            => json::List(vec!(JString!("[]")) + content.iter().map(|c| c.to_json()).collect::<Vec<json::Json>>()),
+            => json::Array(vec!(JString!("[]")) + content.iter().map(|c| c.to_json()).collect::<Vec<json::Json>>()),
             CurlyBracketBlock(ref content)
-            => json::List(vec!(JString!("{}")) + list_to_json(content)),
+            => json::Array(vec!(JString!("{}")) + list_to_json(content)),
 
-            BadURL => JList!(JString!("error"), JString!("bad-url")),
-            BadString => JList!(JString!("error"), JString!("bad-string")),
-            CloseParenthesis => JList!(JString!("error"), JString!(")")),
-            CloseSquareBracket => JList!(JString!("error"), JString!("]")),
-            CloseCurlyBracket => JList!(JString!("error"), JString!("}")),
+            BadURL => JArray!(JString!("error"), JString!("bad-url")),
+            BadString => JArray!(JString!("error"), JString!("bad-string")),
+            CloseParenthesis => JArray!(JString!("error"), JString!(")")),
+            CloseSquareBracket => JArray!(JString!("error"), JString!("]")),
+            CloseCurlyBracket => JArray!(JString!("error"), JString!("}")),
         }
     }
 }
