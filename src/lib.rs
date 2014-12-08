@@ -15,6 +15,7 @@ extern crate test;
 #[cfg(test)]
 extern crate serialize;
 
+pub use color::{parse_color_keyword};
 pub use tokenizer::{tokenize, Tokenizer};
 pub use parser::{parse_stylesheet_rules, StylesheetParser,
                  parse_rule_list, RuleListParser,
