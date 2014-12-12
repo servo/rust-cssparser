@@ -35,15 +35,15 @@ impl Iterator<Node> for Tokenizer {
 #[inline]
 fn preprocess(input: &str) -> String {
     // TODO: Is this faster if done in one pass?
-    input.replace("\r\n", "\n").replace("\r", "\n").replace("\x0C", "\n").replace("\x00", "\uFFFD")
+    input.replace("\r\n", "\n").replace("\r", "\n").replace("\x0C", "\n").replace("\x00", "\u{FFFD}")
 }
 
 
 #[test]
 fn test_preprocess() {
     assert!("" == preprocess("").as_slice());
-    assert!("Lorem\n\t\uFFFDipusm\ndoror\uFFFD\n" ==
-            preprocess("Lorem\r\n\t\x00ipusm\ndoror\uFFFD\r").as_slice());
+    assert!("Lorem\n\t\u{FFFD}ipusm\ndoror\u{FFFD}\n" ==
+            preprocess("Lorem\r\n\t\x00ipusm\ndoror\u{FFFD}\r").as_slice());
 }
 
 
@@ -583,7 +583,7 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> ComponentValue {
 // and that the next input character has already been verified
 // to not be a newline.
 fn consume_escape(tokenizer: &mut Tokenizer) -> char {
-    if tokenizer.is_eof() { return '\uFFFD' }  // Escaped EOF
+    if tokenizer.is_eof() { return '\u{FFFD}' }  // Escaped EOF
     let c = tokenizer.consume_char();
     match c {
         '0'...'9' | 'A'...'F' | 'a'...'f' => {
@@ -603,7 +603,7 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
                     _ => ()
                 }
             }
-            static REPLACEMENT_CHAR: char = '\uFFFD';
+            static REPLACEMENT_CHAR: char = '\u{FFFD}';
             let c: u32 = num::from_str_radix(hex.as_slice(), 16).unwrap();
             if c != 0 {
                 let c = char::from_u32(c);

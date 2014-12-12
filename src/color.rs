@@ -10,7 +10,7 @@ use ast::{ComponentValue, SkipWhitespaceIterable};
 use ast::ComponentValue::{Number, Percentage, Function, Ident, Hash, IDHash, Comma};
 
 
-#[deriving(Clone, PartialEq)]
+#[deriving(Clone, Copy, PartialEq)]
 pub struct RGBA {
     // All in 0...1
     // Use f32 to try and match rust-azure’s AzFloat
@@ -32,7 +32,7 @@ impl fmt::Show for RGBA {
     }
 }
 
-#[deriving(Clone, PartialEq)]
+#[deriving(Clone, Copy, PartialEq)]
 pub enum Color {
     CurrentColor,
     RGBA(RGBA),

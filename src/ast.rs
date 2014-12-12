@@ -15,7 +15,7 @@ pub struct NumericValue {
 }
 
 
-#[deriving(PartialEq, Show)]
+#[deriving(PartialEq, Show, Copy)]
 pub struct SourceLocation {
     pub line: uint,  // First line is 1
     pub column: uint,  // First character of a line is at column 1
@@ -117,13 +117,13 @@ pub enum Rule {
     AtRule(AtRule),
 }
 
-#[deriving(PartialEq)]
+#[deriving(PartialEq, Copy)]
 pub struct SyntaxError {
     pub location: SourceLocation,
     pub reason: ErrorReason,
 }
 
-#[deriving(PartialEq, Show)]
+#[deriving(PartialEq, Show, Copy)]
 pub enum ErrorReason {
     EmptyInput,  // Parsing a single "thing", found only whitespace.
     ExtraInput,  // Found more non-whitespace after parsing a single "thing".
