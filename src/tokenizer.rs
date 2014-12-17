@@ -554,13 +554,16 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> ComponentValue {
         question_marks += 1;
         tokenizer.position += 1
     }
+    let first: u32 = if hex.len() > 0 {
+        num::from_str_radix(hex.as_slice(), 16).unwrap()
+    } else { 0 };
     let start;
     let end;
     if question_marks > 0 {
-        start = num::from_str_radix((hex + "0".repeat(question_marks)).as_slice(), 16).unwrap();
-        end = num::from_str_radix((hex + "F".repeat(question_marks)).as_slice(), 16).unwrap();
+        start = first << (question_marks * 4);
+        end = ((first + 1) << (question_marks * 4)) - 1;
     } else {
-        start = num::from_str_radix(hex.as_slice(), 16).unwrap();
+        start = first;
         hex.truncate(0);
         if !tokenizer.is_eof() && tokenizer.current_char() == '-' {
             tokenizer.position += 1;

@@ -444,10 +444,13 @@ impl ToJson for ComponentValue {
             Delim('\\') => JString!("\\"),
             Delim(value) => Json::String(String::from_char(1, value)),
 
-            Number(ref value) => Json::Array(vec!(JString!("number")) + numeric(value)),
-            Percentage(ref value) => Json::Array(vec!(JString!("percentage")) + numeric(value)),
+            Number(ref value) => Json::Array(
+                vec!(JString!("number")) + numeric(value).as_slice()),
+            Percentage(ref value) => Json::Array(
+                vec!(JString!("percentage")) + numeric(value).as_slice()),
             Dimension(ref value, ref unit) => Json::Array(
-                vec!(JString!("dimension")) + numeric(value) + [unit.to_json()].as_slice()),
+                vec!(JString!("dimension")) + numeric(value).as_slice()
+                + [unit.to_json()].as_slice()),
 
             UnicodeRange(start, end)
             => JArray!(JString!("unicode-range"), start.to_json(), end.to_json()),
@@ -466,14 +469,19 @@ impl ToJson for ComponentValue {
             CDC => JString!("-->"),
 
             Function(ref name, ref arguments)
-            => Json::Array(vec!(JString!("function"), name.to_json()) +
-                     arguments.iter().map(|a| a.to_json()).collect::<Vec<json::Json>>()),
+            => Json::Array(
+                vec!(JString!("function"), name.to_json())
+                + arguments.iter().map(|a| a.to_json()).collect::<Vec<json::Json>>().as_slice()),
             ParenthesisBlock(ref content)
-            => Json::Array(vec!(JString!("()")) + content.iter().map(|c| c.to_json()).collect::<Vec<json::Json>>()),
+            => Json::Array(
+                vec!(JString!("()"))
+                + content.iter().map(|c| c.to_json()).collect::<Vec<json::Json>>().as_slice()),
             SquareBracketBlock(ref content)
-            => Json::Array(vec!(JString!("[]")) + content.iter().map(|c| c.to_json()).collect::<Vec<json::Json>>()),
+            => Json::Array(
+                vec!(JString!("[]"))
+                + content.iter().map(|c| c.to_json()).collect::<Vec<json::Json>>().as_slice()),
             CurlyBracketBlock(ref content)
-            => Json::Array(vec!(JString!("{}")) + list_to_json(content)),
+            => Json::Array(vec!(JString!("{}")) + list_to_json(content).as_slice()),
 
             BadURL => JArray!(JString!("error"), JString!("bad-url")),
             BadString => JArray!(JString!("error"), JString!("bad-string")),
