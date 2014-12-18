@@ -42,8 +42,21 @@ fn preprocess(input: &str) -> String {
 #[test]
 fn test_preprocess() {
     assert!("" == preprocess("").as_slice());
-    assert!("Lorem\n\t\u{FFFD}ipusm\ndoror\u{FFFD}\n" ==
-            preprocess("Lorem\r\n\t\x00ipusm\ndoror\u{FFFD}\r").as_slice());
+    assert!("Lorem\n\n\t\u{FFFD}ipusm\ndoror\u{FFFD}á\n" ==
+            preprocess("Lorem\r\n\n\t\x00ipusm\ndoror\u{FFFD}á\r").as_slice());
+}
+
+#[cfg(test)]
+mod bench_preprocess {
+    extern crate test;
+
+    #[bench]
+    fn bench_preprocess(b: &mut test::Bencher) {
+        let source = "Lorem\n\t\u{FFFD}ipusm\ndoror\u{FFFD}á\n";
+        b.iter(|| {
+            let _ = super::preprocess(source);
+        });
+    }
 }
 
 
