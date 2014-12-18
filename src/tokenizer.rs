@@ -34,8 +34,44 @@ impl Iterator<Node> for Tokenizer {
 
 #[inline]
 fn preprocess(input: &str) -> String {
-    // TODO: Is this faster if done in one pass?
-    input.replace("\r\n", "\n").replace("\r", "\n").replace("\x0C", "\n").replace("\x00", "\u{FFFD}")
+    let bytes = input.as_bytes();
+    let mut result: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut last: u8 = 0;
+    let mut offset: uint = 0;
+    while offset < bytes.len() {
+        let byte = bytes[offset];
+        match byte {
+            b'\r'               => result.push(b'\n'),
+            b'\n' if last == 13 => (),
+            b'\n'               => result.push(b'\n'),
+            b'\x0C'             => result.push(b'\n'),
+            b'\0'               => result.push_all("\u{FFFD}".as_bytes()),
+            _ if byte < 128     => result.push(byte),
+            _                   => {
+                // Multi-byte character
+                result.push(byte);
+                let remaining = bytes.len() - offset;
+                if remaining >= 3 && byte >= 0xF0 {
+                    result.push(bytes[offset + 1]);
+                    result.push(bytes[offset + 2]);
+                    result.push(bytes[offset + 3]);
+                    offset += 3;
+                } else if remaining >= 2 && byte >= 0xE0 {
+                    result.push(bytes[offset + 1]);
+                    result.push(bytes[offset + 2]);
+                    offset += 2;
+                } else if remaining >= 1 && byte >= 0xC0 {
+                    result.push(bytes[offset + 1]);
+                    offset += 1;
+                }
+            }
+        }
+
+        last = byte;
+        offset += 1;
+    }
+
+    String::from_utf8(result).unwrap()
 }
 
 
