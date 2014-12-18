@@ -43,36 +43,15 @@ fn preprocess(input: &str) -> String {
     let bytes = input.as_bytes();
     let mut result: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut last: u8 = 0;
-    let mut offset: uint = 0;
-    while offset < bytes.len() {
-        let byte = bytes[offset];
-        match byte {
-            b'\n' if last == b'\r'  => (),
-            b'\r' | b'\n' | b'\x0C' => result.push(b'\n'),
-            b'\0'                   => result.push_all("\u{FFFD}".as_bytes()),
-            _ if byte < 128         => result.push(byte),
-            _                       => {
-                // Multi-byte character
-                result.push(byte);
-                let remaining = bytes.len() - offset;
-                if remaining >= 3 && byte >= 0xF0 {
-                    result.push(bytes[offset + 1]);
-                    result.push(bytes[offset + 2]);
-                    result.push(bytes[offset + 3]);
-                    offset += 3;
-                } else if remaining >= 2 && byte >= 0xE0 {
-                    result.push(bytes[offset + 1]);
-                    result.push(bytes[offset + 2]);
-                    offset += 2;
-                } else if remaining >= 1 && byte >= 0xC0 {
-                    result.push(bytes[offset + 1]);
-                    offset += 1;
-                }
-            }
+    for byte in bytes.iter() {
+        match *byte {
+            b'\n' if last == b'\r' => (),
+            b'\r' | b'\x0C'        => result.push(b'\n'),
+            b'\0'                  => result.push_all("\u{FFFD}".as_bytes()),
+            _                      => result.push(*byte),
         }
 
-        last = byte;
-        offset += 1;
+        last = *byte;
     }
 
     unsafe { String::from_utf8_unchecked(result) }
