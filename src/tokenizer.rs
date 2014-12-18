@@ -34,16 +34,48 @@ impl Iterator<Node> for Tokenizer {
 
 #[inline]
 fn preprocess(input: &str) -> String {
-    // TODO: Is this faster if done in one pass?
-    input.replace("\r\n", "\n").replace("\r", "\n").replace("\x0C", "\n").replace("\x00", "\u{FFFD}")
+    // Replace:
+    // "\r\n" => "\n"
+    // "\r"   => "\n"
+    // "\x0C" => "\n"
+    // "\x00" => "\u{FFFD}"
+
+    let bytes = input.as_bytes();
+    let mut result: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut last: u8 = 0;
+    for byte in bytes.iter() {
+        match *byte {
+            b'\n' if last == b'\r' => (),
+            b'\r' | b'\x0C'        => result.push(b'\n'),
+            b'\0'                  => result.push_all("\u{FFFD}".as_bytes()),
+            _                      => result.push(*byte),
+        }
+
+        last = *byte;
+    }
+
+    unsafe { String::from_utf8_unchecked(result) }
 }
 
 
 #[test]
 fn test_preprocess() {
     assert!("" == preprocess("").as_slice());
-    assert!("Lorem\n\t\u{FFFD}ipusm\ndoror\u{FFFD}\n" ==
-            preprocess("Lorem\r\n\t\x00ipusm\ndoror\u{FFFD}\r").as_slice());
+    assert!("Lorem\n\n\t\u{FFFD}ipusm\ndoror\u{FFFD}á\n" ==
+            preprocess("Lorem\r\n\n\t\x00ipusm\ndoror\u{FFFD}á\r").as_slice());
+}
+
+#[cfg(test)]
+mod bench_preprocess {
+    extern crate test;
+
+    #[bench]
+    fn bench_preprocess(b: &mut test::Bencher) {
+        let source = "Lorem\n\t\u{FFFD}ipusm\ndoror\u{FFFD}á\n";
+        b.iter(|| {
+            let _ = super::preprocess(source);
+        });
+    }
 }
 
 
