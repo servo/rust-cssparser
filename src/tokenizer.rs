@@ -34,6 +34,12 @@ impl Iterator<Node> for Tokenizer {
 
 #[inline]
 fn preprocess(input: &str) -> String {
+    // Replace:
+    // "\r\n" => "\n"
+    // "\r"   => "\n"
+    // "\x0C" => "\n"
+    // "\x00" => "\u{FFFD}"
+
     let bytes = input.as_bytes();
     let mut result: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut last: u8 = 0;
@@ -41,13 +47,11 @@ fn preprocess(input: &str) -> String {
     while offset < bytes.len() {
         let byte = bytes[offset];
         match byte {
-            b'\r'               => result.push(b'\n'),
-            b'\n' if last == 13 => (),
-            b'\n'               => result.push(b'\n'),
-            b'\x0C'             => result.push(b'\n'),
-            b'\0'               => result.push_all("\u{FFFD}".as_bytes()),
-            _ if byte < 128     => result.push(byte),
-            _                   => {
+            b'\n' if last == b'\r'  => (),
+            b'\r' | b'\n' | b'\x0C' => result.push(b'\n'),
+            b'\0'                   => result.push_all("\u{FFFD}".as_bytes()),
+            _ if byte < 128         => result.push(byte),
+            _                       => {
                 // Multi-byte character
                 result.push(byte);
                 let remaining = bytes.len() - offset;
