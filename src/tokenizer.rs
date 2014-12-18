@@ -75,7 +75,7 @@ fn preprocess(input: &str) -> String {
         offset += 1;
     }
 
-    String::from_utf8(result).unwrap()
+    unsafe { String::from_utf8_unchecked(result) }
 }
 
 
