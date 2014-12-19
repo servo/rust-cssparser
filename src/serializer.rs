@@ -171,7 +171,7 @@ impl<'a, I: Iterator<&'a ComponentValue>> ToCss for I {
             ($value:expr, $($pattern:pat)|+) => (
                 match $value { $($pattern)|+ => true, _ => false }
             );
-        )
+        );
         // This does not borrow-check: for component_value in self {
         loop { match self.next() { None => break, Some(component_value) => {
             let (a, b) = (previous, component_value);

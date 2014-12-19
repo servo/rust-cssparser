@@ -112,7 +112,7 @@ macro_rules! for_iter(
             match $iter.next() { None => break, Some($pattern) => $loop_body }
         }
     );
-)
+);
 
 
 impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for StylesheetParser<T> {
@@ -128,7 +128,7 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for StylesheetParser
                     Err(e) => Err(e),
                 }),
             }
-        })
+        });
         None
     }
 }
@@ -147,7 +147,7 @@ impl<T: Iterator<Node>> Iterator<Result<Rule, SyntaxError>> for RuleListParser<T
                     Err(e) => Err(e),
                 }),
             }
-        })
+        });
         None
     }
 }
@@ -171,7 +171,7 @@ for DeclarationListParser<T> {
                     }
                 }),
             }
-        })
+        });
         None
     }
 }
@@ -187,7 +187,7 @@ fn parse_at_rule<T: Iterator<Node>>(iter: &mut T, name: String, location: Source
             Semicolon => break,
             component_value => prelude.push(component_value),
         }
-    })
+    });
     AtRule {location: location, name: name, prelude: prelude, block: block}
 }
 
@@ -207,7 +207,7 @@ fn parse_qualified_rule<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
             => return Ok(QualifiedRule {location: location, prelude: prelude, block: content}),
             component_value => prelude.push(component_value),
         }
-    })
+    });
     error(location, ErrorReason::MissingQualifiedRuleBlock)
 }
 
@@ -236,7 +236,7 @@ fn parse_declaration<T: Iterator<Node>>(iter: &mut T, first: ComponentValue,
             },
             component_value => value.push(component_value),
         }
-    })
+    });
     Ok(Declaration{location: location, name: name, value: value, important: important})
 }
 

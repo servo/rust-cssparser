@@ -235,7 +235,7 @@ fn parse_color_hash(value: &str) -> Result<Color, ()> {
                 _ => return Err(())  // Not a valid color
             }
         }};
-    )
+    );
     macro_rules! to_rgba(
         ($r: expr, $g: expr, $b: expr,) => {
             Ok(Color::RGBA(RGBA { red: $r as f32 / 255.,
@@ -243,7 +243,7 @@ fn parse_color_hash(value: &str) -> Result<Color, ()> {
                                   blue: $b as f32 / 255.,
                                   alpha: 1. }))
         };
-    )
+    );
 
     match value.len() {
         6 => to_rgba!(
@@ -277,25 +277,25 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
     let mut iter = arguments.skip_whitespace();
     macro_rules! expect_comma(
         () => ( match iter.next() { Some(&Comma) => {}, _ => { return Err(()) } } );
-    )
+    );
     macro_rules! expect_percentage(
         () => ( match iter.next() {
             Some(&Percentage(ref v)) => v.value,
             _ => return Err(()),
         });
-    )
+    );
     macro_rules! expect_integer(
         () => ( match iter.next() {
             Some(&Number(ref v)) if v.int_value.is_some() => v.value,
             _ => return Err(()),
         });
-    )
+    );
     macro_rules! expect_number(
         () => ( match iter.next() {
             Some(&Number(ref v)) => v.value,
             _ => return Err(()),
         });
-    )
+    );
 
     let red: f32;
     let green: f32;
