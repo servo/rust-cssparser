@@ -281,6 +281,17 @@ impl ToCss for Declaration {
 }
 
 
+impl ToCss for [Declaration] {
+    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+        for declaration in self.iter() {
+            try!(declaration.to_css(dest));
+            try!(dest.write_char(';'));
+        }
+        Ok(())
+    }
+}
+
+
 impl ToCss for QualifiedRule {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
         try!(self.prelude.to_css(dest));
@@ -312,19 +323,33 @@ impl ToCss for AtRule {
 
 impl ToCss for DeclarationListItem {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        match *self {
-            DeclarationListItem::Declaration(ref declaration) => declaration.to_css(dest),
-            DeclarationListItem::AtRule(ref at_rule) => at_rule.to_css(dest),
+        match self {
+            &DeclarationListItem::Declaration(ref declaration) => declaration.to_css(dest),
+            &DeclarationListItem::AtRule(ref at_rule) => at_rule.to_css(dest),
         }
+    }
+}
+
+
+impl ToCss for [DeclarationListItem] {
+    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+        for item in self.iter() {
+            try!(item.to_css(dest));
+            match item {
+                &DeclarationListItem::AtRule(_) => {}
+                &DeclarationListItem::Declaration(_) => try!(dest.write_char(';'))
+            }
+        }
+        Ok(())
     }
 }
 
 
 impl ToCss for Rule {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        match *self {
-            Rule::QualifiedRule(ref rule) => rule.to_css(dest),
-            Rule::AtRule(ref rule) => rule.to_css(dest),
+        match self {
+            &Rule::QualifiedRule(ref rule) => rule.to_css(dest),
+            &Rule::AtRule(ref rule) => rule.to_css(dest),
         }
     }
 }
