@@ -102,8 +102,7 @@ impl ToCss for ComponentValue {
             },
             &CurlyBracketBlock(ref content) => {
                 try!(dest.write_char('{'));
-                let component_values = content.iter().map(|t| match *t { (ref c, _) => c });
-                try!(component_values_to_css(component_values, dest));
+                try!(content.to_css(dest));
                 try!(dest.write_char('}'));
             },
 
@@ -178,6 +177,13 @@ impl<'a> ToCss for [ComponentValue] {
     }
 }
 
+impl<'a> ToCss for [Node] {
+    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+        let component_values = self.iter().map(|n| match n { &(ref c, _) => c });
+        component_values_to_css(component_values, dest)
+    }
+}
+
 fn component_values_to_css<'a, I, W>(mut iter: I, dest: &mut W) -> text_writer::Result
 where I: Iterator<&'a ComponentValue>, W: TextWriter {
     let mut previous = match iter.next() {
@@ -238,4 +244,63 @@ where I: Iterator<&'a ComponentValue>, W: TextWriter {
         previous = component_value;
     }}}
     Ok(())
+}
+
+
+impl ToCss for Declaration {
+    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+        try!(dest.write_str(self.name.as_slice()));
+        try!(dest.write_char(':'));
+        try!(self.value.to_css(dest));
+        Ok(())
+    }
+}
+
+
+impl ToCss for QualifiedRule {
+    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+        try!(self.prelude.to_css(dest));
+        try!(dest.write_char('{'));
+        try!(self.block.to_css(dest));
+        try!(dest.write_char('}'));
+        Ok(())
+    }
+}
+
+
+impl ToCss for AtRule {
+    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+        try!(dest.write_char('@'));
+        try!(dest.write_str(self.name.as_slice()));
+        try!(self.prelude.to_css(dest));
+        match self.block {
+            Some(ref block) => {
+                try!(dest.write_char('{'));
+                try!(block.to_css(dest));
+                try!(dest.write_char('}'));
+            }
+            None => try!(dest.write_char(';'))
+        }
+        Ok(())
+    }
+}
+
+
+impl ToCss for DeclarationListItem {
+    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+        match *self {
+            DeclarationListItem::Declaration(ref declaration) => declaration.to_css(dest),
+            DeclarationListItem::AtRule(ref at_rule) => at_rule.to_css(dest),
+        }
+    }
+}
+
+
+impl ToCss for Rule {
+    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+        match *self {
+            Rule::QualifiedRule(ref rule) => rule.to_css(dest),
+            Rule::AtRule(ref rule) => rule.to_css(dest),
+        }
+    }
 }
