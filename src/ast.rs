@@ -69,19 +69,6 @@ pub enum ComponentValue {
 }
 
 
-impl ComponentValue {
-    pub fn to_css(&self) -> String {
-        let mut css = String::new();
-        self.to_css_push(&mut css);
-        css
-    }
-
-    pub fn to_css_push(&self, css: &mut String) {
-        ::serializer::to_css_push(self, css)
-    }
-}
-
-
 #[deriving(PartialEq)]
 pub struct Declaration {
     pub location: SourceLocation,

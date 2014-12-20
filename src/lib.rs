@@ -7,7 +7,8 @@
 
 #![feature(globs, macro_rules)]
 
-extern crate encoding;  // https://github.com/lifthrasiir/rust-encoding
+extern crate encoding;
+extern crate text_writer;
 
 #[cfg(test)]
 extern crate test;

@@ -4,6 +4,10 @@ name = "cssparser"
 version = "0.1.0"
 authors = [ "Simon Sapin <simon.sapin@exyr.org>" ]
 
+[dependencies]
+
+text_writer = "0.1"
+
 [dependencies.encoding]
 
 git = "https://github.com/lifthrasiir/rust-encoding"
