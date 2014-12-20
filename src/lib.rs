@@ -25,7 +25,7 @@ pub use parser::{parse_stylesheet_rules, StylesheetParser,
 pub use from_bytes::{decode_stylesheet_bytes, parse_stylesheet_rules_from_bytes};
 pub use color::{RGBA, Color};
 pub use nth::parse_nth;
-pub use serializer::{ToCss, serialize_identifier, serialize_string};
+pub use serializer::{ToCss, CssStringWriter, serialize_identifier, serialize_string};
 
 pub mod ast;
 mod tokenizer;

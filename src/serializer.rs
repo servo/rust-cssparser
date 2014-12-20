@@ -180,18 +180,57 @@ where W: TextWriter {
 pub fn serialize_string<W>(value: &str, dest: &mut W) -> text_writer::Result
 where W: TextWriter {
     try!(dest.write_char('"'));
-    // TODO: avoid decoding/re-encoding UTF-8?
-    for c in value.chars() {
-        match c {
-            '"' => try!(dest.write_str("\\\"")),
-            '\\' => try!(dest.write_str("\\\\")),
-            '\n' => try!(dest.write_str("\\A ")),
-            '\r' => try!(dest.write_str("\\D ")),
-            '\x0C' => try!(dest.write_str("\\C ")),
-            _ => try!(dest.write_char(c)),
-        };
+    try!(CssStringWriter::new(dest).write_str(value));
+    try!(dest.write_char('"'));
+    Ok(())
+}
+
+
+/// A `TextWriter` adaptor that escapes text for writing as a CSS string.
+/// Quotes are not included.
+///
+/// Typical usage:
+///
+/// ```{rust,ignore}
+/// fn write_foo<W>(foo: &Foo, dest: &mut W) -> text_writer::Result where W: TextWriter {
+///     try!(dest.write_char('"'));
+///     {
+///         let mut string_dest = CssStringWriter::new(dest);
+///         // Write into string_dest...
+///     }
+///     try!(dest.write_char('"'));
+///     Ok(())
+/// }
+/// ```
+pub struct CssStringWriter<'a, W: 'a> {
+    inner: &'a mut W,
+}
+
+impl<'a, W> CssStringWriter<'a, W> where W: TextWriter {
+    pub fn new(inner: &'a mut W) -> CssStringWriter<'a, W> {
+        CssStringWriter { inner: inner }
     }
-    dest.write_char('"')
+}
+
+impl<'a, W> TextWriter for CssStringWriter<'a, W> where W: TextWriter {
+    fn write_str(&mut self, s: &str) -> text_writer::Result {
+        // TODO: avoid decoding/re-encoding UTF-8?
+        for c in s.chars() {
+            try!(self.write_char(c))
+        }
+        Ok(())
+    }
+
+    fn write_char(&mut self, c: char) -> text_writer::Result {
+        match c {
+            '"' => self.inner.write_str("\\\""),
+            '\\' => self.inner.write_str("\\\\"),
+            '\n' => self.inner.write_str("\\A "),
+            '\r' => self.inner.write_str("\\D "),
+            '\x0C' => self.inner.write_str("\\C "),
+            _ => self.inner.write_char(c),
+        }
+    }
 }
 
 
