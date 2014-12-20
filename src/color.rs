@@ -62,7 +62,7 @@ impl Color {
 
 
 #[inline]
-fn parse_color_keyword(value: &str) -> Result<Color, ()> {
+pub fn parse_color_keyword(value: &str) -> Result<Color, ()> {
     let lower_value = value.to_ascii_lower();
     let (r, g, b) = match lower_value.as_slice() {
         "black" => (0., 0., 0.),
