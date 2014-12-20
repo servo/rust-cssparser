@@ -23,12 +23,6 @@ pub struct RGBA {
     pub alpha: f32,
 }
 
-impl fmt::Show for RGBA {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.to_css(f).map_err(|_| fmt::WriteError)
-    }
-}
-
 impl ToCss for RGBA {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
         if self.alpha == 1f32 {
@@ -53,12 +47,6 @@ pub enum Color {
     RGBA(RGBA),
 }
 
-impl fmt::Show for Color {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.to_css(f).map_err(|_| fmt::WriteError)
-    }
-}
-
 impl ToCss for Color {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
         match self {
@@ -66,6 +54,14 @@ impl ToCss for Color {
             &Color::RGBA(rgba) => rgba.to_css(dest),
         }
     }
+}
+
+impl fmt::Show for RGBA {
+    #[inline] fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_to_css(f) }
+}
+
+impl fmt::Show for Color {
+    #[inline] fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_to_css(f) }
 }
 
 /// Return `Err(())` on invalid or unsupported value (not a color).

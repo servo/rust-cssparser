@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use std::fmt;
+
 use text_writer::{mod, TextWriter};
 
 use ast::*;
@@ -9,12 +11,34 @@ use ast::ComponentValue::*;
 
 
 pub trait ToCss for Sized? {
+    /// Serialize `self` in CSS syntax, writing to `dest`.
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter;
 
+    /// Serialize `self` in CSS syntax and return a string.
+    ///
+    /// (This is a convenience wrapper for `to_css` and probably should not be overridden.)
+    #[inline]
     fn to_css_string(&self) -> String {
         let mut s = String::new();
         self.to_css(&mut s).unwrap();
         s
+    }
+
+    /// Serialize `self` in CSS syntax and return a result compatible with `std::fmt::Show`.
+    ///
+    /// Typical usage is, for a `Foo` that implements `ToCss`:
+    ///
+    /// ```{rust,ignore}
+    /// use std::fmt;
+    /// impl fmt::Show for Foo {
+    ///     #[inline] fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_to_css(f) }
+    /// }
+    /// ```
+    ///
+    /// (This is a convenience wrapper for `to_css` and probably should not be overridden.)
+    #[inline]
+    fn fmt_to_css<W>(&self, dest: &mut W) -> fmt::Result where W: TextWriter {
+        self.to_css(dest).map_err(|_| fmt::WriteError)
     }
 }
 
