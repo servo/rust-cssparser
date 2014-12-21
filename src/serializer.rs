@@ -38,7 +38,7 @@ pub trait ToCss for Sized? {
     /// (This is a convenience wrapper for `to_css` and probably should not be overridden.)
     #[inline]
     fn fmt_to_css<W>(&self, dest: &mut W) -> fmt::Result where W: TextWriter {
-        self.to_css(dest).map_err(|_| fmt::WriteError)
+        self.to_css(dest).map_err(|_| fmt::Error)
     }
 }
 
