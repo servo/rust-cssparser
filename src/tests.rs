@@ -273,7 +273,7 @@ fn nth() {
 fn serializer() {
     run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
         let component_values = tokenize(input).map(|(c, _)| c).collect::<Vec<ComponentValue>>();
-        let serialized = component_values.iter().to_css();
+        let serialized = component_values.to_css_string();
         tokenize(serialized.as_slice()).map(|(c, _)| c).collect::<Vec<ComponentValue>>()
     });
 }
