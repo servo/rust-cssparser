@@ -8,9 +8,7 @@ use std::num::{Float, FloatMath};
 
 use text_writer::{mod, TextWriter};
 
-use ast::{ComponentValue, SkipWhitespaceIterable};
-use ast::ComponentValue::{Number, Percentage, Function, Ident, Hash, IDHash, Comma};
-use serializer::ToCss;
+use super::{Token, Parser, ToCss};
 
 
 #[deriving(Clone, PartialEq)]
@@ -66,13 +64,18 @@ impl fmt::Show for Color {
 
 /// Return `Err(())` on invalid or unsupported value (not a color).
 impl Color {
-    pub fn parse(component_value: &ComponentValue) -> Result<Color, ()> {
-        match *component_value {
-            Hash(ref value) | IDHash(ref value) => parse_color_hash(value.as_slice()),
-            Ident(ref value) => parse_color_keyword(value.as_slice()),
-            Function(ref name, ref arguments)
-                => parse_color_function(name.as_slice(), arguments.as_slice()),
-            _ => Err(())
+    pub fn parse(input: &mut Parser) -> Result<Color, ()> {
+        match try!(input.next()) {
+            Token::Hash(ref value) | Token::IDHash(ref value) => {
+                parse_color_hash(value.as_slice())
+            }
+            Token::Ident(ref value) => parse_color_keyword(value.as_slice()),
+            Token::Function(ref name) => {
+                input.parse_nested_block().parse_entirely(|arguments| {
+                    parse_color_function(name.as_slice(), arguments)
+                })
+            }
+            token => input.unexpected(token)
         }
     }
 }
@@ -279,70 +282,43 @@ fn parse_color_hash(value: &str) -> Result<Color, ()> {
 
 
 #[inline]
-fn parse_color_function(name: &str, arguments: &[ComponentValue])
-                        -> Result<Color, ()> {
-    let lower_name = name.to_ascii_lower();
-    let lower_name = lower_name.as_slice();
-
+fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()> {
     let (is_rgb, has_alpha) =
-        if "rgba" == lower_name { (true, true) }
-        else if "rgb" == lower_name { (true, false) }
-        else if "hsl" == lower_name { (false, false) }
-        else if "hsla" == lower_name { (false, true) }
+        if name.eq_ignore_ascii_case("rgba") { (true, true) }
+        else if name.eq_ignore_ascii_case("rgb") { (true, false) }
+        else if name.eq_ignore_ascii_case("hsl") { (false, false) }
+        else if name.eq_ignore_ascii_case("hsla") { (false, true) }
         else { return Err(()) };
-
-    let mut iter = arguments.skip_whitespace();
-    macro_rules! expect_comma(
-        () => ( match iter.next() { Some(&Comma) => {}, _ => { return Err(()) } } );
-    )
-    macro_rules! expect_percentage(
-        () => ( match iter.next() {
-            Some(&Percentage(ref v)) => v.value,
-            _ => return Err(()),
-        });
-    )
-    macro_rules! expect_integer(
-        () => ( match iter.next() {
-            Some(&Number(ref v)) if v.int_value.is_some() => v.value,
-            _ => return Err(()),
-        });
-    )
-    macro_rules! expect_number(
-        () => ( match iter.next() {
-            Some(&Number(ref v)) => v.value,
-            _ => return Err(()),
-        });
-    )
 
     let red: f32;
     let green: f32;
     let blue: f32;
     if is_rgb {
         // Either integers or percentages, but all the same type.
-        match iter.next() {
-            Some(&Number(ref v)) if v.int_value.is_some() => {
+        match try!(arguments.next()) {
+            Token::Number(ref v) if v.int_value.is_some() => {
                 red = (v.value / 255.) as f32;
-                expect_comma!();
-                green = (expect_integer!() / 255.) as f32;
-                expect_comma!();
-                blue = (expect_integer!() / 255.) as f32;
+                try!(arguments.expect_comma());
+                green = try!(arguments.expect_integer()) as f32 / 255.;
+                try!(arguments.expect_comma());
+                blue = try!(arguments.expect_integer()) as f32 / 255.;
             }
-            Some(&Percentage(ref v)) => {
+            Token::Percentage(ref v) => {
                 red = (v.value / 100.) as f32;
-                expect_comma!();
-                green = (expect_percentage!() / 100.) as f32;
-                expect_comma!();
-                blue = (expect_percentage!() / 100.) as f32;
+                try!(arguments.expect_comma());
+                green = (try!(arguments.expect_percentage()) / 100.) as f32;
+                try!(arguments.expect_comma());
+                blue = (try!(arguments.expect_percentage()) / 100.) as f32;
             }
             _ => return Err(())
         };
     } else {
-        let hue = expect_number!() / 360.;
+        let hue = try!(arguments.expect_number()) / 360.;
         let hue = hue - hue.floor();
-        expect_comma!();
-        let saturation = (expect_percentage!() / 100.).max(0.).min(1.);
-        expect_comma!();
-        let lightness = (expect_percentage!() / 100.).max(0.).min(1.);
+        try!(arguments.expect_comma());
+        let saturation = (try!(arguments.expect_percentage()) / 100.).max(0.).min(1.);
+        try!(arguments.expect_comma());
+        let lightness = (try!(arguments.expect_percentage()) / 100.).max(0.).min(1.);
 
         // http://www.w3.org/TR/css3-color/#hsl-color
         fn hue_to_rgb(m1: f64, m2: f64, mut h: f64) -> f64 {
@@ -363,14 +339,11 @@ fn parse_color_function(name: &str, arguments: &[ComponentValue])
     }
 
     let alpha = if has_alpha {
-        expect_comma!();
-        (expect_number!()).max(0.).min(1.) as f32
+        try!(arguments.expect_comma());
+        (try!(arguments.expect_number())).max(0.).min(1.) as f32
     } else {
         1.
     };
-    if iter.next().is_none() {
-        Ok(Color::RGBA(RGBA { red: red, green: green, blue: blue, alpha: alpha }))
-    } else {
-        Err(())
-    }
+    try!(arguments.expect_exhausted());
+    Ok(Color::RGBA(RGBA { red: red, green: green, blue: blue, alpha: alpha }))
 }

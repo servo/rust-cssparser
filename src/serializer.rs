@@ -6,8 +6,7 @@ use std::fmt;
 
 use text_writer::{mod, TextWriter};
 
-use ast::*;
-use ast::ComponentValue::*;
+use super::Token;
 
 
 pub trait ToCss for Sized? {
@@ -43,38 +42,38 @@ pub trait ToCss for Sized? {
 }
 
 
-impl ToCss for ComponentValue {
+impl ToCss for Token {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        match self {
-            &Ident(ref value) => try!(serialize_identifier(value.as_slice(), dest)),
-            &AtKeyword(ref value) => {
+        match *self {
+            Token::Ident(ref value) => try!(serialize_identifier(value.as_slice(), dest)),
+            Token::AtKeyword(ref value) => {
                 try!(dest.write_char('@'));
                 try!(serialize_identifier(value.as_slice(), dest));
             },
-            &Hash(ref value) => {
+            Token::Hash(ref value) => {
                 try!(dest.write_char('#'));
                 for c in value.as_slice().chars() {
                     try!(serialize_char(c, dest, /* is_identifier_start = */ false));
                 }
             },
-            &IDHash(ref value) => {
+            Token::IDHash(ref value) => {
                 try!(dest.write_char('#'));
                 try!(serialize_identifier(value.as_slice(), dest));
             }
-            &QuotedString(ref value) => try!(serialize_string(value.as_slice(), dest)),
-            &URL(ref value) => {
+            Token::QuotedString(ref value) => try!(serialize_string(value.as_slice(), dest)),
+            Token::Url(ref value) => {
                 try!(dest.write_str("url("));
                 try!(serialize_string(value.as_slice(), dest));
                 try!(dest.write_char(')'));
             },
-            &Delim(value) => try!(dest.write_char(value)),
+            Token::Delim(value) => try!(dest.write_char(value)),
 
-            &Number(ref value) => try!(dest.write_str(value.representation.as_slice())),
-            &Percentage(ref value) => {
+            Token::Number(ref value) => try!(dest.write_str(value.representation.as_slice())),
+            Token::Percentage(ref value) => {
                 try!(dest.write_str(value.representation.as_slice()));
                 try!(dest.write_char('%'));
             },
-            &Dimension(ref value, ref unit) => {
+            Token::Dimension(ref value, ref unit) => {
                 try!(dest.write_str(value.representation.as_slice()));
                 // Disambiguate with scientific notation.
                 let unit = unit.as_slice();
@@ -88,53 +87,39 @@ impl ToCss for ComponentValue {
                 }
             },
 
-            &UnicodeRange(start, end) => {
+            Token::UnicodeRange(start, end) => {
                 try!(dest.write_str(format!("U+{:X}", start).as_slice()));
                 if end != start {
                     try!(dest.write_str(format!("-{:X}", end).as_slice()));
                 }
             }
 
-            &WhiteSpace => try!(dest.write_char(' ')),
-            &Colon => try!(dest.write_char(':')),
-            &Semicolon => try!(dest.write_char(';')),
-            &Comma => try!(dest.write_char(',')),
-            &IncludeMatch => try!(dest.write_str("~=")),
-            &DashMatch => try!(dest.write_str("|=")),
-            &PrefixMatch => try!(dest.write_str("^=")),
-            &SuffixMatch => try!(dest.write_str("$=")),
-            &SubstringMatch => try!(dest.write_str("*=")),
-            &Column => try!(dest.write_str("||")),
-            &CDO => try!(dest.write_str("<!--")),
-            &CDC => try!(dest.write_str("-->")),
+            Token::WhiteSpace => try!(dest.write_char(' ')),
+            Token::Colon => try!(dest.write_char(':')),
+            Token::Semicolon => try!(dest.write_char(';')),
+            Token::Comma => try!(dest.write_char(',')),
+            Token::IncludeMatch => try!(dest.write_str("~=")),
+            Token::DashMatch => try!(dest.write_str("|=")),
+            Token::PrefixMatch => try!(dest.write_str("^=")),
+            Token::SuffixMatch => try!(dest.write_str("$=")),
+            Token::SubstringMatch => try!(dest.write_str("*=")),
+            Token::Column => try!(dest.write_str("||")),
+            Token::CDO => try!(dest.write_str("<!--")),
+            Token::CDC => try!(dest.write_str("-->")),
 
-            &Function(ref name, ref arguments) => {
+            Token::Function(ref name) => {
                 try!(serialize_identifier(name.as_slice(), dest));
                 try!(dest.write_char('('));
-                try!(arguments.to_css(dest));
-                try!(dest.write_char(')'));
             },
-            &ParenthesisBlock(ref content) => {
-                try!(dest.write_char('('));
-                try!(content.to_css(dest));
-                try!(dest.write_char(')'));
-            },
-            &SquareBracketBlock(ref content) => {
-                try!(dest.write_char('['));
-                try!(content.to_css(dest));
-                try!(dest.write_char(']'));
-            },
-            &CurlyBracketBlock(ref content) => {
-                try!(dest.write_char('{'));
-                try!(content.to_css(dest));
-                try!(dest.write_char('}'));
-            },
+            Token::ParenthesisBlock => try!(dest.write_char('(')),
+            Token::SquareBracketBlock => try!(dest.write_char('[')),
+            Token::CurlyBracketBlock => try!(dest.write_char('{')),
 
-            &BadURL => try!(dest.write_str("url(<bad url>)")),
-            &BadString => try!(dest.write_str("\"<bad string>\n")),
-            &CloseParenthesis => try!(dest.write_char(')')),
-            &CloseSquareBracket => try!(dest.write_char(']')),
-            &CloseCurlyBracket => try!(dest.write_char('}')),
+            Token::BadUrl => try!(dest.write_str("url(<bad url>)")),
+            Token::BadString => try!(dest.write_str("\"<bad string>\n")),
+            Token::CloseParenthesis => try!(dest.write_char(')')),
+            Token::CloseSquareBracket => try!(dest.write_char(']')),
+            Token::CloseCurlyBracket => try!(dest.write_char('}')),
         }
         Ok(())
     }
@@ -234,161 +219,68 @@ impl<'a, W> TextWriter for CssStringWriter<'a, W> where W: TextWriter {
 }
 
 
-impl<'a> ToCss for [ComponentValue] {
+impl<'a> ToCss for [Token] {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        component_values_to_css(self.iter(), dest)
-    }
-}
+        use Token::*;
 
-impl<'a> ToCss for [Node] {
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        let component_values = self.iter().map(|n| match n { &(ref c, _) => c });
-        component_values_to_css(component_values, dest)
-    }
-}
-
-fn component_values_to_css<'a, I, W>(mut iter: I, dest: &mut W) -> text_writer::Result
-where I: Iterator<&'a ComponentValue>, W: TextWriter {
-    let mut previous = match iter.next() {
-        None => return Ok(()),
-        Some(first) => { try!(first.to_css(dest)); first }
-    };
-    macro_rules! matches(
-        ($value:expr, $($pattern:pat)|+) => (
-            match $value { $($pattern)|+ => true, _ => false }
-        );
-    )
-    // This does not borrow-check: for component_value in iter {
-    loop { match iter.next() { None => break, Some(component_value) => {
-        let (a, b) = (previous, component_value);
-        if (
-            matches!(*a, Ident(..) | AtKeyword(..) | Hash(..) | IDHash(..) |
-                         Dimension(..) | Delim('#') | Delim('-') | Number(..)) &&
-            matches!(*b, Ident(..) | Function(..) | URL(..) | BadURL(..) |
-                         Number(..) | Percentage(..) | Dimension(..) | UnicodeRange(..))
-        ) || (
-            matches!(*a, Ident(..)) &&
-            matches!(*b, ParenthesisBlock(..))
-        ) || (
-            matches!(*a, Ident(..) | AtKeyword(..) | Hash(..) | IDHash(..) | Dimension(..)) &&
-            matches!(*b, Delim('-') | CDC)
-        ) || (
-            matches!(*a, Delim('#') | Delim('-') | Number(..) | Delim('@')) &&
-            matches!(*b, Ident(..) | Function(..) | URL(..) | BadURL(..))
-        ) || (
-            matches!(*a, Delim('@')) &&
-            matches!(*b, Ident(..) | Function(..) | URL(..) | BadURL(..) |
-                         UnicodeRange(..) | Delim('-'))
-        ) || (
-            matches!(*a, UnicodeRange(..) | Delim('.') | Delim('+')) &&
-            matches!(*b, Number(..) | Percentage(..) | Dimension(..))
-        ) || (
-            matches!(*a, UnicodeRange(..)) &&
-            matches!(*b, Ident(..) | Function(..) | Delim('?'))
-        ) || (match (a, b) { (&Delim(a), &Delim(b)) => matches!((a, b),
-            ('#', '-') |
-            ('$', '=') |
-            ('*', '=') |
-            ('^', '=') |
-            ('~', '=') |
-            ('|', '=') |
-            ('|', '|') |
-            ('/', '*')
-        ), _ => false }) {
-            try!(dest.write_str("/**/"));
-        }
-        // Skip whitespace when '\n' was previously written at the previous iteration.
-        if !matches!((previous, component_value), (&Delim('\\'), &WhiteSpace)) {
-            try!(component_value.to_css(dest));
-        }
-        if component_value == &Delim('\\') {
-            try!(dest.write_char('\n'));
-        }
-        previous = component_value;
-    }}}
-    Ok(())
-}
-
-
-impl ToCss for Declaration {
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        try!(dest.write_str(self.name.as_slice()));
-        try!(dest.write_char(':'));
-        try!(self.value.to_css(dest));
-        Ok(())
-    }
-}
-
-
-impl ToCss for [Declaration] {
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        for declaration in self.iter() {
-            try!(declaration.to_css(dest));
-            try!(dest.write_char(';'));
-        }
-        Ok(())
-    }
-}
-
-
-impl ToCss for QualifiedRule {
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        try!(self.prelude.to_css(dest));
-        try!(dest.write_char('{'));
-        try!(self.block.to_css(dest));
-        try!(dest.write_char('}'));
-        Ok(())
-    }
-}
-
-
-impl ToCss for AtRule {
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        try!(dest.write_char('@'));
-        try!(dest.write_str(self.name.as_slice()));
-        try!(self.prelude.to_css(dest));
-        match self.block {
-            Some(ref block) => {
-                try!(dest.write_char('{'));
-                try!(block.to_css(dest));
-                try!(dest.write_char('}'));
+        let mut iter = self.iter();
+        let mut previous = match iter.next() {
+            None => return Ok(()),
+            Some(first) => { try!(first.to_css(dest)); first }
+        };
+        macro_rules! matches(
+            ($value:expr, $($pattern:pat)|+) => (
+                match $value { $($pattern)|+ => true, _ => false }
+            );
+        )
+        // This does not borrow-check: for component_value in iter {
+        loop { match iter.next() { None => break, Some(component_value) => {
+            let (a, b) = (previous, component_value);
+            if (
+                matches!(*a, Ident(..) | AtKeyword(..) | Hash(..) | IDHash(..) |
+                             Dimension(..) | Delim('#') | Delim('-') | Number(..)) &&
+                matches!(*b, Ident(..) | Function(..) | Url(..) | BadUrl(..) |
+                             Number(..) | Percentage(..) | Dimension(..) | UnicodeRange(..))
+            ) || (
+                matches!(*a, Ident(..)) &&
+                matches!(*b, ParenthesisBlock(..))
+            ) || (
+                matches!(*a, Ident(..) | AtKeyword(..) | Hash(..) | IDHash(..) | Dimension(..)) &&
+                matches!(*b, Delim('-') | CDC)
+            ) || (
+                matches!(*a, Delim('#') | Delim('-') | Number(..) | Delim('@')) &&
+                matches!(*b, Ident(..) | Function(..) | Url(..) | BadUrl(..))
+            ) || (
+                matches!(*a, Delim('@')) &&
+                matches!(*b, Ident(..) | Function(..) | Url(..) | BadUrl(..) |
+                             UnicodeRange(..) | Delim('-'))
+            ) || (
+                matches!(*a, UnicodeRange(..) | Delim('.') | Delim('+')) &&
+                matches!(*b, Number(..) | Percentage(..) | Dimension(..))
+            ) || (
+                matches!(*a, UnicodeRange(..)) &&
+                matches!(*b, Ident(..) | Function(..) | Delim('?'))
+            ) || (match (a, b) { (&Delim(a), &Delim(b)) => matches!((a, b),
+                ('#', '-') |
+                ('$', '=') |
+                ('*', '=') |
+                ('^', '=') |
+                ('~', '=') |
+                ('|', '=') |
+                ('|', '|') |
+                ('/', '*')
+            ), _ => false }) {
+                try!(dest.write_str("/**/"));
             }
-            None => try!(dest.write_char(';'))
-        }
-        Ok(())
-    }
-}
-
-
-impl ToCss for DeclarationListItem {
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        match self {
-            &DeclarationListItem::Declaration(ref declaration) => declaration.to_css(dest),
-            &DeclarationListItem::AtRule(ref at_rule) => at_rule.to_css(dest),
-        }
-    }
-}
-
-
-impl ToCss for [DeclarationListItem] {
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        for item in self.iter() {
-            try!(item.to_css(dest));
-            match item {
-                &DeclarationListItem::AtRule(_) => {}
-                &DeclarationListItem::Declaration(_) => try!(dest.write_char(';'))
+            // Skip whitespace when '\n' was previously written at the previous iteration.
+            if !matches!((previous, component_value), (&Delim('\\'), &WhiteSpace)) {
+                try!(component_value.to_css(dest));
             }
-        }
+            if component_value == &Delim('\\') {
+                try!(dest.write_char('\n'));
+            }
+            previous = component_value;
+        }}}
         Ok(())
-    }
-}
-
-
-impl ToCss for Rule {
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        match self {
-            &Rule::QualifiedRule(ref rule) => rule.to_css(dest),
-            &Rule::AtRule(ref rule) => rule.to_css(dest),
-        }
     }
 }

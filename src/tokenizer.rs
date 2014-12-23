@@ -7,32 +7,68 @@
 use std::{char, num};
 use std::ascii::AsciiExt;
 
-use ast::*;
-use ast::ComponentValue::*;
+use self::Token::*;
 
 
-/// Returns a `Iterator<(ComponentValue, SourceLocation)>`
-pub fn tokenize(input: &str) -> Tokenizer {
-    Tokenizer {
-        length: input.len(),
-        input: input,
-        position: 0,
-    }
+#[deriving(PartialEq, Show)]
+pub enum Token {
+    // Preserved tokens.
+    Ident(String),
+    AtKeyword(String),
+    Hash(String),
+    IDHash(String),  // Hash that is a valid ID selector.
+    QuotedString(String),
+    Url(String),
+    Delim(char),
+    Number(NumericValue),
+    Percentage(NumericValue),
+    Dimension(NumericValue, String),
+    UnicodeRange(u32, u32),  // (start, end) of range
+    WhiteSpace,
+    Colon,  // :
+    Semicolon,  // ;
+    Comma,  // ,
+    IncludeMatch, // ~=
+    DashMatch, // |=
+    PrefixMatch, // ^=
+    SuffixMatch, // $=
+    SubstringMatch, // *=
+    Column, // ||
+    CDO,  // <!--
+    CDC,  // -->
+
+    // Function
+    Function(String),  // name
+
+    // Simple block
+    ParenthesisBlock,  // (…)
+    SquareBracketBlock,  // […]
+    CurlyBracketBlock,  // {…}
+
+    // These are always invalid
+    BadUrl,
+    BadString,
+    CloseParenthesis, // )
+    CloseSquareBracket, // ]
+    CloseCurlyBracket, // }
 }
 
-impl<'a> Iterator<Node> for Tokenizer<'a> {
-    #[inline]
-    fn next(&mut self) -> Option<Node> { next_component_value(self) }
+
+#[deriving(PartialEq, Show)]
+pub struct NumericValue {
+    pub representation: String,
+    pub value: f64,
+    pub int_value: Option<i64>,
 }
-
-
-//  ***********  End of public API  ***********
 
 
 pub struct Tokenizer<'a> {
     input: &'a str,
     length: uint,  // All counted in bytes, not characters
     position: uint,  // All counted in bytes, not characters
+
+    /// For `peek` and `push_back`
+    buffer: Option<Token>,
 }
 
 macro_rules! is_match(
@@ -43,6 +79,43 @@ macro_rules! is_match(
 
 
 impl<'a> Tokenizer<'a> {
+    #[inline]
+    pub fn new(input: &str) -> Tokenizer {
+        Tokenizer {
+            length: input.len(),
+            input: input,
+            position: 0,
+            buffer: None,
+        }
+    }
+
+    #[inline]
+    pub fn next(&mut self) -> Result<Token, ()> {
+        if let Some(token) = self.buffer.take() {
+            Ok(token)
+        } else {
+            next_token(self).ok_or(())
+        }
+    }
+
+    #[inline]
+    pub fn peek(&mut self) -> Result<&Token, ()> {
+        match self.buffer {
+            Some(ref token) => Ok(token),
+            None => {
+                self.buffer = next_token(self);
+                self.buffer.as_ref().ok_or(())
+            }
+        }
+    }
+
+    #[inline]
+    pub fn push_back(&mut self, token: Token) {
+        assert!(self.buffer.is_none(),
+                "Parser::push_back can only be called after Parser::next");
+        self.buffer = Some(token);
+    }
+
     #[inline]
     fn is_eof(&self) -> bool { self.position >= self.length }
 
@@ -75,18 +148,13 @@ impl<'a> Tokenizer<'a> {
 }
 
 
-fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
+fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
     consume_comments(tokenizer);
     if tokenizer.is_eof() {
         return None
     }
-    let start_location = SourceLocation{
-        // FIXME
-        line: 0,
-        column: tokenizer.position,
-    };
     let c = tokenizer.current_char();
-    let component_value = match c {
+    let token = match c {
         '\t' | '\n' | ' ' | '\r' | '\x0C' => {
             while !tokenizer.is_eof() {
                 match tokenizer.current_char() {
@@ -112,7 +180,7 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
             else { tokenizer.position += 1; Delim(c) }
         },
         '\'' => consume_string(tokenizer, true),
-        '(' => ParenthesisBlock(consume_block(tokenizer, CloseParenthesis)),
+        '(' => { tokenizer.position += 1; ParenthesisBlock },
         ')' => { tokenizer.position += 1; CloseParenthesis },
         '*' => {
             if tokenizer.starts_with("*=") { tokenizer.position += 2; SubstringMatch }
@@ -189,7 +257,7 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
             else { consume_ident_like(tokenizer) }
         },
         'a'...'z' | 'A'...'Z' | '_' | '\0' => consume_ident_like(tokenizer),
-        '[' => SquareBracketBlock(consume_block(tokenizer, CloseSquareBracket)),
+        '[' => { tokenizer.position += 1; SquareBracketBlock },
         '\\' => {
             if !tokenizer.has_newline_at(1) { consume_ident_like(tokenizer) }
             else { tokenizer.position += 1; Delim(c) }
@@ -199,7 +267,7 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
             if tokenizer.starts_with("^=") { tokenizer.position += 2; PrefixMatch }
             else { tokenizer.position += 1; Delim(c) }
         },
-        '{' => CurlyBracketBlock(consume_block_with_location(tokenizer, CloseCurlyBracket)),
+        '{' => { tokenizer.position += 1; CurlyBracketBlock },
         '|' => {
             if tokenizer.starts_with("|=") { tokenizer.position += 2; DashMatch }
             else if tokenizer.starts_with("||") { tokenizer.position += 2; Column }
@@ -219,7 +287,7 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
             }
         },
     };
-    Some((component_value, start_location))
+    Some(token)
 }
 
 
@@ -239,39 +307,7 @@ fn consume_comments(tokenizer: &mut Tokenizer) {
 }
 
 
-fn consume_block(tokenizer: &mut Tokenizer, ending_token: ComponentValue) -> Vec<ComponentValue> {
-    tokenizer.position += 1;  // Skip the initial {[(
-    let mut content = Vec::new();
-    loop {
-        match next_component_value(tokenizer) {
-            Some((component_value, _location)) => {
-                if component_value == ending_token { break }
-                else { content.push(component_value) }
-            },
-            None => break,
-        }
-    }
-    content
-}
-
-
-fn consume_block_with_location(tokenizer: &mut Tokenizer, ending_token: ComponentValue) -> Vec<Node> {
-    tokenizer.position += 1;  // Skip the initial {[(
-    let mut content = Vec::new();
-    loop {
-        match next_component_value(tokenizer) {
-            Some((component_value, location)) => {
-                if component_value == ending_token { break }
-                else { content.push((component_value, location)) }
-            },
-            None => break,
-        }
-    }
-    content
-}
-
-
-fn consume_string(tokenizer: &mut Tokenizer, single_quote: bool) -> ComponentValue {
+fn consume_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Token {
     match consume_quoted_string(tokenizer, single_quote) {
         Ok(value) => QuotedString(value),
         Err(()) => BadString
@@ -330,11 +366,12 @@ fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
 }
 
 
-fn consume_ident_like(tokenizer: &mut Tokenizer) -> ComponentValue {
+fn consume_ident_like(tokenizer: &mut Tokenizer) -> Token {
     let value = consume_name(tokenizer);
     if !tokenizer.is_eof() && tokenizer.current_char() == '(' {
-        if value.as_slice().eq_ignore_ascii_case("url") { consume_url(tokenizer) }
-        else { Function(value, consume_block(tokenizer, CloseParenthesis)) }
+        tokenizer.position += 1;
+        if value.eq_ignore_ascii_case("url") { consume_url(tokenizer) }
+        else { Function(value) }
     } else {
         Ident(value)
     }
@@ -360,7 +397,7 @@ fn consume_name(tokenizer: &mut Tokenizer) -> String {
 }
 
 
-fn consume_numeric(tokenizer: &mut Tokenizer) -> ComponentValue {
+fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
     // Parse [+-]?\d*(\.\d+)?([eE][+-]?\d+)?
     // But this is always called so that there is at least one digit in \d*(\.\d+)?
     let mut representation = String::new();
@@ -436,8 +473,7 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> ComponentValue {
 }
 
 
-fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
-    tokenizer.position += 1;  // Skip the ( of url(
+fn consume_url(tokenizer: &mut Tokenizer) -> Token {
     while !tokenizer.is_eof() {
         match tokenizer.current_char() {
             ' ' | '\t' | '\n' | '\r' | '\x0C' => tokenizer.position += 1,
@@ -447,16 +483,16 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
             _ => return consume_unquoted_url(tokenizer),
         }
     }
-    return URL(String::new());
+    return Url(String::new());
 
-    fn consume_quoted_url(tokenizer: &mut Tokenizer, single_quote: bool) -> ComponentValue {
+    fn consume_quoted_url(tokenizer: &mut Tokenizer, single_quote: bool) -> Token {
         match consume_quoted_string(tokenizer, single_quote) {
             Ok(value) => consume_url_end(tokenizer, value),
             Err(()) => consume_bad_url(tokenizer),
         }
     }
 
-    fn consume_unquoted_url(tokenizer: &mut Tokenizer) -> ComponentValue {
+    fn consume_unquoted_url(tokenizer: &mut Tokenizer) -> Token {
         let mut string = String::new();
         while !tokenizer.is_eof() {
             let next_char = match tokenizer.consume_char() {
@@ -475,10 +511,10 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
             };
             string.push(next_char)
         }
-        URL(string)
+        Url(string)
     }
 
-    fn consume_url_end(tokenizer: &mut Tokenizer, string: String) -> ComponentValue {
+    fn consume_url_end(tokenizer: &mut Tokenizer, string: String) -> Token {
         while !tokenizer.is_eof() {
             match tokenizer.consume_char() {
                 ' ' | '\t' | '\n' | '\r' | '\x0C' => (),
@@ -486,10 +522,10 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
                 _ => return consume_bad_url(tokenizer)
             }
         }
-        URL(string)
+        Url(string)
     }
 
-    fn consume_bad_url(tokenizer: &mut Tokenizer) -> ComponentValue {
+    fn consume_bad_url(tokenizer: &mut Tokenizer) -> Token {
         // Consume up to the closing )
         while !tokenizer.is_eof() {
             match tokenizer.consume_char() {
@@ -498,13 +534,13 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
                 _ => ()
             }
         }
-        BadURL
+        BadUrl
     }
 }
 
 
 
-fn consume_unicode_range(tokenizer: &mut Tokenizer) -> ComponentValue {
+fn consume_unicode_range(tokenizer: &mut Tokenizer) -> Token {
     tokenizer.position += 2;  // Skip U+
     let mut hex = String::new();
     while hex.len() < 6 && !tokenizer.is_eof()

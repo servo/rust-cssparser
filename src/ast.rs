@@ -3,8 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::fmt;
-use std::slice;
-use std::vec;
 
 
 #[deriving(PartialEq, Show)]
@@ -22,18 +20,18 @@ pub struct SourceLocation {
 }
 
 
-pub type Node = (ComponentValue, SourceLocation);  // TODO this is not a good name
+pub type Node = (Token, SourceLocation);  // TODO this is not a good name
 
 
 #[deriving(PartialEq, Show)]
-pub enum ComponentValue {
+pub enum Token {
     // Preserved tokens.
     Ident(String),
     AtKeyword(String),
     Hash(String),
     IDHash(String),  // Hash that is a valid ID selector.
     QuotedString(String),
-    URL(String),
+    Url(String),
     Delim(char),
     Number(NumericValue),
     Percentage(NumericValue),
@@ -53,15 +51,15 @@ pub enum ComponentValue {
     CDC,  // -->
 
     // Function
-    Function(String, Vec<ComponentValue>),  // name, arguments
+    Function(String),  // name
 
     // Simple block
-    ParenthesisBlock(Vec<ComponentValue>),  // (…)
-    SquareBracketBlock(Vec<ComponentValue>),  // […]
-    CurlyBracketBlock(Vec<Node>),  // {…}
+    ParenthesisBlock,  // (…)
+    SquareBracketBlock,  // […]
+    CurlyBracketBlock,  // {…}
 
     // These are always invalid
-    BadURL,
+    BadUrl,
     BadString,
     CloseParenthesis, // )
     CloseSquareBracket, // ]
@@ -73,14 +71,14 @@ pub enum ComponentValue {
 pub struct Declaration {
     pub location: SourceLocation,
     pub name: String,
-    pub value: Vec<ComponentValue>,
+    pub value: Vec<Token>,
     pub important: bool,
 }
 
 #[deriving(PartialEq)]
 pub struct QualifiedRule {
     pub location: SourceLocation,
-    pub prelude: Vec<ComponentValue>,
+    pub prelude: Vec<Token>,
     pub block: Vec<Node>,
 }
 
@@ -88,7 +86,7 @@ pub struct QualifiedRule {
 pub struct AtRule {
     pub location: SourceLocation,
     pub name: String,
-    pub prelude: Vec<ComponentValue>,
+    pub prelude: Vec<Token>,
     pub block: Option<Vec<Node>>,
 }
 
@@ -123,54 +121,5 @@ pub enum ErrorReason {
 impl fmt::Show for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}:{} {}", self.location.line, self.location.column, self.reason)
-    }
-}
-
-
-pub trait SkipWhitespaceIterable<'a> {
-    fn skip_whitespace(self) -> SkipWhitespaceIterator<'a>;
-}
-
-impl<'a> SkipWhitespaceIterable<'a> for &'a [ComponentValue] {
-    fn skip_whitespace(self) -> SkipWhitespaceIterator<'a> {
-        SkipWhitespaceIterator{ iter_with_whitespace: self.iter() }
-    }
-}
-
-#[deriving(Clone)]
-pub struct SkipWhitespaceIterator<'a> {
-    pub iter_with_whitespace: slice::Items<'a, ComponentValue>,
-}
-
-impl<'a> Iterator<&'a ComponentValue> for SkipWhitespaceIterator<'a> {
-    fn next(&mut self) -> Option<&'a ComponentValue> {
-        for component_value in self.iter_with_whitespace {
-            if component_value != &ComponentValue::WhiteSpace { return Some(component_value) }
-        }
-        None
-    }
-}
-
-
-pub trait MoveSkipWhitespaceIterable {
-    fn move_skip_whitespace(self) -> MoveSkipWhitespaceIterator;
-}
-
-impl MoveSkipWhitespaceIterable for Vec<ComponentValue> {
-    fn move_skip_whitespace(self) -> MoveSkipWhitespaceIterator {
-        MoveSkipWhitespaceIterator{ iter_with_whitespace: self.into_iter() }
-    }
-}
-
-pub struct MoveSkipWhitespaceIterator {
-    iter_with_whitespace: vec::MoveItems<ComponentValue>,
-}
-
-impl Iterator<ComponentValue> for MoveSkipWhitespaceIterator {
-    fn next(&mut self) -> Option<ComponentValue> {
-        for component_value in self.iter_with_whitespace {
-            if component_value != ComponentValue::WhiteSpace { return Some(component_value) }
-        }
-        None
     }
 }

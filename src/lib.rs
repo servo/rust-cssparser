@@ -5,7 +5,7 @@
 #![crate_name = "cssparser"]
 #![crate_type = "rlib"]
 
-#![feature(globs, macro_rules)]
+#![feature(globs, macro_rules, if_let, while_let, unsafe_destructor)]
 
 extern crate encoding;
 extern crate text_writer;
@@ -16,18 +16,18 @@ extern crate test;
 #[cfg(test)]
 extern crate serialize;
 
-pub use color::{parse_color_keyword};
-pub use tokenizer::{tokenize, Tokenizer};
-pub use parser::{parse_stylesheet_rules, StylesheetParser,
-                 parse_rule_list, RuleListParser,
-                 parse_declaration_list, DeclarationListParser,
-                 parse_one_rule, parse_one_declaration, parse_one_component_value};
-pub use from_bytes::decode_stylesheet_bytes;
-pub use color::{RGBA, Color};
+pub use tokenizer::{Tokenizer, Token, NumericValue};
+pub use rules_and_declarations::{Priority, parse_important};
+pub use rules_and_declarations::{DeclarationParser, DeclarationListParser, parse_one_declaration};
+pub use rules_and_declarations::{RuleListParser, parse_one_rule};
+pub use rules_and_declarations::{AtRulePrelude, QualifiedRuleParser, AtRuleParser};
+pub use from_bytes::{decode_stylesheet_bytes, parse_stylesheet_rules_from_bytes};
+pub use color::{RGBA, Color, parse_color_keyword};
 pub use nth::parse_nth;
 pub use serializer::{ToCss, CssStringWriter, serialize_identifier, serialize_string};
+pub use parser::{Parser, Delimiter, Delimiters};
 
-pub mod ast;
+mod rules_and_declarations;
 mod tokenizer;
 mod parser;
 mod from_bytes;
