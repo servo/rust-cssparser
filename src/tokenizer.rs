@@ -35,15 +35,7 @@ impl Iterator<Node> for Tokenizer {
 #[inline]
 fn preprocess(input: &str) -> String {
     // TODO: Is this faster if done in one pass?
-    input.replace("\r\n", "\n").replace("\r", "\n").replace("\x0C", "\n").replace("\x00", "\uFFFD")
-}
-
-
-#[test]
-fn test_preprocess() {
-    assert!("" == preprocess("").as_slice());
-    assert!("Lorem\n\t\uFFFDipusm\ndoror\uFFFD\n" ==
-            preprocess("Lorem\r\n\t\x00ipusm\ndoror\uFFFD\r").as_slice());
+    input.replace("\r\n", "\n").replace("\r", "\n").replace("\x0C", "\n")
 }
 
 
@@ -219,7 +211,7 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
             { consume_unicode_range(tokenizer) }
             else { consume_ident_like(tokenizer) }
         },
-        'a'...'z' | 'A'...'Z' | '_' => consume_ident_like(tokenizer),
+        'a'...'z' | 'A'...'Z' | '_' | '\0' => consume_ident_like(tokenizer),
         '[' => SquareBracketBlock(consume_block(tokenizer, CloseSquareBracket)),
         '\\' => {
             if !tokenizer.starts_with("\\\n") { consume_ident_like(tokenizer) }
@@ -336,6 +328,7 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Resul
                 }
                 // else: escaped EOF, do nothing.
             }
+            '\0' => string.push('\uFFFD'),
             c => string.push(c),
         }
     }
@@ -346,9 +339,9 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Resul
 #[inline]
 fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
     !tokenizer.is_eof() && match tokenizer.current_char() {
-        'a'...'z' | 'A'...'Z' | '_' => true,
+        'a'...'z' | 'A'...'Z' | '_' | '\0' => true,
         '-' => tokenizer.position + 1 < tokenizer.length && match tokenizer.char_at(1) {
-            'a'...'z' | 'A'...'Z' | '_' => true,
+            'a'...'z' | 'A'...'Z' | '_' | '\0' => true,
             '\\' => !tokenizer.input.as_slice().slice_from(tokenizer.position + 1).starts_with("\\\n"),
             c => c > '\x7F',  // Non-ASCII
         },
@@ -379,6 +372,7 @@ fn consume_name(tokenizer: &mut Tokenizer) -> String {
                 tokenizer.position += 1;
                 consume_escape(tokenizer)
             },
+            '\0' => { tokenizer.position += 1; '\uFFFD' },
             _ => if c > '\x7F' { tokenizer.consume_char() }  // Non-ASCII
                  else { break }
         })
@@ -497,7 +491,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
                     return consume_url_end(tokenizer, string)
                 },
                 ')' => break,
-                '\x00'...'\x08' | '\x0B' | '\x0E'...'\x1F' | '\x7F'  // non-printable
+                '\x01'...'\x08' | '\x0B' | '\x0E'...'\x1F' | '\x7F'  // non-printable
                     | '"' | '\'' | '(' => return consume_bad_url(tokenizer),
                 '\\' => {
                     if !tokenizer.is_eof() && tokenizer.current_char() == '\n' {
@@ -505,6 +499,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
                     }
                     consume_escape(tokenizer)
                 },
+                '\0' => '\uFFFD',
                 c => c
             };
             string.push(next_char)
