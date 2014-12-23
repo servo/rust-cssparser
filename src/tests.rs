@@ -185,8 +185,9 @@ fn stylesheet_from_bytes() {
             let environment_encoding = get_string(&map, &"environment_encoding".to_string())
                 .and_then(encoding_from_whatwg_label);
 
-            let (mut rules, used_encoding) = parse_stylesheet_rules_from_bytes(
+            let (css_unicode, used_encoding) = decode_stylesheet_bytes(
                 css.as_slice(), protocol_encoding_label, environment_encoding);
+            let mut rules = parse_stylesheet_rules(tokenize(css_unicode.as_slice()));
 
             (rules.collect::<Vec<Result<Rule, SyntaxError>>>(), used_encoding.name().to_string()).to_json()
         };

@@ -13,7 +13,6 @@ use ast::ComponentValue::*;
 
 /// Returns a `Iterator<(ComponentValue, SourceLocation)>`
 pub fn tokenize(input: &str) -> Tokenizer {
-    let input = input.into_string();
     Tokenizer {
         length: input.len(),
         input: input,
@@ -21,7 +20,7 @@ pub fn tokenize(input: &str) -> Tokenizer {
     }
 }
 
-impl Iterator<Node> for Tokenizer {
+impl<'a> Iterator<Node> for Tokenizer<'a> {
     #[inline]
     fn next(&mut self) -> Option<Node> { next_component_value(self) }
 }
@@ -30,8 +29,8 @@ impl Iterator<Node> for Tokenizer {
 //  ***********  End of public API  ***********
 
 
-pub struct Tokenizer {
-    input: String,
+pub struct Tokenizer<'a> {
+    input: &'a str,
     length: uint,  // All counted in bytes, not characters
     position: uint,  // All counted in bytes, not characters
 }
@@ -43,7 +42,7 @@ macro_rules! is_match(
 )
 
 
-impl Tokenizer {
+impl<'a> Tokenizer<'a> {
     #[inline]
     fn is_eof(&self) -> bool { self.position >= self.length }
 

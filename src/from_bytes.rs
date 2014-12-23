@@ -8,9 +8,6 @@ use encoding::label::encoding_from_whatwg_label;
 use encoding::all::UTF_8;
 use encoding::{EncodingRef, DecoderTrap, decode};
 
-use tokenizer::{tokenize, Tokenizer};
-use parser::{parse_stylesheet_rules, StylesheetParser};
-
 
 /// Determine the character encoding of a CSS stylesheet and decode it.
 ///
@@ -67,24 +64,4 @@ pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>
 fn decode_replace(input: &[u8], fallback_encoding: EncodingRef)-> (String, EncodingRef) {
     let (result, used_encoding) = decode(input, DecoderTrap::Replace, fallback_encoding);
     (result.unwrap(), used_encoding)
-}
-
-
-/// Parse stylesheet from bytes.
-///
-/// * `css_bytes`: A byte string.
-/// * `protocol_encoding`: The encoding label, if any, defined by HTTP or equivalent protocol.
-///     (e.g. via the `charset` parameter of the `Content-Type` header.)
-/// * `environment_encoding`: An optional `Encoding` object for the [environment encoding]
-///     (http://www.w3.org/TR/css-syntax/#environment-encoding), if any.
-///
-/// Returns a 2-tuple of a `Iterator<Result<Rule, SyntaxError>>`
-/// and the `Encoding` object that was used.
-pub fn parse_stylesheet_rules_from_bytes(
-        css_bytes: &[u8], protocol_encoding_label: Option<&str>,
-        environment_encoding: Option<EncodingRef>)
-     -> (StylesheetParser<Tokenizer>, EncodingRef) {
-    let (css_unicode, encoding) = decode_stylesheet_bytes(
-        css_bytes, protocol_encoding_label, environment_encoding);
-    (parse_stylesheet_rules(tokenize(css_unicode.as_slice())), encoding)
 }
