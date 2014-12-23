@@ -13,7 +13,7 @@ use ast::ComponentValue::*;
 
 /// Returns a `Iterator<(ComponentValue, SourceLocation)>`
 pub fn tokenize(input: &str) -> Tokenizer {
-    let input = preprocess(input);
+    let input = input.into_string();
     Tokenizer {
         length: input.len(),
         input: input,
@@ -28,12 +28,6 @@ impl Iterator<Node> for Tokenizer {
 
 
 //  ***********  End of public API  ***********
-
-
-#[inline]
-fn preprocess(input: &str) -> String {
-    input.into_string()
-}
 
 
 pub struct Tokenizer {
