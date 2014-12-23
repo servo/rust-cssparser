@@ -18,8 +18,6 @@ pub fn tokenize(input: &str) -> Tokenizer {
         length: input.len(),
         input: input,
         position: 0,
-        line: 1,
-        last_line_start: 0,
     }
 }
 
@@ -43,8 +41,6 @@ pub struct Tokenizer {
     input: String,
     length: uint,  // All counted in bytes, not characters
     position: uint,  // All counted in bytes, not characters
-    line: uint,
-    last_line_start: uint,  // All counted in bytes, not characters
 }
 
 
@@ -72,15 +68,6 @@ impl Tokenizer {
     fn starts_with(&self, needle: &str) -> bool {
         self.input.as_slice().slice_from(self.position).starts_with(needle)
     }
-
-    #[inline]
-    fn new_line(&mut self) {
-        if cfg!(test) {
-            assert!(self.input.as_slice().char_at(self.position - 1) == '\n')
-        }
-        self.line += 1;
-        self.last_line_start = self.position;
-    }
 }
 
 macro_rules! is_match(
@@ -93,27 +80,19 @@ macro_rules! is_match(
 fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
     consume_comments(tokenizer);
     if tokenizer.is_eof() {
-        if cfg!(test) {
-            assert!(tokenizer.line == tokenizer.input.as_slice().split('\n').count(),
-                    "The tokenizer is missing a tokenizer.new_line() call somewhere.")
-        }
         return None
     }
     let start_location = SourceLocation{
-        line: tokenizer.line,
-        // The start of the line is column 1:
-        column: tokenizer.position - tokenizer.last_line_start + 1,
+        // FIXME
+        line: 0,
+        column: tokenizer.position,
     };
     let c = tokenizer.current_char();
     let component_value = match c {
         '\t' | '\n' | ' ' => {
             while !tokenizer.is_eof() {
                 match tokenizer.current_char() {
-                    ' ' | '\t' => tokenizer.position += 1,
-                    '\n' => {
-                        tokenizer.position += 1;
-                        tokenizer.new_line();
-                    },
+                    ' ' | '\t' | '\n' => tokenizer.position += 1,
                     _ => break,
                 }
             }
@@ -251,15 +230,11 @@ fn consume_comments(tokenizer: &mut Tokenizer) {
     while tokenizer.starts_with("/*") {
         tokenizer.position += 2;  // +2 to consume "/*"
         while !tokenizer.is_eof() {
-            match tokenizer.consume_char() {
-                '*' => {
-                    if !tokenizer.is_eof() && tokenizer.current_char() == '/' {
-                        tokenizer.position += 1;
-                        break
-                    }
-                },
-                '\n' => tokenizer.new_line(),
-                _ => ()
+            if tokenizer.consume_char() == '*' &&
+               !tokenizer.is_eof() &&
+               tokenizer.current_char() == '/' {
+                tokenizer.position += 1;
+                break
             }
         }
     }
@@ -322,7 +297,6 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Resul
                 if !tokenizer.is_eof() {
                     if tokenizer.current_char() == '\n' {  // Escaped newline
                         tokenizer.position += 1;
-                        tokenizer.new_line();
                     }
                     else { string.push(consume_escape(tokenizer)) }
                 }
@@ -461,11 +435,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
     tokenizer.position += 1;  // Skip the ( of url(
     while !tokenizer.is_eof() {
         match tokenizer.current_char() {
-            ' ' | '\t' => tokenizer.position += 1,
-            '\n' => {
-                tokenizer.position += 1;
-                tokenizer.new_line();
-            },
+            ' ' | '\t' | '\n' => tokenizer.position += 1,
             '"' => return consume_quoted_url(tokenizer, false),
             '\'' => return consume_quoted_url(tokenizer, true),
             ')' => { tokenizer.position += 1; break },
@@ -485,11 +455,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
         let mut string = String::new();
         while !tokenizer.is_eof() {
             let next_char = match tokenizer.consume_char() {
-                ' ' | '\t' => return consume_url_end(tokenizer, string),
-                '\n' => {
-                    tokenizer.new_line();
-                    return consume_url_end(tokenizer, string)
-                },
+                ' ' | '\t' | '\n' => return consume_url_end(tokenizer, string),
                 ')' => break,
                 '\x01'...'\x08' | '\x0B' | '\x0E'...'\x1F' | '\x7F'  // non-printable
                     | '"' | '\'' | '(' => return consume_bad_url(tokenizer),
@@ -510,8 +476,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
     fn consume_url_end(tokenizer: &mut Tokenizer, string: String) -> ComponentValue {
         while !tokenizer.is_eof() {
             match tokenizer.consume_char() {
-                ' ' | '\t' => (),
-                '\n' => tokenizer.new_line(),
+                ' ' | '\t' | '\n' => (),
                 ')' => break,
                 _ => return consume_bad_url(tokenizer)
             }
@@ -525,7 +490,6 @@ fn consume_url(tokenizer: &mut Tokenizer) -> ComponentValue {
             match tokenizer.consume_char() {
                 ')' => break,
                 '\\' => tokenizer.position += 1, // Skip an escaped ')' or '\'
-                '\n' => tokenizer.new_line(),
                 _ => ()
             }
         }
@@ -593,8 +557,7 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
             }
             if !tokenizer.is_eof() {
                 match tokenizer.current_char() {
-                    ' ' | '\t' => tokenizer.position += 1,
-                    '\n' => { tokenizer.position += 1; tokenizer.new_line() },
+                    ' ' | '\t' | '\n' => tokenizer.position += 1,
                     _ => ()
                 }
             }
