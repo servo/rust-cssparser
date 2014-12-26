@@ -111,7 +111,7 @@ fn parse_n_dash_digits(string: &str) -> Option<i32> {
     && string.starts_with("n-")
     && string.slice_from(2).chars().all(|c| match c { '0'...'9' => true, _ => false })
     {
-        let result = from_str(string.slice_from(1));  // Include the minus sign
+        let result = string.slice_from(1).parse();  // Include the minus sign
         assert!(result.is_some());
         result
     }

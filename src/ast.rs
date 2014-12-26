@@ -152,7 +152,7 @@ impl<'a> SkipWhitespaceIterable<'a> for &'a [ComponentValue] {
 
 #[deriving(Clone)]
 pub struct SkipWhitespaceIterator<'a> {
-    pub iter_with_whitespace: slice::Items<'a, ComponentValue>,
+    pub iter_with_whitespace: slice::Iter<'a, ComponentValue>,
 }
 
 impl<'a> Iterator<&'a ComponentValue> for SkipWhitespaceIterator<'a> {
@@ -176,7 +176,7 @@ impl MoveSkipWhitespaceIterable for Vec<ComponentValue> {
 }
 
 pub struct MoveSkipWhitespaceIterator {
-    iter_with_whitespace: vec::MoveItems<ComponentValue>,
+    iter_with_whitespace: vec::IntoIter<ComponentValue>,
 }
 
 impl Iterator<ComponentValue> for MoveSkipWhitespaceIterator {

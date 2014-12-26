@@ -469,14 +469,14 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> ComponentValue {
     }
     let (value, int_value) = {
         // TODO: handle overflow
-        // Remove any + sign as int::from_str() does not parse them.
+        // Remove any + sign as int::parse() does not parse them.
         let repr = if representation.starts_with("+") {
             representation.slice_from(1)
         } else {
             representation.as_slice()
         };
-        (from_str::<f64>(repr).unwrap(), if is_integer {
-            Some(from_str::<i64>(repr).unwrap())
+        (repr.parse::<f64>().unwrap(), if is_integer {
+            Some(repr.parse::<i64>().unwrap())
         } else {
             None
         })
