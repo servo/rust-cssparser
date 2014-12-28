@@ -144,11 +144,11 @@ fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
                 && is_match!(tokenizer.char_at(2), '0'...'9')
             ) {
                 consume_numeric(tokenizer)
-            } else if is_ident_start(tokenizer) {
-                consume_ident_like(tokenizer)
             } else if tokenizer.starts_with("-->") {
                 tokenizer.position += 3;
                 CDC
+            } else if is_ident_start(tokenizer) {
+                consume_ident_like(tokenizer)
             } else {
                 tokenizer.position += 1;
                 Delim(c)
@@ -320,7 +320,7 @@ fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
     !tokenizer.is_eof() && match tokenizer.current_char() {
         'a'...'z' | 'A'...'Z' | '_' | '\0' => true,
         '-' => tokenizer.position + 1 < tokenizer.length && match tokenizer.char_at(1) {
-            'a'...'z' | 'A'...'Z' | '_' | '\0' => true,
+            'a'...'z' | 'A'...'Z' | '-' | '_' | '\0' => true,
             '\\' => !tokenizer.has_newline_at(1),
             c => c > '\x7F',  // Non-ASCII
         },
