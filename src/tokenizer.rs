@@ -64,7 +64,6 @@ pub struct NumericValue {
 
 pub struct Tokenizer<'a> {
     input: &'a str,
-    length: uint,  // All counted in bytes, not characters
     position: uint,  // All counted in bytes, not characters
 
     /// For `peek` and `push_back`
@@ -76,7 +75,6 @@ impl<'a> Tokenizer<'a> {
     #[inline]
     pub fn new(input: &str) -> Tokenizer {
         Tokenizer {
-            length: input.len(),
             input: input,
             position: 0,
             buffer: None,
@@ -111,7 +109,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    fn is_eof(&self) -> bool { self.position >= self.length }
+    fn is_eof(&self) -> bool { self.position >= self.input.len() }
 
     // Assumes non-EOF
     #[inline]
@@ -124,7 +122,7 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn has_newline_at(&self, offset: uint) -> bool {
-        self.position + offset < self.length &&
+        self.position + offset < self.input.len() &&
         matches!(self.char_at(offset), '\n' | '\r' | '\x0C')
     }
 
@@ -182,10 +180,10 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
         },
         '+' => {
             if (
-                tokenizer.position + 1 < tokenizer.length
+                tokenizer.position + 1 < tokenizer.input.len()
                 && matches!(tokenizer.char_at(1), '0'...'9')
             ) || (
-                tokenizer.position + 2 < tokenizer.length
+                tokenizer.position + 2 < tokenizer.input.len()
                 && tokenizer.char_at(1) == '.'
                 && matches!(tokenizer.char_at(2), '0'...'9')
             ) {
@@ -198,10 +196,10 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
         ',' => { tokenizer.position += 1; Comma },
         '-' => {
             if (
-                tokenizer.position + 1 < tokenizer.length
+                tokenizer.position + 1 < tokenizer.input.len()
                 && matches!(tokenizer.char_at(1), '0'...'9')
             ) || (
-                tokenizer.position + 2 < tokenizer.length
+                tokenizer.position + 2 < tokenizer.input.len()
                 && tokenizer.char_at(1) == '.'
                 && matches!(tokenizer.char_at(2), '0'...'9')
             ) {
@@ -217,7 +215,7 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
             }
         },
         '.' => {
-            if tokenizer.position + 1 < tokenizer.length
+            if tokenizer.position + 1 < tokenizer.input.len()
                 && matches!(tokenizer.char_at(1), '0'...'9'
             ) {
                 consume_numeric(tokenizer)
@@ -244,7 +242,7 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
             else { Delim(c) }
         },
         'u' | 'U' => {
-            if tokenizer.position + 2 < tokenizer.length
+            if tokenizer.position + 2 < tokenizer.input.len()
                && tokenizer.char_at(1) == '+'
                && matches!(tokenizer.char_at(2), '0'...'9' | 'a'...'f' | 'A'...'F' | '?')
             { consume_unicode_range(tokenizer) }
@@ -349,7 +347,7 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Resul
 fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
     !tokenizer.is_eof() && match tokenizer.current_char() {
         'a'...'z' | 'A'...'Z' | '_' | '\0' => true,
-        '-' => tokenizer.position + 1 < tokenizer.length && match tokenizer.char_at(1) {
+        '-' => tokenizer.position + 1 < tokenizer.input.len() && match tokenizer.char_at(1) {
             'a'...'z' | 'A'...'Z' | '-' | '_' | '\0' => true,
             '\\' => !tokenizer.has_newline_at(1),
             c => c > '\x7F',  // Non-ASCII
@@ -405,7 +403,7 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
             _ => break
         }
     }
-    if tokenizer.position + 1 < tokenizer.length && tokenizer.current_char() == '.'
+    if tokenizer.position + 1 < tokenizer.input.len() && tokenizer.current_char() == '.'
             && matches!(tokenizer.char_at(1), '0'...'9') {
         is_integer = false;
         representation.push(tokenizer.consume_char());  // '.'
@@ -418,11 +416,11 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
         }
     }
     if (
-        tokenizer.position + 1 < tokenizer.length
+        tokenizer.position + 1 < tokenizer.input.len()
         && matches!(tokenizer.current_char(), 'e' | 'E')
         && matches!(tokenizer.char_at(1), '0'...'9')
     ) || (
-        tokenizer.position + 2 < tokenizer.length
+        tokenizer.position + 2 < tokenizer.input.len()
         && matches!(tokenizer.current_char(), 'e' | 'E')
         && matches!(tokenizer.char_at(1), '+' | '-')
         && matches!(tokenizer.char_at(2), '0'...'9')
