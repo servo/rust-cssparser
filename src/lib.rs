@@ -7,12 +7,9 @@
 
 extern crate encoding;
 extern crate text_writer;
-
-#[cfg(test)]
-extern crate test;
-
-#[cfg(test)]
-extern crate serialize;
+#[macro_use] extern crate matches;
+#[cfg(test)] extern crate test;
+#[cfg(test)] extern crate serialize;
 
 pub use color::{parse_color_keyword};
 pub use tokenizer::{tokenize, Tokenizer};

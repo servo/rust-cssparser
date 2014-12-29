@@ -109,7 +109,7 @@ fn parse_end(iter: &mut Iter, a: i32, b: i32) -> Nth {
 fn parse_n_dash_digits(string: &str) -> Option<i32> {
     if string.len() >= 3
     && string.starts_with("n-")
-    && string.slice_from(2).chars().all(|c| match c { '0'...'9' => true, _ => false })
+    && string.slice_from(2).chars().all(|c| matches!(c, '0'...'9'))
     {
         let result = string.slice_from(1).parse();  // Include the minus sign
         assert!(result.is_some());
@@ -120,8 +120,5 @@ fn parse_n_dash_digits(string: &str) -> Option<i32> {
 
 #[inline]
 fn has_sign(value: &NumericValue) -> bool {
-    match value.representation.as_bytes()[0] as char {
-        '+' | '-' => true,
-        _ => false
-    }
+    matches!(value.representation.as_bytes()[0], b'+' | b'-')
 }
