@@ -108,8 +108,17 @@ impl<'a> Tokenizer<'a> {
         self.buffer = Some(token);
     }
 
+    // `tokenizer.current_char()` will not fail.
     #[inline]
-    fn is_eof(&self) -> bool { self.position >= self.input.len() }
+    fn is_eof(&self) -> bool { !self.has_at_least(0) }
+
+    // The input has at least `n` bytes left *after* the current one.
+    // That is, `tokenizer.char_at(n)` will not fail.
+    #[inline]
+    fn has_at_least(&self, n: uint) -> bool { self.position + n < self.input.len() }
+
+    #[inline]
+    fn advance(&mut self, n: uint) { self.position += n }
 
     // Assumes non-EOF
     #[inline]
@@ -150,7 +159,7 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
         '\t' | '\n' | ' ' | '\r' | '\x0C' => {
             while !tokenizer.is_eof() {
                 match tokenizer.current_char() {
-                    ' ' | '\t' | '\n' | '\r' | '\x0C' => tokenizer.position += 1,
+                    ' ' | '\t' | '\n' | '\r' | '\x0C' => tokenizer.advance(1),
                     _ => break,
                 }
             }
@@ -158,7 +167,7 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
         },
         '"' => consume_string(tokenizer, false),
         '#' => {
-            tokenizer.position += 1;
+            tokenizer.advance(1);
             if is_ident_start(tokenizer) { IDHash(consume_name(tokenizer)) }
             else if !tokenizer.is_eof() && match tokenizer.current_char() {
                 'a'...'z' | 'A'...'Z' | '0'...'9' | '-' | '_' => true,
@@ -168,113 +177,113 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
             else { Delim(c) }
         },
         '$' => {
-            if tokenizer.starts_with("$=") { tokenizer.position += 2; SuffixMatch }
-            else { tokenizer.position += 1; Delim(c) }
+            if tokenizer.starts_with("$=") { tokenizer.advance(2); SuffixMatch }
+            else { tokenizer.advance(1); Delim(c) }
         },
         '\'' => consume_string(tokenizer, true),
-        '(' => { tokenizer.position += 1; ParenthesisBlock },
-        ')' => { tokenizer.position += 1; CloseParenthesis },
+        '(' => { tokenizer.advance(1); ParenthesisBlock },
+        ')' => { tokenizer.advance(1); CloseParenthesis },
         '*' => {
-            if tokenizer.starts_with("*=") { tokenizer.position += 2; SubstringMatch }
-            else { tokenizer.position += 1; Delim(c) }
+            if tokenizer.starts_with("*=") { tokenizer.advance(2); SubstringMatch }
+            else { tokenizer.advance(1); Delim(c) }
         },
         '+' => {
             if (
-                tokenizer.position + 1 < tokenizer.input.len()
+                tokenizer.has_at_least(1)
                 && matches!(tokenizer.char_at(1), '0'...'9')
             ) || (
-                tokenizer.position + 2 < tokenizer.input.len()
+                tokenizer.has_at_least(2)
                 && tokenizer.char_at(1) == '.'
                 && matches!(tokenizer.char_at(2), '0'...'9')
             ) {
                 consume_numeric(tokenizer)
             } else {
-                tokenizer.position += 1;
+                tokenizer.advance(1);
                 Delim(c)
             }
         },
-        ',' => { tokenizer.position += 1; Comma },
+        ',' => { tokenizer.advance(1); Comma },
         '-' => {
             if (
-                tokenizer.position + 1 < tokenizer.input.len()
+                tokenizer.has_at_least(1)
                 && matches!(tokenizer.char_at(1), '0'...'9')
             ) || (
-                tokenizer.position + 2 < tokenizer.input.len()
+                tokenizer.has_at_least(2)
                 && tokenizer.char_at(1) == '.'
                 && matches!(tokenizer.char_at(2), '0'...'9')
             ) {
                 consume_numeric(tokenizer)
             } else if tokenizer.starts_with("-->") {
-                tokenizer.position += 3;
+                tokenizer.advance(3);
                 CDC
             } else if is_ident_start(tokenizer) {
                 consume_ident_like(tokenizer)
             } else {
-                tokenizer.position += 1;
+                tokenizer.advance(1);
                 Delim(c)
             }
         },
         '.' => {
-            if tokenizer.position + 1 < tokenizer.input.len()
+            if tokenizer.has_at_least(1)
                 && matches!(tokenizer.char_at(1), '0'...'9'
             ) {
                 consume_numeric(tokenizer)
             } else {
-                tokenizer.position += 1;
+                tokenizer.advance(1);
                 Delim(c)
             }
         }
         '0'...'9' => consume_numeric(tokenizer),
-        ':' => { tokenizer.position += 1; Colon },
-        ';' => { tokenizer.position += 1; Semicolon },
+        ':' => { tokenizer.advance(1); Colon },
+        ';' => { tokenizer.advance(1); Semicolon },
         '<' => {
             if tokenizer.starts_with("<!--") {
-                tokenizer.position += 4;
+                tokenizer.advance(4);
                 CDO
             } else {
-                tokenizer.position += 1;
+                tokenizer.advance(1);
                 Delim(c)
             }
         },
         '@' => {
-            tokenizer.position += 1;
+            tokenizer.advance(1);
             if is_ident_start(tokenizer) { AtKeyword(consume_name(tokenizer)) }
             else { Delim(c) }
         },
         'u' | 'U' => {
-            if tokenizer.position + 2 < tokenizer.input.len()
+            if tokenizer.has_at_least(2)
                && tokenizer.char_at(1) == '+'
                && matches!(tokenizer.char_at(2), '0'...'9' | 'a'...'f' | 'A'...'F' | '?')
             { consume_unicode_range(tokenizer) }
             else { consume_ident_like(tokenizer) }
         },
         'a'...'z' | 'A'...'Z' | '_' | '\0' => consume_ident_like(tokenizer),
-        '[' => { tokenizer.position += 1; SquareBracketBlock },
+        '[' => { tokenizer.advance(1); SquareBracketBlock },
         '\\' => {
             if !tokenizer.has_newline_at(1) { consume_ident_like(tokenizer) }
-            else { tokenizer.position += 1; Delim(c) }
+            else { tokenizer.advance(1); Delim(c) }
         },
-        ']' => { tokenizer.position += 1; CloseSquareBracket },
+        ']' => { tokenizer.advance(1); CloseSquareBracket },
         '^' => {
-            if tokenizer.starts_with("^=") { tokenizer.position += 2; PrefixMatch }
-            else { tokenizer.position += 1; Delim(c) }
+            if tokenizer.starts_with("^=") { tokenizer.advance(2); PrefixMatch }
+            else { tokenizer.advance(1); Delim(c) }
         },
-        '{' => { tokenizer.position += 1; CurlyBracketBlock },
+        '{' => { tokenizer.advance(1); CurlyBracketBlock },
         '|' => {
-            if tokenizer.starts_with("|=") { tokenizer.position += 2; DashMatch }
-            else if tokenizer.starts_with("||") { tokenizer.position += 2; Column }
-            else { tokenizer.position += 1; Delim(c) }
+            if tokenizer.starts_with("|=") { tokenizer.advance(2); DashMatch }
+            else if tokenizer.starts_with("||") { tokenizer.advance(2); Column }
+            else { tokenizer.advance(1); Delim(c) }
         },
-        '}' => { tokenizer.position += 1; CloseCurlyBracket },
+        '}' => { tokenizer.advance(1); CloseCurlyBracket },
         '~' => {
-            if tokenizer.starts_with("~=") { tokenizer.position += 2; IncludeMatch }
-            else { tokenizer.position += 1; Delim(c) }
+            if tokenizer.starts_with("~=") { tokenizer.advance(2); IncludeMatch }
+            else { tokenizer.advance(1); Delim(c) }
         },
         _ => {
             if c > '\x7F' {  // Non-ASCII
                 consume_ident_like(tokenizer)
             } else {
-                tokenizer.position += 1;
+                tokenizer.advance(1);
                 Delim(c)
             }
         },
@@ -286,12 +295,12 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
 #[inline]
 fn consume_comments(tokenizer: &mut Tokenizer) {
     while tokenizer.starts_with("/*") {
-        tokenizer.position += 2;  // +2 to consume "/*"
+        tokenizer.advance(2);  // +2 to consume "/*"
         while !tokenizer.is_eof() {
             if tokenizer.consume_char() == '*' &&
                !tokenizer.is_eof() &&
                tokenizer.current_char() == '/' {
-                tokenizer.position += 1;
+                tokenizer.advance(1);
                 break
             }
         }
@@ -309,7 +318,7 @@ fn consume_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Token {
 
 /// Return `Err(())` on syntax error (ie. unescaped newline)
 fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Result<String, ()> {
-    tokenizer.position += 1;  // Skip the initial quote
+    tokenizer.advance(1);  // Skip the initial quote
     let mut string = String::new();
     while !tokenizer.is_eof() {
         match tokenizer.consume_char() {
@@ -323,11 +332,11 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Resul
                 if !tokenizer.is_eof() {
                     match tokenizer.current_char() {
                         // Escaped newline
-                        '\n' | '\x0C' => tokenizer.position += 1,
+                        '\n' | '\x0C' => tokenizer.advance(1),
                         '\r' => {
-                            tokenizer.position += 1;
+                            tokenizer.advance(1);
                             if !tokenizer.is_eof() && tokenizer.current_char() == '\n' {
-                                tokenizer.position += 1;
+                                tokenizer.advance(1);
                             }
                         }
                         _ => string.push(consume_escape(tokenizer))
@@ -347,7 +356,7 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Resul
 fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
     !tokenizer.is_eof() && match tokenizer.current_char() {
         'a'...'z' | 'A'...'Z' | '_' | '\0' => true,
-        '-' => tokenizer.position + 1 < tokenizer.input.len() && match tokenizer.char_at(1) {
+        '-' => tokenizer.has_at_least(1) && match tokenizer.char_at(1) {
             'a'...'z' | 'A'...'Z' | '-' | '_' | '\0' => true,
             '\\' => !tokenizer.has_newline_at(1),
             c => c > '\x7F',  // Non-ASCII
@@ -361,7 +370,7 @@ fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
 fn consume_ident_like(tokenizer: &mut Tokenizer) -> Token {
     let value = consume_name(tokenizer);
     if !tokenizer.is_eof() && tokenizer.current_char() == '(' {
-        tokenizer.position += 1;
+        tokenizer.advance(1);
         if value.eq_ignore_ascii_case("url") { consume_url(tokenizer) }
         else { Function(value) }
     } else {
@@ -374,13 +383,13 @@ fn consume_name(tokenizer: &mut Tokenizer) -> String {
     while !tokenizer.is_eof() {
         let c = tokenizer.current_char();
         value.push(match c {
-            'a'...'z' | 'A'...'Z' | '0'...'9' | '_' | '-'  => { tokenizer.position += 1; c },
+            'a'...'z' | 'A'...'Z' | '0'...'9' | '_' | '-'  => { tokenizer.advance(1); c },
             '\\' => {
                 if tokenizer.has_newline_at(1) { break }
-                tokenizer.position += 1;
+                tokenizer.advance(1);
                 consume_escape(tokenizer)
             },
-            '\0' => { tokenizer.position += 1; '\uFFFD' },
+            '\0' => { tokenizer.advance(1); '\uFFFD' },
             _ => if c > '\x7F' { tokenizer.consume_char() }  // Non-ASCII
                  else { break }
         })
@@ -403,7 +412,7 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
             _ => break
         }
     }
-    if tokenizer.position + 1 < tokenizer.input.len() && tokenizer.current_char() == '.'
+    if tokenizer.has_at_least(1) && tokenizer.current_char() == '.'
             && matches!(tokenizer.char_at(1), '0'...'9') {
         is_integer = false;
         representation.push(tokenizer.consume_char());  // '.'
@@ -416,11 +425,11 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
         }
     }
     if (
-        tokenizer.position + 1 < tokenizer.input.len()
+        tokenizer.has_at_least(1)
         && matches!(tokenizer.current_char(), 'e' | 'E')
         && matches!(tokenizer.char_at(1), '0'...'9')
     ) || (
-        tokenizer.position + 2 < tokenizer.input.len()
+        tokenizer.has_at_least(2)
         && matches!(tokenizer.current_char(), 'e' | 'E')
         && matches!(tokenizer.char_at(1), '+' | '-')
         && matches!(tokenizer.char_at(2), '0'...'9')
@@ -457,7 +466,7 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
         representation: representation,
     };
     if !tokenizer.is_eof() && tokenizer.current_char() == '%' {
-        tokenizer.position += 1;
+        tokenizer.advance(1);
         Percentage(value)
     }
     else if is_ident_start(tokenizer) { Dimension(value, consume_name(tokenizer)) }
@@ -468,10 +477,10 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
 fn consume_url(tokenizer: &mut Tokenizer) -> Token {
     while !tokenizer.is_eof() {
         match tokenizer.current_char() {
-            ' ' | '\t' | '\n' | '\r' | '\x0C' => tokenizer.position += 1,
+            ' ' | '\t' | '\n' | '\r' | '\x0C' => tokenizer.advance(1),
             '"' => return consume_quoted_url(tokenizer, false),
             '\'' => return consume_quoted_url(tokenizer, true),
-            ')' => { tokenizer.position += 1; break },
+            ')' => { tokenizer.advance(1); break },
             _ => return consume_unquoted_url(tokenizer),
         }
     }
@@ -522,7 +531,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> Token {
         while !tokenizer.is_eof() {
             match tokenizer.consume_char() {
                 ')' => break,
-                '\\' => tokenizer.position += 1, // Skip an escaped ')' or '\'
+                '\\' => tokenizer.advance(1), // Skip an escaped ')' or '\'
                 _ => ()
             }
         }
@@ -533,7 +542,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> Token {
 
 
 fn consume_unicode_range(tokenizer: &mut Tokenizer) -> Token {
-    tokenizer.position += 2;  // Skip U+
+    tokenizer.advance(2);  // Skip U+
     let mut hex = String::new();
     while hex.len() < 6 && !tokenizer.is_eof()
           && matches!(tokenizer.current_char(), '0'...'9' | 'A'...'F' | 'a'...'f') {
@@ -544,7 +553,7 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> Token {
     while question_marks < max_question_marks && !tokenizer.is_eof()
             && tokenizer.current_char() == '?' {
         question_marks += 1;
-        tokenizer.position += 1
+        tokenizer.advance(1)
     }
     let start;
     let end;
@@ -555,12 +564,12 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> Token {
         start = num::from_str_radix(hex.as_slice(), 16).unwrap();
         hex.truncate(0);
         if !tokenizer.is_eof() && tokenizer.current_char() == '-' {
-            tokenizer.position += 1;
+            tokenizer.advance(1);
             while hex.len() < 6 && !tokenizer.is_eof() {
                 let c = tokenizer.current_char();
                 match c {
                     '0'...'9' | 'A'...'F' | 'a'...'f' => {
-                        hex.push(c); tokenizer.position += 1 },
+                        hex.push(c); tokenizer.advance(1) },
                     _ => break
                 }
             }
@@ -584,17 +593,17 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
                 let c = tokenizer.current_char();
                 match c {
                     '0'...'9' | 'A'...'F' | 'a'...'f' => {
-                        hex.push(c); tokenizer.position += 1 },
+                        hex.push(c); tokenizer.advance(1) },
                     _ => break
                 }
             }
             if !tokenizer.is_eof() {
                 match tokenizer.current_char() {
-                    ' ' | '\t' | '\n' | '\x0C' => tokenizer.position += 1,
+                    ' ' | '\t' | '\n' | '\x0C' => tokenizer.advance(1),
                     '\r' => {
-                        tokenizer.position += 1;
+                        tokenizer.advance(1);
                         if !tokenizer.is_eof() && tokenizer.current_char() == '\n' {
-                            tokenizer.position += 1;
+                            tokenizer.advance(1);
                         }
                     }
                     _ => ()
