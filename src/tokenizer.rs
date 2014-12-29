@@ -71,12 +71,6 @@ pub struct Tokenizer<'a> {
     buffer: Option<Token>,
 }
 
-macro_rules! is_match(
-    ($value:expr, $($pattern:pat)|+) => (
-        match $value { $($pattern)|+ => true, _ => false }
-    );
-)
-
 
 impl<'a> Tokenizer<'a> {
     #[inline]
@@ -131,7 +125,7 @@ impl<'a> Tokenizer<'a> {
     #[inline]
     fn has_newline_at(&self, offset: uint) -> bool {
         self.position + offset < self.length &&
-        is_match!(self.char_at(offset), '\n' | '\r' | '\x0C')
+        matches!(self.char_at(offset), '\n' | '\r' | '\x0C')
     }
 
     #[inline]
@@ -189,11 +183,11 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
         '+' => {
             if (
                 tokenizer.position + 1 < tokenizer.length
-                && is_match!(tokenizer.char_at(1), '0'...'9')
+                && matches!(tokenizer.char_at(1), '0'...'9')
             ) || (
                 tokenizer.position + 2 < tokenizer.length
                 && tokenizer.char_at(1) == '.'
-                && is_match!(tokenizer.char_at(2), '0'...'9')
+                && matches!(tokenizer.char_at(2), '0'...'9')
             ) {
                 consume_numeric(tokenizer)
             } else {
@@ -205,11 +199,11 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
         '-' => {
             if (
                 tokenizer.position + 1 < tokenizer.length
-                && is_match!(tokenizer.char_at(1), '0'...'9')
+                && matches!(tokenizer.char_at(1), '0'...'9')
             ) || (
                 tokenizer.position + 2 < tokenizer.length
                 && tokenizer.char_at(1) == '.'
-                && is_match!(tokenizer.char_at(2), '0'...'9')
+                && matches!(tokenizer.char_at(2), '0'...'9')
             ) {
                 consume_numeric(tokenizer)
             } else if tokenizer.starts_with("-->") {
@@ -224,7 +218,7 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
         },
         '.' => {
             if tokenizer.position + 1 < tokenizer.length
-                && is_match!(tokenizer.char_at(1), '0'...'9'
+                && matches!(tokenizer.char_at(1), '0'...'9'
             ) {
                 consume_numeric(tokenizer)
             } else {
@@ -252,7 +246,7 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
         'u' | 'U' => {
             if tokenizer.position + 2 < tokenizer.length
                && tokenizer.char_at(1) == '+'
-               && is_match!(tokenizer.char_at(2), '0'...'9' | 'a'...'f' | 'A'...'F' | '?')
+               && matches!(tokenizer.char_at(2), '0'...'9' | 'a'...'f' | 'A'...'F' | '?')
             { consume_unicode_range(tokenizer) }
             else { consume_ident_like(tokenizer) }
         },
@@ -402,7 +396,7 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
     // But this is always called so that there is at least one digit in \d*(\.\d+)?
     let mut representation = String::new();
     let mut is_integer = true;
-    if is_match!(tokenizer.current_char(), '-' | '+') {
+    if matches!(tokenizer.current_char(), '-' | '+') {
          representation.push(tokenizer.consume_char())
     }
     while !tokenizer.is_eof() {
@@ -412,7 +406,7 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
         }
     }
     if tokenizer.position + 1 < tokenizer.length && tokenizer.current_char() == '.'
-            && is_match!(tokenizer.char_at(1), '0'...'9') {
+            && matches!(tokenizer.char_at(1), '0'...'9') {
         is_integer = false;
         representation.push(tokenizer.consume_char());  // '.'
         representation.push(tokenizer.consume_char());  // digit
@@ -425,13 +419,13 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
     }
     if (
         tokenizer.position + 1 < tokenizer.length
-        && is_match!(tokenizer.current_char(), 'e' | 'E')
-        && is_match!(tokenizer.char_at(1), '0'...'9')
+        && matches!(tokenizer.current_char(), 'e' | 'E')
+        && matches!(tokenizer.char_at(1), '0'...'9')
     ) || (
         tokenizer.position + 2 < tokenizer.length
-        && is_match!(tokenizer.current_char(), 'e' | 'E')
-        && is_match!(tokenizer.char_at(1), '+' | '-')
-        && is_match!(tokenizer.char_at(2), '0'...'9')
+        && matches!(tokenizer.current_char(), 'e' | 'E')
+        && matches!(tokenizer.char_at(1), '+' | '-')
+        && matches!(tokenizer.char_at(2), '0'...'9')
     ) {
         is_integer = false;
         representation.push(tokenizer.consume_char());  // 'e' or 'E'
@@ -544,7 +538,7 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> Token {
     tokenizer.position += 2;  // Skip U+
     let mut hex = String::new();
     while hex.len() < 6 && !tokenizer.is_eof()
-          && is_match!(tokenizer.current_char(), '0'...'9' | 'A'...'F' | 'a'...'f') {
+          && matches!(tokenizer.current_char(), '0'...'9' | 'A'...'F' | 'a'...'f') {
         hex.push(tokenizer.consume_char());
     }
     let max_question_marks = 6u - hex.len();

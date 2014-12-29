@@ -5,16 +5,13 @@
 #![crate_name = "cssparser"]
 #![crate_type = "rlib"]
 
-#![feature(globs, macro_rules, if_let, while_let, unsafe_destructor)]
+#![feature(globs, macro_rules, if_let, while_let, unsafe_destructor, phase)]
 
 extern crate encoding;
 extern crate text_writer;
-
-#[cfg(test)]
-extern crate test;
-
-#[cfg(test)]
-extern crate serialize;
+#[phase(plugin)] extern crate matches;
+#[cfg(test)] extern crate test;
+#[cfg(test)] extern crate serialize;
 
 pub use tokenizer::{Tokenizer, Token, NumericValue};
 pub use rules_and_declarations::{Priority, parse_important};

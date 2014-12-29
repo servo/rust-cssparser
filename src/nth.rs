@@ -86,7 +86,7 @@ fn parse_signless_b(input: &mut Parser, a: i32, b_sign: i32) -> Result<(i32, i32
 fn parse_n_dash_digits(string: &str) -> Result<i32, ()> {
     if string.len() >= 3
     && string.slice_to(2).eq_ignore_ascii_case("n-")
-    && string.slice_from(2).chars().all(|c| match c { '0'...'9' => true, _ => false })
+    && string.slice_from(2).chars().all(|c| matches!(c, '0'...'9'))
     {
         Ok(from_str(string.slice_from(1)).unwrap())  // Include the minus sign
     } else {
@@ -96,8 +96,5 @@ fn parse_n_dash_digits(string: &str) -> Result<i32, ()> {
 
 #[inline]
 fn has_sign(value: &NumericValue) -> bool {
-    match value.representation.as_bytes()[0] {
-        b'+' | b'-' => true,
-        _ => false
-    }
+    matches!(value.representation.as_bytes()[0], b'+' | b'-')
 }

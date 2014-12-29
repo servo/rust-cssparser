@@ -228,11 +228,6 @@ impl<'a> ToCss for [Token] {
             None => return Ok(()),
             Some(first) => { try!(first.to_css(dest)); first }
         };
-        macro_rules! matches(
-            ($value:expr, $($pattern:pat)|+) => (
-                match $value { $($pattern)|+ => true, _ => false }
-            );
-        )
         // This does not borrow-check: for component_value in iter {
         loop { match iter.next() { None => break, Some(component_value) => {
             let (a, b) = (previous, component_value);
@@ -260,7 +255,7 @@ impl<'a> ToCss for [Token] {
             ) || (
                 matches!(*a, UnicodeRange(..)) &&
                 matches!(*b, Ident(..) | Function(..) | Delim('?'))
-            ) || (match (a, b) { (&Delim(a), &Delim(b)) => matches!((a, b),
+            ) || matches!((a, b), (&Delim(a), &Delim(b)) if matches!((a, b),
                 ('#', '-') |
                 ('$', '=') |
                 ('*', '=') |
@@ -269,7 +264,7 @@ impl<'a> ToCss for [Token] {
                 ('|', '=') |
                 ('|', '|') |
                 ('/', '*')
-            ), _ => false }) {
+            )) {
                 try!(dest.write_str("/**/"));
             }
             // Skip whitespace when '\n' was previously written at the previous iteration.
