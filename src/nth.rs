@@ -20,7 +20,7 @@ pub fn parse_nth(input: &[ComponentValue]) -> Result<(i32, i32), ()> {
         },
         Some(&Dimension(ref value, ref unit)) => match value.int_value {
             Some(a) => {
-                let unit = unit.as_slice().to_ascii_lower();
+                let unit = unit.as_slice().to_ascii_lowercase();
                 let unit = unit.as_slice();
                 match unit {
                     "n" => parse_b(iter, a as i32),
@@ -34,7 +34,7 @@ pub fn parse_nth(input: &[ComponentValue]) -> Result<(i32, i32), ()> {
             _ => Err(()),
         },
         Some(&Ident(ref value)) => {
-            let ident = value.as_slice().to_ascii_lower();
+            let ident = value.as_slice().to_ascii_lowercase();
             let ident = ident.as_slice();
             match ident {
                 "even" => parse_end(iter, 2, 0),
@@ -55,7 +55,7 @@ pub fn parse_nth(input: &[ComponentValue]) -> Result<(i32, i32), ()> {
         },
         Some(&Delim('+')) => match iter.iter_with_whitespace.next() {
             Some(&Ident(ref value)) => {
-                let ident = value.as_slice().to_ascii_lower();
+                let ident = value.as_slice().to_ascii_lowercase();
                 let ident = ident.as_slice();
                 match ident {
                     "n" => parse_b(iter, 1),

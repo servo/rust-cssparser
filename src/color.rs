@@ -79,7 +79,7 @@ impl Color {
 
 #[inline]
 pub fn parse_color_keyword(value: &str) -> Result<Color, ()> {
-    let lower_value = value.to_ascii_lower();
+    let lower_value = value.to_ascii_lowercase();
     let (r, g, b) = match lower_value.as_slice() {
         "black" => (0., 0., 0.),
         "silver" => (192., 192., 192.),
@@ -280,7 +280,7 @@ fn parse_color_hash(value: &str) -> Result<Color, ()> {
 #[inline]
 fn parse_color_function(name: &str, arguments: &[ComponentValue])
                         -> Result<Color, ()> {
-    let lower_name = name.to_ascii_lower();
+    let lower_name = name.to_ascii_lowercase();
     let lower_name = lower_name.as_slice();
 
     let (is_rgb, has_alpha) =
