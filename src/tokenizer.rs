@@ -108,12 +108,12 @@ impl<'a> Tokenizer<'a> {
         self.buffer = Some(token);
     }
 
-    // `tokenizer.current_char()` will not fail.
+    // `tokenizer.current_char()` will not panic.
     #[inline]
     fn is_eof(&self) -> bool { !self.has_at_least(0) }
 
     // The input has at least `n` bytes left *after* the current one.
-    // That is, `tokenizer.char_at(n)` will not fail.
+    // That is, `tokenizer.char_at(n)` will not panic.
     #[inline]
     fn has_at_least(&self, n: uint) -> bool { self.position + n < self.input.len() }
 
@@ -321,13 +321,12 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Resul
     tokenizer.advance(1);  // Skip the initial quote
     let mut string = String::new();
     while !tokenizer.is_eof() {
+        if matches!(tokenizer.current_char(), '\n' | '\r' | '\x0C') {
+            return Err(());
+        }
         match tokenizer.consume_char() {
             '"' if !single_quote => break,
             '\'' if single_quote => break,
-            '\n' | '\r' | '\x0C' => {
-                tokenizer.position -= 1;
-                return Err(());
-            },
             '\\' => {
                 if !tokenizer.is_eof() {
                     match tokenizer.current_char() {
