@@ -6,8 +6,11 @@ use std::ascii::AsciiExt;
 use std::fmt;
 use std::num::{Float, FloatMath};
 
+use text_writer::{mod, TextWriter};
+
 use ast::{ComponentValue, SkipWhitespaceIterable};
 use ast::ComponentValue::{Number, Percentage, Function, Ident, Hash, IDHash, Comma};
+use serializer::ToCss;
 
 
 #[deriving(Clone, Copy, PartialEq)]
@@ -20,14 +23,19 @@ pub struct RGBA {
     pub alpha: f32,
 }
 
-impl fmt::Show for RGBA {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl ToCss for RGBA {
+    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
         if self.alpha == 1f32 {
-            write!(f, "rgb({}, {}, {})", (self.red * 255.).round(), (self.green * 255.).round(),
+            write!(dest, "rgb({}, {}, {})",
+                   (self.red * 255.).round(),
+                   (self.green * 255.).round(),
                    (self.blue * 255.).round())
         } else {
-            write!(f, "rgba({}, {}, {}, {})", (self.red * 255.).round(), (self.green * 255.).round(),
-                   (self.blue * 255.).round(), self.alpha)
+            write!(dest, "rgba({}, {}, {}, {})",
+                   (self.red * 255.).round(),
+                   (self.green * 255.).round(),
+                   (self.blue * 255.).round(),
+                   self.alpha)
         }
     }
 }
@@ -38,13 +46,21 @@ pub enum Color {
     RGBA(RGBA),
 }
 
-impl fmt::Show for Color {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl ToCss for Color {
+    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
         match self {
-            &Color::CurrentColor => write!(f, "currentColor"),
-            &Color::RGBA(c) => write!(f, "{}", c),
+            &Color::CurrentColor => dest.write_str("currentColor"),
+            &Color::RGBA(rgba) => rgba.to_css(dest),
         }
     }
+}
+
+impl fmt::Show for RGBA {
+    #[inline] fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_to_css(f) }
+}
+
+impl fmt::Show for Color {
+    #[inline] fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_to_css(f) }
 }
 
 /// Return `Err(())` on invalid or unsupported value (not a color).

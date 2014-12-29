@@ -14,3 +14,4 @@ license = "MPL-2.0"
 
 [dependencies]
 encoding = "0.2"
+text_writer = "0.1.1"
