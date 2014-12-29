@@ -228,8 +228,7 @@ impl<'a> ToCss for [Token] {
             None => return Ok(()),
             Some(first) => { try!(first.to_css(dest)); first }
         };
-        // This does not borrow-check: for component_value in iter {
-        loop { match iter.next() { None => break, Some(component_value) => {
+        while let Some(component_value) = iter.next() {
             let (a, b) = (previous, component_value);
             if (
                 matches!(*a, Ident(..) | AtKeyword(..) | Hash(..) | IDHash(..) |
@@ -275,7 +274,7 @@ impl<'a> ToCss for [Token] {
                 try!(dest.write_char('\n'));
             }
             previous = component_value;
-        }}}
+        }
         Ok(())
     }
 }
