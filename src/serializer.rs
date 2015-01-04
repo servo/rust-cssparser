@@ -248,7 +248,7 @@ impl<'a> ToCss for [Node] {
 }
 
 fn component_values_to_css<'a, I, W>(mut iter: I, dest: &mut W) -> text_writer::Result
-where I: Iterator<&'a ComponentValue>, W: TextWriter {
+where I: Iterator<Item = &'a ComponentValue>, W: TextWriter {
     let mut previous = match iter.next() {
         None => return Ok(()),
         Some(first) => { try!(first.to_css(dest)); first }

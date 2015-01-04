@@ -142,7 +142,9 @@ pub struct SkipWhitespaceIterator<'a> {
     pub iter_with_whitespace: slice::Iter<'a, ComponentValue>,
 }
 
-impl<'a> Iterator<&'a ComponentValue> for SkipWhitespaceIterator<'a> {
+impl<'a> Iterator for SkipWhitespaceIterator<'a> {
+    type Item = &'a ComponentValue;
+
     fn next(&mut self) -> Option<&'a ComponentValue> {
         for component_value in self.iter_with_whitespace {
             if component_value != &ComponentValue::WhiteSpace { return Some(component_value) }
@@ -166,7 +168,9 @@ pub struct MoveSkipWhitespaceIterator {
     iter_with_whitespace: vec::IntoIter<ComponentValue>,
 }
 
-impl Iterator<ComponentValue> for MoveSkipWhitespaceIterator {
+impl Iterator for MoveSkipWhitespaceIterator {
+    type Item = ComponentValue;
+
     fn next(&mut self) -> Option<ComponentValue> {
         for component_value in self.iter_with_whitespace {
             if component_value != ComponentValue::WhiteSpace { return Some(component_value) }
