@@ -123,11 +123,11 @@ impl Tokenizer {
     }
 }
 
-macro_rules! is_match(
+macro_rules! is_match {
     ($value:expr, $($pattern:pat)|+) => (
         match $value { $($pattern)|+ => true, _ => false }
     );
-);
+}
 
 
 fn next_component_value(tokenizer: &mut Tokenizer) -> Option<Node> {
