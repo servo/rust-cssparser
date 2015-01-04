@@ -4,7 +4,7 @@
 
 use std::fmt;
 
-use text_writer::{mod, TextWriter};
+use text_writer::{self, TextWriter};
 
 use ast::*;
 use ast::ComponentValue::*;

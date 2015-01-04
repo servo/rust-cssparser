@@ -43,7 +43,7 @@ pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>
             Some(label_length)
             => if css.slice_from(10 + label_length).starts_with("\";".as_bytes()) {
                 let label = css.slice(10, 10 + label_length);
-                let label = String::from_chars(label.iter().map(|&b| b as char).collect::<Vec<char>>().as_slice());
+                let label = label.iter().map(|&b| b as char).collect::<String>();
                 match encoding_from_whatwg_label(label.as_slice()) {
                     None => (),
                     Some(fallback) => match fallback.name() {

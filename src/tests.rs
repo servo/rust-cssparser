@@ -5,7 +5,7 @@
 use std::io;
 use std::io::{File, Command, Writer, TempDir, IoResult};
 use std::num::Float;
-use serialize::json::{mod, Json, ToJson};
+use serialize::json::{self, Json, ToJson};
 use test;
 
 use encoding::label::encoding_from_whatwg_label;
@@ -32,8 +32,8 @@ fn print_json_diff(results: &Json, expected: &Json) -> IoResult<()> {
     use std::io::stdio::stdout;
 
     let temp = try!(TempDir::new("rust-cssparser-tests"));
-    let results = results.to_pretty_str() + "\n";
-    let expected = expected.to_pretty_str() + "\n";
+    let results = results.pretty().to_string() + "\n";
+    let expected = expected.pretty().to_string() + "\n";
     let mut result_path = temp.path().clone();
     result_path.push("results.json");
     let mut expected_path = temp.path().clone();
@@ -442,7 +442,7 @@ impl ToJson for ComponentValue {
             QuotedString(ref value) => JArray!(JString!("string"), value.to_json()),
             URL(ref value) => JArray!(JString!("url"), value.to_json()),
             Delim('\\') => JString!("\\"),
-            Delim(value) => Json::String(String::from_char(1, value)),
+            Delim(value) => Json::String(value.to_string()),
 
             Number(ref value) => Json::Array(
                 vec!(JString!("number")) + numeric(value).as_slice()),

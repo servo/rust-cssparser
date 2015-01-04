@@ -7,7 +7,7 @@ use std::slice;
 use std::vec;
 
 
-#[deriving(PartialEq, Show)]
+#[derive(PartialEq, Show)]
 pub struct NumericValue {
     pub representation: String,
     pub value: f64,
@@ -15,7 +15,7 @@ pub struct NumericValue {
 }
 
 
-#[deriving(PartialEq, Show, Copy)]
+#[derive(PartialEq, Show, Copy)]
 pub struct SourceLocation {
     pub line: uint,  // First line is 1
     pub column: uint,  // First character of a line is at column 1
@@ -25,7 +25,7 @@ pub struct SourceLocation {
 pub type Node = (ComponentValue, SourceLocation);  // TODO this is not a good name
 
 
-#[deriving(PartialEq, Show)]
+#[derive(PartialEq, Show)]
 pub enum ComponentValue {
     // Preserved tokens.
     Ident(String),
@@ -69,7 +69,7 @@ pub enum ComponentValue {
 }
 
 
-#[deriving(PartialEq)]
+#[derive(PartialEq)]
 pub struct Declaration {
     pub location: SourceLocation,
     pub name: String,
@@ -77,14 +77,14 @@ pub struct Declaration {
     pub important: bool,
 }
 
-#[deriving(PartialEq)]
+#[derive(PartialEq)]
 pub struct QualifiedRule {
     pub location: SourceLocation,
     pub prelude: Vec<ComponentValue>,
     pub block: Vec<Node>,
 }
 
-#[deriving(PartialEq)]
+#[derive(PartialEq)]
 pub struct AtRule {
     pub location: SourceLocation,
     pub name: String,
@@ -92,25 +92,25 @@ pub struct AtRule {
     pub block: Option<Vec<Node>>,
 }
 
-#[deriving(PartialEq)]
+#[derive(PartialEq)]
 pub enum DeclarationListItem {
     Declaration(Declaration),
     AtRule(AtRule),
 }
 
-#[deriving(PartialEq)]
+#[derive(PartialEq)]
 pub enum Rule {
     QualifiedRule(QualifiedRule),
     AtRule(AtRule),
 }
 
-#[deriving(PartialEq, Copy)]
+#[derive(PartialEq, Copy)]
 pub struct SyntaxError {
     pub location: SourceLocation,
     pub reason: ErrorReason,
 }
 
-#[deriving(PartialEq, Show, Copy)]
+#[derive(PartialEq, Show, Copy)]
 pub enum ErrorReason {
     EmptyInput,  // Parsing a single "thing", found only whitespace.
     ExtraInput,  // Found more non-whitespace after parsing a single "thing".
@@ -137,7 +137,7 @@ impl<'a> SkipWhitespaceIterable<'a> for &'a [ComponentValue] {
     }
 }
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct SkipWhitespaceIterator<'a> {
     pub iter_with_whitespace: slice::Iter<'a, ComponentValue>,
 }

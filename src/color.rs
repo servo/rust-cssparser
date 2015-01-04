@@ -6,14 +6,14 @@ use std::ascii::AsciiExt;
 use std::fmt;
 use std::num::{Float, FloatMath};
 
-use text_writer::{mod, TextWriter};
+use text_writer::{self, TextWriter};
 
 use ast::{ComponentValue, SkipWhitespaceIterable};
 use ast::ComponentValue::{Number, Percentage, Function, Ident, Hash, IDHash, Comma};
 use serializer::ToCss;
 
 
-#[deriving(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct RGBA {
     // All in 0...1
     // Use f32 to try and match rust-azure’s AzFloat
@@ -40,7 +40,7 @@ impl ToCss for RGBA {
     }
 }
 
-#[deriving(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Color {
     CurrentColor,
     RGBA(RGBA),

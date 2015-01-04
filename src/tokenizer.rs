@@ -622,7 +622,7 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
     let c = tokenizer.consume_char();
     match c {
         '0'...'9' | 'A'...'F' | 'a'...'f' => {
-            let mut hex = String::from_char(1, c);
+            let mut hex = c.to_string();
             while hex.len() < 6 && !tokenizer.is_eof() {
                 let c = tokenizer.current_char();
                 match c {
