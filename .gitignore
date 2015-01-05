@@ -1,13 +1,3 @@
-*.o
-*.a
-*.so
-*.rlib
-*.dylib
-*.dSYM
-*.dll
-*.dummy
-*-test
-Makefile
 /target
 /Cargo.lock
 /.cargo/config

@@ -18,9 +18,9 @@ use super::{Tokenizer, Parser, Token, NumericValue,
             Color, RGBA, parse_nth, ToCss};
 
 
-macro_rules! JList {
-    ($($e: expr,)*) => { JList![ $( $e ),* ] };
-    ($($e: expr),*) => { json::List(vec![ $( $e.to_json() ),* ]) };
+macro_rules! JArray {
+    ($($e: expr,)*) => { JArray![ $( $e ),* ] };
+    ($($e: expr),*) => { Json::Array(vec!( $( $e.to_json() ),* )) }
 }
 
 
@@ -29,7 +29,7 @@ fn write_whole_file(path: &Path, data: &str) -> IoResult<()> {
 }
 
 
-fn print_json_diff(results: &json::Json, expected: &json::Json) -> IoResult<()> {
+fn print_json_diff(results: &Json, expected: &Json) -> IoResult<()> {
     use std::io::stdio::stdout;
 
     let temp = try!(TempDir::new("rust-cssparser-tests"));
@@ -51,30 +51,30 @@ fn print_json_diff(results: &json::Json, expected: &json::Json) -> IoResult<()> 
 }
 
 
-fn almost_equals(a: &json::Json, b: &json::Json) -> bool {
+fn almost_equals(a: &Json, b: &Json) -> bool {
     match (a, b) {
-        (&json::I64(a), _) => almost_equals(&json::F64(a as f64), b),
-        (&json::U64(a), _) => almost_equals(&json::F64(a as f64), b),
-        (_, &json::I64(b)) => almost_equals(a, &json::F64(b as f64)),
-        (_, &json::U64(b)) => almost_equals(a, &json::F64(b as f64)),
+        (&Json::I64(a), _) => almost_equals(&Json::F64(a as f64), b),
+        (&Json::U64(a), _) => almost_equals(&Json::F64(a as f64), b),
+        (_, &Json::I64(b)) => almost_equals(a, &Json::F64(b as f64)),
+        (_, &Json::U64(b)) => almost_equals(a, &Json::F64(b as f64)),
 
-        (&json::F64(a), &json::F64(b)) => (a - b).abs() < 1e-6,
+        (&Json::F64(a), &Json::F64(b)) => (a - b).abs() < 1e-6,
 
-        (&json::Boolean(a), &json::Boolean(b)) => a == b,
-        (&json::String(ref a), &json::String(ref b)) => a == b,
-        (&json::List(ref a), &json::List(ref b)) => {
+        (&Json::Boolean(a), &Json::Boolean(b)) => a == b,
+        (&Json::String(ref a), &Json::String(ref b)) => a == b,
+        (&Json::Array(ref a), &Json::Array(ref b)) => {
             a.len() == b.len() &&
             a.iter().zip(b.iter()).all(|(ref a, ref b)| almost_equals(*a, *b))
         },
-        (&json::Object(_), &json::Object(_)) => panic!("Not implemented"),
-        (&json::Null, &json::Null) => true,
+        (&Json::Object(_), &Json::Object(_)) => panic!("Not implemented"),
+        (&Json::Null, &Json::Null) => true,
         _ => false,
     }
 }
 
 fn normalize(json: &mut Json) {
     match *json {
-        Json::List(ref mut list) => {
+        Json::Array(ref mut list) => {
             match find_url(list.as_mut_slice()) {
                 Some(Ok(url)) => *list = vec!["url".to_json(), Json::String(url)],
                 Some(Err(())) => *list = vec!["error".to_json(), "bad-url".to_json()],
@@ -110,7 +110,7 @@ fn find_url(list: &mut [Json]) -> Option<Result<String, ()>> {
         args.as_mut_slice()
     };
 
-    if let [Json::List(ref mut arg1), ref rest..] = args.as_mut_slice() {
+    if let [Json::Array(ref mut arg1), ref rest..] = args.as_mut_slice() {
         if let [Json::String(ref a11), Json::String(ref mut a12)] = arg1.as_mut_slice() {
             if a11.as_slice() == "string" && rest.iter().all(|a| a == &" ".to_json()) {
                 return Some(Ok(mem::replace(a12, String::new())))
@@ -131,9 +131,9 @@ fn assert_json_eq(results: json::Json, mut expected: json::Json, message: String
 }
 
 
-fn run_raw_json_tests(json_data: &str, run: |json::Json, json::Json|) {
+fn run_raw_json_tests(json_data: &str, run: |Json, Json|) {
     let items = match json::from_str(json_data) {
-        Ok(json::List(items)) => items,
+        Ok(Json::Array(items)) => items,
         _ => panic!("Invalid JSON")
     };
     assert!(items.len() % 2 == 0);
@@ -153,7 +153,7 @@ fn run_raw_json_tests(json_data: &str, run: |json::Json, json::Json|) {
 fn run_json_tests(json_data: &str, parse: |input: &mut Parser| -> Json) {
     run_raw_json_tests(json_data, |input, expected| {
         match input {
-            json::String(input) => {
+            Json::String(input) => {
                 // FIXME: Use Parser::parse_str when unboxed closures permit.
                 let result = parse(&mut Parser::new(&mut Tokenizer::new(input.as_slice())));
                 assert_json_eq(result, expected, input);
@@ -167,7 +167,7 @@ fn run_json_tests(json_data: &str, parse: |input: &mut Parser| -> Json) {
 #[test]
 fn component_value_list() {
     run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
-        Json::List(component_values_to_json(input))
+        Json::Array(component_values_to_json(input))
     });
 }
 
@@ -177,7 +177,7 @@ fn one_component_value() {
     run_json_tests(include_str!("css-parsing-tests/one_component_value.json"), |input| {
         input.parse_entirely(|input| {
             Ok(one_component_value_to_json(try!(input.next()), input))
-        }).unwrap_or(JList!["error", "invalid"])
+        }).unwrap_or(JArray!["error", "invalid"])
     });
 }
 
@@ -185,8 +185,8 @@ fn one_component_value() {
 #[test]
 fn declaration_list() {
     run_json_tests(include_str!("css-parsing-tests/declaration_list.json"), |input| {
-        Json::List(DeclarationListParser::new(input, JsonParser).map(|result| {
-            result.unwrap_or(JList!["error", "invalid"])
+        Json::Array(DeclarationListParser::new(input, JsonParser).map(|result| {
+            result.unwrap_or(JArray!["error", "invalid"])
         }).collect())
     });
 }
@@ -195,7 +195,7 @@ fn declaration_list() {
 #[test]
 fn one_declaration() {
     run_json_tests(include_str!("css-parsing-tests/one_declaration.json"), |input| {
-        parse_one_declaration(input, &mut JsonParser).unwrap_or(JList!["error", "invalid"])
+        parse_one_declaration(input, &mut JsonParser).unwrap_or(JArray!["error", "invalid"])
     });
 }
 
@@ -203,8 +203,8 @@ fn one_declaration() {
 #[test]
 fn rule_list() {
     run_json_tests(include_str!("css-parsing-tests/rule_list.json"), |input| {
-        Json::List(RuleListParser::new_for_nested_rule(input, JsonParser).map(|result| {
-            result.unwrap_or(JList!["error", "invalid"])
+        Json::Array(RuleListParser::new_for_nested_rule(input, JsonParser).map(|result| {
+            result.unwrap_or(JArray!["error", "invalid"])
         }).collect())
     });
 }
@@ -213,8 +213,8 @@ fn rule_list() {
 #[test]
 fn stylesheet() {
     run_json_tests(include_str!("css-parsing-tests/stylesheet.json"), |input| {
-        Json::List(RuleListParser::new_for_stylesheet(input, JsonParser).map(|result| {
-            result.unwrap_or(JList!["error", "invalid"])
+        Json::Array(RuleListParser::new_for_stylesheet(input, JsonParser).map(|result| {
+            result.unwrap_or(JArray!["error", "invalid"])
         }).collect())
     });
 }
@@ -223,7 +223,7 @@ fn stylesheet() {
 #[test]
 fn one_rule() {
     run_json_tests(include_str!("css-parsing-tests/one_rule.json"), |input| {
-        parse_one_rule(input, &mut JsonParser).unwrap_or(JList!["error", "invalid"])
+        parse_one_rule(input, &mut JsonParser).unwrap_or(JArray!["error", "invalid"])
     });
 }
 
@@ -233,37 +233,37 @@ fn stylesheet_from_bytes() {
     run_raw_json_tests(include_str!("css-parsing-tests/stylesheet_bytes.json"),
                        |input, expected| {
         let map = match input {
-            json::Object(map) => map,
+            Json::Object(map) => map,
             _ => panic!("Unexpected JSON")
         };
 
         let result = {
-            let css = get_string(&map, &"css_bytes".to_string()).unwrap().chars().map(|c| {
+            let css = get_string(&map, "css_bytes").unwrap().chars().map(|c| {
                 assert!(c as u32 <= 0xFF);
                 c as u8
             }).collect::<Vec<u8>>();
-            let protocol_encoding_label = get_string(&map, &"protocol_encoding".to_string());
-            let environment_encoding = get_string(&map, &"environment_encoding".to_string())
+            let protocol_encoding_label = get_string(&map, "protocol_encoding");
+            let environment_encoding = get_string(&map, "environment_encoding")
                 .and_then(encoding_from_whatwg_label);
 
             parse_stylesheet_rules_from_bytes(
                 css.as_slice(), protocol_encoding_label, environment_encoding,
                 JsonParser, |encoding, rules| {
-                    Json::List(vec![
-                        Json::List(rules.map(|result| {
-                            result.unwrap_or(JList!["error", "invalid"])
+                    Json::Array(vec![
+                        Json::Array(rules.map(|result| {
+                            result.unwrap_or(JArray!["error", "invalid"])
                         }).collect()),
                         encoding.name().to_json()
                     ])
                 })
         };
-        assert_json_eq(result, expected, json::Object(map).to_string());
+        assert_json_eq(result, expected, Json::Object(map).to_string());
     });
 
-    fn get_string<'a>(map: &'a json::JsonObject, key: &String) -> Option<&'a str> {
+    fn get_string<'a>(map: &'a json::Object, key: &str) -> Option<&'a str> {
         match map.get(key) {
-            Some(&json::String(ref s)) => Some(s.as_slice()),
-            Some(&json::Null) => None,
+            Some(&Json::String(ref s)) => Some(s.as_slice()),
+            Some(&Json::Null) => None,
             None => None,
             _ => panic!("Unexpected JSON"),
         }
@@ -271,7 +271,7 @@ fn stylesheet_from_bytes() {
 }
 
 
-fn run_color_tests(json_data: &str, to_json: |result: Result<Color, ()>| -> json::Json) {
+fn run_color_tests(json_data: &str, to_json: |result: Result<Color, ()>| -> Json) {
     run_json_tests(json_data, |input| {
         to_json(input.parse_entirely(Color::parse))
     });
@@ -298,7 +298,7 @@ fn color3_keywords() {
             Ok(Color::RGBA(RGBA { red: r, green: g, blue: b, alpha: a }))
             => [r * 255., g * 255., b * 255., a].to_json(),
             Ok(Color::CurrentColor) => "currentColor".to_json(),
-            Err(()) => json::Null,
+            Err(()) => Json::Null,
         }
     });
 }
@@ -357,7 +357,7 @@ fn serializer() {
         let mut tokens = vec![];
         flatten(input, &mut tokens);
         let serialized = tokens.to_css_string();
-        Json::List(Parser::parse_str(serialized.as_slice(), component_values_to_json))
+        Json::Array(Parser::parse_str(serialized.as_slice(), component_values_to_json))
     });
 }
 
@@ -428,7 +428,7 @@ impl DeclarationParser<Json> for JsonParser {
             }
             value.push(one_component_value_to_json(token, input));
         }
-        Ok(JList![
+        Ok(JArray![
             "declaration",
             name,
             value,
@@ -443,18 +443,18 @@ impl AtRuleParser<Vec<Json>, Json> for JsonParser {
         Ok(AtRulePrelude::OptionalBlock(vec![
             "at-rule".to_json(),
             name.to_json(),
-            Json::List(component_values_to_json(input)),
+            Json::Array(component_values_to_json(input)),
         ]))
     }
 
     fn parse_block(&mut self, mut prelude: Vec<Json>, input: &mut Parser) -> Result<Json, ()> {
-        prelude.push(Json::List(component_values_to_json(input)));
-        Ok(Json::List(prelude))
+        prelude.push(Json::Array(component_values_to_json(input)));
+        Ok(Json::Array(prelude))
     }
 
     fn rule_without_block(&mut self, mut prelude: Vec<Json>) -> Result<Json, ()> {
         prelude.push(Json::Null);
-        Ok(Json::List(prelude))
+        Ok(Json::Array(prelude))
     }
 }
 
@@ -464,7 +464,7 @@ impl QualifiedRuleParser<Vec<Json>, Json> for JsonParser {
     }
 
     fn parse_block(&mut self, prelude: Vec<Json>, input: &mut Parser) -> Result<Json, ()> {
-        Ok(JList![
+        Ok(JArray![
             "qualified rule",
             prelude,
             component_values_to_json(input),
@@ -491,22 +491,22 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
     }
 
     match token {
-        Token::Ident(value) => JList!["ident", value],
-        Token::AtKeyword(value) => JList!["at-keyword", value],
-        Token::Hash(value) => JList!["hash", value, "unrestricted"],
-        Token::IDHash(value) => JList!["hash", value, "id"],
-        Token::QuotedString(value) => JList!["string", value],
-        Token::Url(value) => JList!["url", value],
+        Token::Ident(value) => JArray!["ident", value],
+        Token::AtKeyword(value) => JArray!["at-keyword", value],
+        Token::Hash(value) => JArray!["hash", value, "unrestricted"],
+        Token::IDHash(value) => JArray!["hash", value, "id"],
+        Token::QuotedString(value) => JArray!["string", value],
+        Token::Url(value) => JArray!["url", value],
         Token::Delim('\\') => "\\".to_json(),
         Token::Delim(value) => String::from_char(1, value).to_json(),
 
-        Token::Number(value) => json::List(vec!["number".to_json()] + numeric(value)),
-        Token::Percentage(value) => json::List(
+        Token::Number(value) => Json::Array(vec!["number".to_json()] + numeric(value)),
+        Token::Percentage(value) => Json::Array(
             vec!["percentage".to_json()] + numeric(value)),
-        Token::Dimension(value, unit) => json::List(
+        Token::Dimension(value, unit) => Json::Array(
             vec!["dimension".to_json()] + numeric(value) + [unit.to_json()].as_slice()),
 
-        Token::UnicodeRange(start, end) => JList!["unicode-range", start, end],
+        Token::UnicodeRange(start, end) => JArray!["unicode-range", start, end],
 
         Token::WhiteSpace => " ".to_json(),
         Token::Colon => ":".to_json(),
@@ -522,25 +522,25 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::CDC => "-->".to_json(),
 
         Token::Function(name) => {
-            json::List(vec!["function".to_json(), name.to_json()] +
+            Json::Array(vec!["function".to_json(), name.to_json()] +
                        component_values_to_json(&mut input.parse_nested_block()))
         }
         Token::ParenthesisBlock => {
-            json::List(vec!["()".to_json()] +
+            Json::Array(vec!["()".to_json()] +
                        component_values_to_json(&mut input.parse_nested_block()))
         }
         Token::SquareBracketBlock => {
-            json::List(vec!["[]".to_json()] +
+            Json::Array(vec!["[]".to_json()] +
                        component_values_to_json(&mut input.parse_nested_block()))
         }
         Token::CurlyBracketBlock => {
-            json::List(vec!["{}".to_json()] +
+            Json::Array(vec!["{}".to_json()] +
                        component_values_to_json(&mut input.parse_nested_block()))
         }
-        Token::BadUrl => JList!["error", "bad-url"],
-        Token::BadString => JList!["error", "bad-string"],
-        Token::CloseParenthesis => JList!["error", ")"],
-        Token::CloseSquareBracket => JList!["error", "]"],
-        Token::CloseCurlyBracket => JList!["error", "}"],
+        Token::BadUrl => JArray!["error", "bad-url"],
+        Token::BadString => JArray!["error", "bad-string"],
+        Token::CloseParenthesis => JArray!["error", ")"],
+        Token::CloseSquareBracket => JArray!["error", "]"],
+        Token::CloseCurlyBracket => JArray!["error", "}"],
     }
 }

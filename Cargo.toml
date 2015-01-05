@@ -1,14 +1,18 @@
 [package]
 
 name = "cssparser"
-version = "0.1.0"
+version = "0.1.1"
 authors = [ "Simon Sapin <simon.sapin@exyr.org>" ]
 
-[dependencies]
+description = "Rust implementation of CSS Syntax Level 3"
+documentation = "http://servo.github.io/rust-cssparser/cssparser/index.html"
+repository = "https://github.com/servo/rust-cssparser"
+readme = "README.md"
+keywords = ["css", "syntax", "parser"]
+license = "MPL-2.0"
 
+
+[dependencies]
+encoding = "0.2"
 text_writer = "0.1.1"
 matches = "0.1"
-
-[dependencies.encoding]
-
-git = "https://github.com/lifthrasiir/rust-encoding"

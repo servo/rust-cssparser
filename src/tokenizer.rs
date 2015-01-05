@@ -554,13 +554,16 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> Token {
         question_marks += 1;
         tokenizer.advance(1)
     }
+    let first: u32 = if hex.len() > 0 {
+        num::from_str_radix(hex.as_slice(), 16).unwrap()
+    } else { 0 };
     let start;
     let end;
     if question_marks > 0 {
-        start = num::from_str_radix((hex + "0".repeat(question_marks)).as_slice(), 16).unwrap();
-        end = num::from_str_radix((hex + "F".repeat(question_marks)).as_slice(), 16).unwrap();
+        start = first << (question_marks * 4);
+        end = ((first + 1) << (question_marks * 4)) - 1;
     } else {
-        start = num::from_str_radix(hex.as_slice(), 16).unwrap();
+        start = first;
         hex.truncate(0);
         if !tokenizer.is_eof() && tokenizer.current_char() == '-' {
             tokenizer.advance(1);
@@ -583,7 +586,7 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> Token {
 // and that the next input character has already been verified
 // to not be a newline.
 fn consume_escape(tokenizer: &mut Tokenizer) -> char {
-    if tokenizer.is_eof() { return '\uFFFD' }  // Escaped EOF
+    if tokenizer.is_eof() { return '\u{FFFD}' }  // Escaped EOF
     let c = tokenizer.consume_char();
     match c {
         '0'...'9' | 'A'...'F' | 'a'...'f' => {
@@ -608,7 +611,7 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
                     _ => ()
                 }
             }
-            static REPLACEMENT_CHAR: char = '\uFFFD';
+            static REPLACEMENT_CHAR: char = '\u{FFFD}';
             let c: u32 = num::from_str_radix(hex.as_slice(), 16).unwrap();
             if c != 0 {
                 let c = char::from_u32(c);

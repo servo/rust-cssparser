@@ -11,7 +11,7 @@ use text_writer::{mod, TextWriter};
 use super::{Token, Parser, ToCss};
 
 
-#[deriving(Clone, PartialEq)]
+#[deriving(Clone, Copy, PartialEq)]
 pub struct RGBA {
     // All in 0...1
     // Use f32 to try and match rust-azure’s AzFloat
@@ -38,8 +38,7 @@ impl ToCss for RGBA {
     }
 }
 
-
-#[deriving(Clone, PartialEq)]
+#[deriving(Clone, Copy, PartialEq)]
 pub enum Color {
     CurrentColor,
     RGBA(RGBA),
@@ -255,7 +254,7 @@ fn parse_color_hash(value: &str) -> Result<Color, ()> {
                 _ => return Err(())  // Not a valid color
             }
         }};
-    )
+    );
     macro_rules! to_rgba(
         ($r: expr, $g: expr, $b: expr,) => {
             Ok(Color::RGBA(RGBA { red: $r as f32 / 255.,
@@ -263,7 +262,7 @@ fn parse_color_hash(value: &str) -> Result<Color, ()> {
                                   blue: $b as f32 / 255.,
                                   alpha: 1. }))
         };
-    )
+    );
 
     match value.len() {
         6 => to_rgba!(
