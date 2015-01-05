@@ -5,6 +5,7 @@
 // http://dev.w3.org/csswg/css-syntax/#parsing
 
 use std::ascii::AsciiExt;
+use std::str::CowString;
 use super::{Token, Parser, Delimiter};
 
 
@@ -204,7 +205,7 @@ pub fn parse_one_rule<QP, AP, R, P>(input: &mut Parser, parser: &mut P)
 }
 
 
-fn parse_declaration<D, P>(name: String, input: &mut Parser, parser: &mut P)
+fn parse_declaration<D, P>(name: CowString, input: &mut Parser, parser: &mut P)
                            -> Result<D, ()>
                            where P: DeclarationParser<D> {
     let result = input.parse_until_before(Delimiter::Semicolon).parse_entirely(|input| {
@@ -218,7 +219,7 @@ fn parse_declaration<D, P>(name: String, input: &mut Parser, parser: &mut P)
 }
 
 
-fn parse_at_rule<R, AP, P>(name: String, input: &mut Parser, parser: &mut P)
+fn parse_at_rule<R, AP, P>(name: CowString, input: &mut Parser, parser: &mut P)
                            -> Result<R, ()>
                            where P: AtRuleParser<AP, R> {
     let delimiters = Delimiter::Semicolon | Delimiter::CurlyBracketBlock;

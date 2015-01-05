@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use std::borrow::Cow::Borrowed;
 use std::io::{mod, File, Command, Writer, TempDir, IoResult};
 use std::num::Float;
 use std::mem;
@@ -339,7 +340,7 @@ fn nth() {
 #[test]
 fn serializer() {
     run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
-        fn flatten(input: &mut Parser, tokens: &mut Vec<Token>) {
+        fn flatten<'i, 't>(input: &mut Parser<'i, 't>, tokens: &mut Vec<Token<'i>>) {
             while let Ok(token) = input.next_including_whitespace() {
                 let closing_token = match token {
                     Token::Function(_) | Token::ParenthesisBlock => Some(Token::CloseParenthesis),
@@ -416,7 +417,7 @@ impl DeclarationParser<Json> for JsonParser {
                         // This can never happen per spec
                         // (even CSS Variables forbid top-level `!`)
                         value.push("!".to_json());
-                        token = Token::Ident("important".into_string());
+                        token = Token::Ident(Borrowed("important"));
                     }
                     // More hacks
                     Ok(Priority::Normal) => {

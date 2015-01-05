@@ -58,7 +58,7 @@ where W: TextWriter {
 }
 
 
-impl ToCss for Token {
+impl<'a> ToCss for Token<'a> {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
         match *self {
             Token::Ident(ref value) => try!(serialize_identifier(value.as_slice(), dest)),
@@ -235,7 +235,7 @@ impl<'a, W> TextWriter for CssStringWriter<'a, W> where W: TextWriter {
 }
 
 
-impl<'a> ToCss for [Token] {
+impl<'a> ToCss for [Token<'a>] {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
         use Token::*;
 

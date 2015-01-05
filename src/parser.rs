@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use std::str::CowString;
 use super::{Token, NumericValue, Tokenizer};
 
 
@@ -193,7 +194,7 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
-    pub fn peek(&mut self) -> Result<&Token, ()> {
+    pub fn peek(&mut self) -> Result<&Token<'i>, ()> {
         // Consume whatever needs to be consumed (e.g. open blocks).
         let token = try!(self.next());
         self.push_back(token);
@@ -202,7 +203,7 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
-    pub fn push_back(&mut self, token: Token) {
+    pub fn push_back(&mut self, token: Token<'i>) {
         if BlockType::opening(&token) == self.state.at_start_of {
             self.state.at_start_of = None;
         }
@@ -212,14 +213,14 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
-    pub fn push_back_result(&mut self, token_result: Result<Token, ()>) {
+    pub fn push_back_result(&mut self, token_result: Result<Token<'i>, ()>) {
         if let Ok(token) = token_result {
             self.push_back(token)
         }
     }
 
     #[inline]
-    pub fn unexpected<T>(&mut self, token: Token) -> Result<T, ()> {
+    pub fn unexpected<T>(&mut self, token: Token<'i>) -> Result<T, ()> {
         self.push_back(token);
         Err(())
     }
@@ -229,7 +230,7 @@ impl<'i, 't> Parser<'i, 't> {
         &mut **self.tokenizer.as_mut().unwrap()
     }
 
-    pub fn next(&mut self) -> Result<Token, ()> {
+    pub fn next(&mut self) -> Result<Token<'i>, ()> {
         loop {
             match self.next_including_whitespace() {
                 Ok(Token::WhiteSpace) => {},
@@ -238,7 +239,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
-    pub fn next_including_whitespace(&mut self) -> Result<Token, ()> {
+    pub fn next_including_whitespace(&mut self) -> Result<Token<'i>, ()> {
         if self.tokenizer.is_none() {
             return Err(())
         }
@@ -362,7 +363,7 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
-    pub fn expect_ident(&mut self) -> Result<String, ()> {
+    pub fn expect_ident(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
             Token::Ident(value) => Ok(value),
             token => self.unexpected(token)
@@ -370,7 +371,7 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
-    pub fn expect_quoted_string(&mut self) -> Result<String, ()> {
+    pub fn expect_quoted_string(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
             Token::QuotedString(value) => Ok(value),
             token => self.unexpected(token)
@@ -378,7 +379,7 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
-    pub fn expect_url(&mut self) -> Result<String, ()> {
+    pub fn expect_url(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
             Token::Url(value) => Ok(value),
             token => self.unexpected(token)

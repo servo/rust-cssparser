@@ -6,23 +6,25 @@
 
 use std::{char, num};
 use std::ascii::AsciiExt;
+use std::str::CowString;
+use std::borrow::Cow::{Owned, Borrowed};
 
 use self::Token::*;
 
 
 #[deriving(PartialEq, Show)]
-pub enum Token {
+pub enum Token<'a> {
     // Preserved tokens.
-    Ident(String),
-    AtKeyword(String),
-    Hash(String),
-    IDHash(String),  // Hash that is a valid ID selector.
-    QuotedString(String),
-    Url(String),
+    Ident(CowString<'a>),
+    AtKeyword(CowString<'a>),
+    Hash(CowString<'a>),
+    IDHash(CowString<'a>),  // Hash that is a valid ID selector.
+    QuotedString(CowString<'a>),
+    Url(CowString<'a>),
     Delim(char),
     Number(NumericValue),
     Percentage(NumericValue),
-    Dimension(NumericValue, String),
+    Dimension(NumericValue, CowString<'a>),
     UnicodeRange(u32, u32),  // (start, end) of range
     WhiteSpace,
     Colon,  // :
@@ -38,7 +40,7 @@ pub enum Token {
     CDC,  // -->
 
     // Function
-    Function(String),  // name
+    Function(CowString<'a>),  // name
 
     // Simple block
     ParenthesisBlock,  // (…)
@@ -68,7 +70,7 @@ pub struct Tokenizer<'a> {
     position: uint,  // All counted in bytes, not characters
 
     /// For `peek` and `push_back`
-    buffer: Option<Token>,
+    buffer: Option<Token<'a>>,
 }
 
 
@@ -83,7 +85,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn next(&mut self) -> Result<Token, ()> {
+    pub fn next(&mut self) -> Result<Token<'a>, ()> {
         if let Some(token) = self.buffer.take() {
             Ok(token)
         } else {
@@ -92,7 +94,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn peek(&mut self) -> Result<&Token, ()> {
+    pub fn peek(&mut self) -> Result<&Token<'a>, ()> {
         match self.buffer {
             Some(ref token) => Ok(token),
             None => {
@@ -103,7 +105,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn push_back(&mut self, token: Token) {
+    pub fn push_back(&mut self, token: Token<'a>) {
         assert!(self.buffer.is_none(),
                 "Parser::push_back can only be called after Parser::next");
         self.buffer = Some(token);
@@ -155,7 +157,7 @@ impl<'a> Tokenizer<'a> {
 }
 
 
-fn next_token(tokenizer: &mut Tokenizer) -> Option<Token> {
+fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
     consume_comments(tokenizer);
     if tokenizer.is_eof() {
         return None
@@ -314,7 +316,7 @@ fn consume_comments(tokenizer: &mut Tokenizer) {
 }
 
 
-fn consume_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Token {
+fn consume_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool) -> Token<'a> {
     match consume_quoted_string(tokenizer, single_quote) {
         Ok(value) => QuotedString(value),
         Err(()) => BadString
@@ -323,7 +325,8 @@ fn consume_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Token {
 
 
 /// Return `Err(())` on syntax error (ie. unescaped newline)
-fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Result<String, ()> {
+fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
+                             -> Result<CowString<'a>, ()> {
     tokenizer.advance(1);  // Skip the initial quote
     let mut string = String::new();
     while !tokenizer.is_eof() {
@@ -353,7 +356,7 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Resul
             c => string.push(c),
         }
     }
-    Ok(string)
+    Ok(Owned(string))
 }
 
 
@@ -372,7 +375,7 @@ fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
 }
 
 
-fn consume_ident_like(tokenizer: &mut Tokenizer) -> Token {
+fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     let value = consume_name(tokenizer);
     if !tokenizer.is_eof() && tokenizer.current_char() == '(' {
         tokenizer.advance(1);
@@ -383,7 +386,7 @@ fn consume_ident_like(tokenizer: &mut Tokenizer) -> Token {
     }
 }
 
-fn consume_name(tokenizer: &mut Tokenizer) -> String {
+fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowString<'a> {
     let mut value = String::new();
     while !tokenizer.is_eof() {
         let c = tokenizer.current_char();
@@ -399,7 +402,7 @@ fn consume_name(tokenizer: &mut Tokenizer) -> String {
                  else { break }
         })
     }
-    value
+    Owned(value)
 }
 
 
@@ -413,7 +416,7 @@ fn consume_digits(tokenizer: &mut Tokenizer) {
 }
 
 
-fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
+fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     // Parse [+-]?\d*(\.\d+)?([eE][+-]?\d+)?
     // But this is always called so that there is at least one digit in \d*(\.\d+)?
     let start_pos = tokenizer.position;
@@ -470,7 +473,7 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
 }
 
 
-fn consume_url(tokenizer: &mut Tokenizer) -> Token {
+fn consume_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     while !tokenizer.is_eof() {
         match tokenizer.current_char() {
             ' ' | '\t' | '\n' | '\r' | '\x0C' => tokenizer.advance(1),
@@ -480,20 +483,22 @@ fn consume_url(tokenizer: &mut Tokenizer) -> Token {
             _ => return consume_unquoted_url(tokenizer),
         }
     }
-    return Url(String::new());
+    return Url(Borrowed(""));
 
-    fn consume_quoted_url(tokenizer: &mut Tokenizer, single_quote: bool) -> Token {
+    fn consume_quoted_url<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool) -> Token<'a> {
         match consume_quoted_string(tokenizer, single_quote) {
             Ok(value) => consume_url_end(tokenizer, value),
             Err(()) => consume_bad_url(tokenizer),
         }
     }
 
-    fn consume_unquoted_url(tokenizer: &mut Tokenizer) -> Token {
+    fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         let mut string = String::new();
         while !tokenizer.is_eof() {
             let next_char = match tokenizer.consume_char() {
-                ' ' | '\t' | '\n' | '\r' | '\x0C' => return consume_url_end(tokenizer, string),
+                ' ' | '\t' | '\n' | '\r' | '\x0C' => {
+                    return consume_url_end(tokenizer, Owned(string))
+                }
                 ')' => break,
                 '\x01'...'\x08' | '\x0B' | '\x0E'...'\x1F' | '\x7F'  // non-printable
                     | '"' | '\'' | '(' => return consume_bad_url(tokenizer),
@@ -508,10 +513,10 @@ fn consume_url(tokenizer: &mut Tokenizer) -> Token {
             };
             string.push(next_char)
         }
-        Url(string)
+        Url(Owned(string))
     }
 
-    fn consume_url_end(tokenizer: &mut Tokenizer, string: String) -> Token {
+    fn consume_url_end<'a>(tokenizer: &mut Tokenizer<'a>, string: CowString<'a>) -> Token<'a> {
         while !tokenizer.is_eof() {
             match tokenizer.consume_char() {
                 ' ' | '\t' | '\n' | '\r' | '\x0C' => (),
@@ -522,7 +527,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> Token {
         Url(string)
     }
 
-    fn consume_bad_url(tokenizer: &mut Tokenizer) -> Token {
+    fn consume_bad_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         // Consume up to the closing )
         while !tokenizer.is_eof() {
             match tokenizer.consume_char() {
@@ -537,7 +542,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> Token {
 
 
 
-fn consume_unicode_range(tokenizer: &mut Tokenizer) -> Token {
+fn consume_unicode_range<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     tokenizer.advance(2);  // Skip U+
     let mut hex = String::new();
     while hex.len() < 6 && !tokenizer.is_eof()
