@@ -15,7 +15,7 @@ use super::{Tokenizer, Parser, Token, NumericValue,
             AtRulePrelude, AtRuleParser, QualifiedRuleParser, Priority,
             parse_one_declaration, parse_one_rule, parse_important,
             parse_stylesheet_rules_from_bytes,
-            Color, RGBA, parse_nth, ToCss};
+            Color, RGBA, parse_color_keyword, parse_nth, ToCss};
 
 
 macro_rules! JArray {
@@ -307,7 +307,7 @@ fn color3_keywords() {
 #[bench]
 fn bench_color_lookup_red(b: &mut test::Bencher) {
     b.iter(|| {
-        assert!(Parser::parse_str("red", Color::parse).is_ok())
+        test::black_box(parse_color_keyword("red"))
     });
 }
 
@@ -315,7 +315,7 @@ fn bench_color_lookup_red(b: &mut test::Bencher) {
 #[bench]
 fn bench_color_lookup_lightgoldenrodyellow(b: &mut test::Bencher) {
     b.iter(|| {
-        assert!(Parser::parse_str("lightgoldenrodyellow", Color::parse).is_ok())
+        test::black_box(parse_color_keyword("lightgoldenrodyellow"))
     });
 }
 
@@ -323,7 +323,7 @@ fn bench_color_lookup_lightgoldenrodyellow(b: &mut test::Bencher) {
 #[bench]
 fn bench_color_lookup_fail(b: &mut test::Bencher) {
     b.iter(|| {
-        assert!(Parser::parse_str("lightgoldenrodyellowbazinga", Color::parse).is_ok())
+        test::black_box(parse_color_keyword("lightgoldenrodyellowbazinga"))
     });
 }
 

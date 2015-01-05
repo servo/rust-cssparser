@@ -24,6 +24,46 @@ pub use nth::parse_nth;
 pub use serializer::{ToCss, CssStringWriter, serialize_identifier, serialize_string};
 pub use parser::{Parser, Delimiter, Delimiters};
 
+
+/**
+
+This macro is equivalent to a `match` expression on an `&str` value,
+but matching is case-insensitive in the ASCII range.
+
+Usage example:
+
+```{rust,ignore}
+match_ignore_ascii_case! { string:
+    "foo" => Some(Foo),
+    "bar" => Some(Bar),
+    "baz" => Some(Baz)
+    _ => None
+}
+```
+
+The macro also calls `.as_slice()` on the value,
+so that a `String` or `CowString` could be passed directly instead of a `&str`.
+
+Note that because of `macro_rules` ambiguity resolutions quirks,
+each arm except the fallback and the one before it must end with a comma.
+
+*/
+#[macro_export]
+macro_rules! match_ignore_ascii_case {
+    ( $value: expr: $( $string: expr => $result: expr ),+ _ => $fallback: expr ) => {
+        {
+            use std::ascii::AsciiExt;
+            match $value.as_slice() {
+                $(
+                    s if s.eq_ignore_ascii_case($string) => $result,
+                )+
+                _ => $fallback
+            }
+        }
+    };
+}
+
+
 mod rules_and_declarations;
 mod tokenizer;
 mod parser;
