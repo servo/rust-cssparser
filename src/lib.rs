@@ -5,7 +5,7 @@
 #![crate_name = "cssparser"]
 #![crate_type = "rlib"]
 
-#![feature(globs, macro_rules, if_let, while_let, unsafe_destructor, phase)]
+#![feature(globs, macro_rules, unsafe_destructor, phase)]
 
 extern crate encoding;
 extern crate text_writer;

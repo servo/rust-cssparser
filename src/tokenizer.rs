@@ -343,7 +343,7 @@ fn consume_quoted_string(tokenizer: &mut Tokenizer, single_quote: bool) -> Resul
                 }
                 // else: escaped EOF, do nothing.
             }
-            '\0' => string.push('\uFFFD'),
+            '\0' => string.push('\u{FFFD}'),
             c => string.push(c),
         }
     }
@@ -388,7 +388,7 @@ fn consume_name(tokenizer: &mut Tokenizer) -> String {
                 tokenizer.advance(1);
                 consume_escape(tokenizer)
             },
-            '\0' => { tokenizer.advance(1); '\uFFFD' },
+            '\0' => { tokenizer.advance(1); '\u{FFFD}' },
             _ => if c > '\x7F' { tokenizer.consume_char() }  // Non-ASCII
                  else { break }
         })
@@ -506,7 +506,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> Token {
                     }
                     consume_escape(tokenizer)
                 },
-                '\0' => '\uFFFD',
+                '\0' => '\u{FFFD}',
                 c => c
             };
             string.push(next_char)
