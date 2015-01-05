@@ -3,10 +3,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::fmt;
+use std::num::Float;
 
 use text_writer::{mod, TextWriter};
 
-use super::Token;
+use super::{Token, NumericValue};
 
 
 pub trait ToCss for Sized? {
@@ -42,6 +43,21 @@ pub trait ToCss for Sized? {
 }
 
 
+#[inline]
+fn write_numeric<W>(value: NumericValue, dest: &mut W) -> text_writer::Result
+where W: TextWriter {
+    // `value.value >= 0` is true for negative 0.
+    if value.signed && value.value.is_positive() {
+        try!(dest.write_str("+"));
+    }
+    try!(write!(dest, "{}", value.value))
+    if value.int_value.is_none() && value.value.fract() == 0. {
+        try!(dest.write_str(".0"));
+    }
+    Ok(())
+}
+
+
 impl ToCss for Token {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
         match *self {
@@ -68,13 +84,13 @@ impl ToCss for Token {
             },
             Token::Delim(value) => try!(dest.write_char(value)),
 
-            Token::Number(ref value) => try!(dest.write_str(value.representation.as_slice())),
-            Token::Percentage(ref value) => {
-                try!(dest.write_str(value.representation.as_slice()));
+            Token::Number(value) => try!(write_numeric(value, dest)),
+            Token::Percentage(value) => {
+                try!(write_numeric(value, dest));
                 try!(dest.write_char('%'));
             },
-            Token::Dimension(ref value, ref unit) => {
-                try!(dest.write_str(value.representation.as_slice()));
+            Token::Dimension(value, ref unit) => {
+                try!(write_numeric(value, dest));
                 // Disambiguate with scientific notation.
                 let unit = unit.as_slice();
                 if unit == "e" || unit == "E" || unit.starts_with("e-") || unit.starts_with("E-") {

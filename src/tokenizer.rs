@@ -54,11 +54,12 @@ pub enum Token {
 }
 
 
-#[deriving(PartialEq, Show)]
+#[deriving(PartialEq, Show, Copy)]
 pub struct NumericValue {
-    pub representation: String,
     pub value: f64,
     pub int_value: Option<i64>,
+    // Whether the number had a `+` or `-` sign.
+    pub signed: bool,
 }
 
 
@@ -126,7 +127,7 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn char_at(&self, offset: uint) -> char {
-        self.input.as_slice().char_at(self.position + offset)
+        self.input.char_at(self.position + offset)
     }
 
     #[inline]
@@ -137,14 +138,19 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn consume_char(&mut self) -> char {
-        let range = self.input.as_slice().char_range_at(self.position);
+        let range = self.input.char_range_at(self.position);
         self.position = range.next;
         range.ch
     }
 
     #[inline]
     fn starts_with(&self, needle: &str) -> bool {
-        self.input.as_slice().slice_from(self.position).starts_with(needle)
+        self.input.slice_from(self.position).starts_with(needle)
+    }
+
+    #[inline]
+    fn slice_from(&self, start_pos: uint) -> &str {
+        self.input.slice(start_pos, self.position)
     }
 }
 
@@ -397,31 +403,31 @@ fn consume_name(tokenizer: &mut Tokenizer) -> String {
 }
 
 
-fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
-    // Parse [+-]?\d*(\.\d+)?([eE][+-]?\d+)?
-    // But this is always called so that there is at least one digit in \d*(\.\d+)?
-    let mut representation = String::new();
-    let mut is_integer = true;
-    if matches!(tokenizer.current_char(), '-' | '+') {
-         representation.push(tokenizer.consume_char())
-    }
+fn consume_digits(tokenizer: &mut Tokenizer) {
     while !tokenizer.is_eof() {
         match tokenizer.current_char() {
-            '0'...'9' => representation.push(tokenizer.consume_char()),
+            '0'...'9' => tokenizer.advance(1),
             _ => break
         }
     }
+}
+
+
+fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
+    // Parse [+-]?\d*(\.\d+)?([eE][+-]?\d+)?
+    // But this is always called so that there is at least one digit in \d*(\.\d+)?
+    let start_pos = tokenizer.position;
+    let mut is_integer = true;
+    let signed = matches!(tokenizer.current_char(), '-' | '+');
+    if signed {
+        tokenizer.advance(1);
+    }
+    consume_digits(tokenizer);
     if tokenizer.has_at_least(1) && tokenizer.current_char() == '.'
             && matches!(tokenizer.char_at(1), '0'...'9') {
         is_integer = false;
-        representation.push(tokenizer.consume_char());  // '.'
-        representation.push(tokenizer.consume_char());  // digit
-        while !tokenizer.is_eof() {
-            match tokenizer.current_char() {
-                '0'...'9' => representation.push(tokenizer.consume_char()),
-                _ => break
-            }
-        }
+        tokenizer.advance(2);  // '.' and first digit
+        consume_digits(tokenizer);
     }
     if (
         tokenizer.has_at_least(1)
@@ -434,25 +440,16 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
         && matches!(tokenizer.char_at(2), '0'...'9')
     ) {
         is_integer = false;
-        representation.push(tokenizer.consume_char());  // 'e' or 'E'
-        representation.push(tokenizer.consume_char());  // sign or digit
-        // If the above was a sign, the first digit it consumed below
-        // and we make one extraneous is_eof() check.
-        while !tokenizer.is_eof() {
-            match tokenizer.current_char() {
-                '0'...'9' => representation.push(tokenizer.consume_char()),
-                _ => break
-            }
-        }
+        tokenizer.advance(2);  // 'e' or 'E', and sign or first digit
+        consume_digits(tokenizer);
     }
     let (value, int_value) = {
-        // TODO: handle overflow
+        let mut repr = tokenizer.slice_from(start_pos);
         // Remove any + sign as int::from_str() does not parse them.
-        let repr = if representation.starts_with("+") {
-            representation.slice_from(1)
-        } else {
-            representation.as_slice()
-        };
+        if repr.starts_with("+") {
+            repr = repr.slice_from(1)
+        }
+        // TODO: handle overflow
         (from_str::<f64>(repr).unwrap(), if is_integer {
             Some(from_str::<i64>(repr).unwrap())
         } else {
@@ -460,9 +457,9 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
         })
     };
     let value = NumericValue {
-        int_value: int_value,
         value: value,
-        representation: representation,
+        int_value: int_value,
+        signed: signed,
     };
     if !tokenizer.is_eof() && tokenizer.current_char() == '%' {
         tokenizer.advance(1);

@@ -4,7 +4,7 @@
 
 use std::ascii::AsciiExt;
 
-use super::{Token, NumericValue, Parser};
+use super::{Token, Parser};
 
 
 /// Parse the *An+B* notation, as found in the `:nth-child()` selector.
@@ -56,7 +56,7 @@ fn parse_b(input: &mut Parser, a: i32) -> Result<(i32, i32), ()> {
     match input.next() {
         Ok(Token::Delim('+')) => parse_signless_b(input, a, 1),
         Ok(Token::Delim('-')) => parse_signless_b(input, a, -1),
-        Ok(Token::Number(ref value)) if has_sign(value) => {
+        Ok(Token::Number(ref value)) if value.signed => {
             Ok((a, try!(value.int_value.ok_or(())) as i32))
         }
         token => {
@@ -68,7 +68,7 @@ fn parse_b(input: &mut Parser, a: i32) -> Result<(i32, i32), ()> {
 
 fn parse_signless_b(input: &mut Parser, a: i32, b_sign: i32) -> Result<(i32, i32), ()> {
     match try!(input.next()) {
-        Token::Number(ref value) if !has_sign(value) => {
+        Token::Number(ref value) if !value.signed => {
             Ok((a, b_sign * (try!(value.int_value.ok_or(())) as i32)))
         }
         _ => Err(())
@@ -84,9 +84,4 @@ fn parse_n_dash_digits(string: &str) -> Result<i32, ()> {
     } else {
         Err(())
     }
-}
-
-#[inline]
-fn has_sign(value: &NumericValue) -> bool {
-    matches!(value.representation.as_bytes()[0], b'+' | b'-')
 }

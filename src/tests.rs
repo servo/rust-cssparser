@@ -483,11 +483,11 @@ fn component_values_to_json(input: &mut Parser) -> Vec<Json> {
 
 fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
     fn numeric(value: NumericValue) -> Vec<json::Json> {
-        match value {
-            NumericValue{representation: r, value: v, int_value: i}
-            => vec![r.to_json(), v.to_json(),
-                    match i { Some(_) => "integer", None => "number" }.to_json()]
-        }
+        vec![
+            Token::Number(value).to_css_string().to_json(),
+            match value.int_value { Some(i) => i.to_json(), None => value.value.to_json() },
+            match value.int_value { Some(_) => "integer", None => "number" }.to_json()
+        ]
     }
 
     match token {

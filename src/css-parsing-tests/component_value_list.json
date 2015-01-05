@@ -29,7 +29,7 @@
 	["ident", "--red"], " ",
 	["ident", "--red blue"], " ",
 	["dimension", "0", 0, "integer", "red"], " ",
-	["dimension", "-0", 0, "integer", "red"], " ",
+	["dimension", "0", 0, "integer", "red"], " ",
 	["ident", "\uFFFDred"], " ",
 	["ident", "_Red"], " ",
 	".", ["ident", "red"], " ",
@@ -58,7 +58,7 @@
 	["function", "--rgba"], " ",
 	["function", "--rgba"], " ",
 	["dimension", "0", 0, "integer", "rgba"], ["()"], " ",
-	["dimension", "-0", 0, "integer", "rgba"], ["()"], " ",
+	["dimension", "0", 0, "integer", "rgba"], ["()"], " ",
 	["function", "_rgba"], " ",
 	".", ["function", "rgba"], " ",
 	["function", "rgbâ"], " ",
@@ -74,7 +74,7 @@
 	["at-keyword", "--media"], " ",
 	["at-keyword", "--media"], " ",
 	"@", ["dimension", "0", 0, "integer", "media"], " ",
-	"@", ["dimension", "-0", 0, "integer", "media"], " ",
+	"@", ["dimension", "0", 0, "integer", "media"], " ",
 	["at-keyword", "_media"], " ",
 	"@", ".", ["ident", "media"], " ",
 	["at-keyword", "medİa"], " ",
@@ -227,24 +227,24 @@
 	["number", "12", 12, "integer"], " ",
 	["number", "+34", 34, "integer"], " ",
 	["number", "-45", -45, "integer"], " ",
-	["number", ".67", 0.67, "number"], " ",
-	["number", "+.89", 0.89, "number"], " ",
-	["number", "-.01", -0.01, "number"], " ",
+	["number", "0.67", 0.67, "number"], " ",
+	["number", "+0.89", 0.89, "number"], " ",
+	["number", "-0.01", -0.01, "number"], " ",
 	["number", "2.3", 2.3, "number"], " ",
 	["number", "+45.0", 45, "number"], " ",
 	["number", "-0.67", -0.67, "number"]
 ],
 
 "12e2 +34e+1 -45E-0 .68e+3 +.79e-1 -.01E2 2.3E+1 +45.0e6 -0.67e0", [
-	["number", "12e2", 1200, "number"], " ",
-	["number", "+34e+1", 340, "number"], " ",
-	["number", "-45E-0", -45, "number"], " ",
-	["number", ".68e+3", 680, "number"], " ",
-	["number", "+.79e-1", 0.079, "number"], " ",
-	["number", "-.01E2", -1, "number"], " ",
-	["number", "2.3E+1", 23, "number"], " ",
-	["number", "+45.0e6", 45000000, "number"], " ",
-	["number", "-0.67e0", -0.67, "number"]
+	["number", "1200.0", 1200, "number"], " ",
+	["number", "+340.0", 340, "number"], " ",
+	["number", "-45.0", -45, "number"], " ",
+	["number", "680.0", 680, "number"], " ",
+	["number", "+0.079", 0.079, "number"], " ",
+	["number", "-1.0", -1, "number"], " ",
+	["number", "23.0", 23, "number"], " ",
+	["number", "+45000000.0", 45000000, "number"], " ",
+	["number", "-0.67", -0.67, "number"]
 ],
 
 "3. /* Decimal point must have following digits */", [
@@ -256,32 +256,32 @@
 ],
 
 "3e-2.1 /* Integer exponents only */", [
-	["number", "3e-2", 0.03, "number"],
-	["number", ".1", 0.1, "number"], " "
+	["number", "0.03", 0.03, "number"],
+	["number", "0.1", 0.1, "number"], " "
 ],
 
 "12% +34% -45% .67% +.89% -.01% 2.3% +45.0% -0.67%", [
 	["percentage", "12", 12, "integer"], " ",
 	["percentage", "+34", 34, "integer"], " ",
 	["percentage", "-45", -45, "integer"], " ",
-	["percentage", ".67", 0.67, "number"], " ",
-	["percentage", "+.89", 0.89, "number"], " ",
-	["percentage", "-.01", -0.01, "number"], " ",
+	["percentage", "0.67", 0.67, "number"], " ",
+	["percentage", "+0.89", 0.89, "number"], " ",
+	["percentage", "-0.01", -0.01, "number"], " ",
 	["percentage", "2.3", 2.3, "number"], " ",
 	["percentage", "+45.0", 45, "number"], " ",
 	["percentage", "-0.67", -0.67, "number"]
 ],
 
 "12e2% +34e+1% -45E-0% .68e+3% +.79e-1% -.01E2% 2.3E+1% +45.0e6% -0.67e0%", [
-	["percentage", "12e2", 1200, "number"], " ",
-	["percentage", "+34e+1", 340, "number"], " ",
-	["percentage", "-45E-0", -45, "number"], " ",
-	["percentage", ".68e+3", 680, "number"], " ",
-	["percentage", "+.79e-1", 0.079, "number"], " ",
-	["percentage", "-.01E2", -1, "number"], " ",
-	["percentage", "2.3E+1", 23, "number"], " ",
-	["percentage", "+45.0e6", 45000000, "number"], " ",
-	["percentage", "-0.67e0", -0.67, "number"]
+	["percentage", "1200.0", 1200, "number"], " ",
+	["percentage", "+340.0", 340, "number"], " ",
+	["percentage", "-45.0", -45, "number"], " ",
+	["percentage", "680.0", 680, "number"], " ",
+	["percentage", "+0.079", 0.079, "number"], " ",
+	["percentage", "-1.0", -1, "number"], " ",
+	["percentage", "23.0", 23, "number"], " ",
+	["percentage", "+45000000.0", 45000000, "number"], " ",
+	["percentage", "-0.67", -0.67, "number"]
 ],
 
 "12\\% /* Percent sign can not be escaped */", [
@@ -292,24 +292,24 @@
 	["dimension", "12", 12, "integer", "px"], " ",
 	["dimension", "+34", 34, "integer", "px"], " ",
 	["dimension", "-45", -45, "integer", "px"], " ",
-	["dimension", ".67", 0.67, "number", "px"], " ",
-	["dimension", "+.89", 0.89, "number", "px"], " ",
-	["dimension", "-.01", -0.01, "number", "px"], " ",
+	["dimension", "0.67", 0.67, "number", "px"], " ",
+	["dimension", "+0.89", 0.89, "number", "px"], " ",
+	["dimension", "-0.01", -0.01, "number", "px"], " ",
 	["dimension", "2.3", 2.3, "number", "px"], " ",
 	["dimension", "+45.0", 45, "number", "px"], " ",
 	["dimension", "-0.67", -0.67, "number", "px"]
 ],
 
 "12e2px +34e+1px -45E-0px .68e+3px +.79e-1px -.01E2px 2.3E+1px +45.0e6px -0.67e0px", [
-	["dimension", "12e2", 1200, "number", "px"], " ",
-	["dimension", "+34e+1", 340, "number", "px"], " ",
-	["dimension", "-45E-0", -45, "number", "px"], " ",
-	["dimension", ".68e+3", 680, "number", "px"], " ",
-	["dimension", "+.79e-1", 0.079, "number", "px"], " ",
-	["dimension", "-.01E2", -1, "number", "px"], " ",
-	["dimension", "2.3E+1", 23, "number", "px"], " ",
-	["dimension", "+45.0e6", 45000000, "number", "px"], " ",
-	["dimension", "-0.67e0", -0.67, "number", "px"]
+	["dimension", "1200.0", 1200, "number", "px"], " ",
+	["dimension", "+340.0", 340, "number", "px"], " ",
+	["dimension", "-45.0", -45, "number", "px"], " ",
+	["dimension", "680.0", 680, "number", "px"], " ",
+	["dimension", "+0.079", 0.079, "number", "px"], " ",
+	["dimension", "-1.0", -1, "number", "px"], " ",
+	["dimension", "23.0", 23, "number", "px"], " ",
+	["dimension", "+45000000.0", 45000000, "number", "px"], " ",
+	["dimension", "-0.67", -0.67, "number", "px"]
 ],
 
 "12red0 12.0-red 12--red 12-\\-red 120red 12-0red 12\u0000red 12_Red 12.red 12rêd", [
@@ -318,7 +318,7 @@
 	["dimension", "12", 12, "integer", "--red"], " ",
 	["dimension", "12", 12, "integer", "--red"], " ",
 	["dimension", "120", 120, "integer", "red"], " ",
-	["number", "12", 12, "integer"], ["dimension", "-0", 0, "integer", "red"], " ",
+	["number", "12", 12, "integer"], ["dimension", "0", 0, "integer", "red"], " ",
 	["dimension", "12", 12, "integer", "\uFFFDred"], " ",
 	["dimension", "12", 12, "integer", "_Red"], " ",
 	["number", "12", 12, "integer"], ".", ["ident", "red"], " ",
