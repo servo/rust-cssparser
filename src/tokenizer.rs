@@ -108,11 +108,11 @@ impl<'a> Tokenizer<'a> {
         self.buffer = Some(token);
     }
 
-    // `tokenizer.current_char()` will not panic.
+    // If false, `tokenizer.current_char()` will not panic.
     #[inline]
     fn is_eof(&self) -> bool { !self.has_at_least(0) }
 
-    // The input has at least `n` bytes left *after* the current one.
+    // If true, the input has at least `n` bytes left *after* the current one.
     // That is, `tokenizer.char_at(n)` will not panic.
     #[inline]
     fn has_at_least(&self, n: uint) -> bool { self.position + n < self.input.len() }
