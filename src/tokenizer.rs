@@ -121,22 +121,22 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn position(&self) -> TokenizerPosition {
-        TokenizerPosition(self.position)
+    pub fn position(&self) -> SourcePosition {
+        SourcePosition(self.position)
     }
 
     #[inline]
-    pub fn slice_from(&self, start_pos: TokenizerPosition) -> &'a str {
+    pub fn slice_from(&self, start_pos: SourcePosition) -> &'a str {
         self.input.slice(start_pos.0, self.position)
     }
 
     #[inline]
     pub fn current_source_location(&mut self) -> SourceLocation {
-        let position = TokenizerPosition(self.position);
+        let position = SourcePosition(self.position);
         self.source_location(position)
     }
 
-    pub fn source_location(&mut self, position: TokenizerPosition) -> SourceLocation {
+    pub fn source_location(&mut self, position: SourcePosition) -> SourceLocation {
         let target = position.0;
         let mut line_number;
         let mut position;
@@ -212,7 +212,7 @@ impl<'a> Tokenizer<'a> {
 
 
 #[deriving(PartialEq, Eq, PartialOrd, Ord, Show, Clone, Copy)]
-pub struct TokenizerPosition(uint);
+pub struct SourcePosition(uint);
 
 
 #[deriving(PartialEq, Eq, Show, Clone, Copy)]
