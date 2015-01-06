@@ -405,6 +405,15 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
+    pub fn expect_url_or_string(&mut self) -> Result<CowString<'i>, ()> {
+        match try!(self.next()) {
+            Token::Url(value) => Ok(value),
+            Token::QuotedString(value) => Ok(value),
+            token => self.unexpected(token)
+        }
+    }
+
+    #[inline]
     pub fn expect_number(&mut self) -> Result<f64, ()> {
         match try!(self.next()) {
             Token::Number(NumericValue { value, .. }) => Ok(value),
