@@ -6,6 +6,7 @@
 
 use std::{char, num};
 use std::ascii::AsciiExt;
+use std::borrow::ToOwned;
 use std::str::CowString;
 use std::borrow::Cow::{Owned, Borrowed};
 
@@ -151,7 +152,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    fn slice_from(&self, start_pos: uint) -> &str {
+    fn slice_from(&self, start_pos: uint) -> &'a str {
         self.input.slice(start_pos, self.position)
     }
 }
@@ -387,19 +388,51 @@ fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 }
 
 fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowString<'a> {
-    let mut value = String::new();
+    let start_pos = tokenizer.position;
+    let mut value;
+    loop {
+        if tokenizer.is_eof() {
+            return Borrowed(tokenizer.slice_from(start_pos))
+        }
+        match tokenizer.current_char() {
+            'a'...'z' | 'A'...'Z' | '0'...'9' | '_' | '-'  => tokenizer.advance(1),
+            '\\' => {
+                if tokenizer.has_newline_at(1) {
+                    return Borrowed(tokenizer.slice_from(start_pos))
+                }
+                value = tokenizer.slice_from(start_pos).to_owned();
+                tokenizer.advance(1);
+                value.push(consume_escape(tokenizer));
+                break
+            }
+            '\0' => {
+                value = tokenizer.slice_from(start_pos).to_owned();
+                tokenizer.advance(1);
+                value.push_str("\u{FFFD}");
+                break
+            }
+            c if c.is_ascii() => return Borrowed(tokenizer.slice_from(start_pos)),
+            _ => {
+                tokenizer.consume_char();
+            }
+        }
+    }
+
     while !tokenizer.is_eof() {
         let c = tokenizer.current_char();
         value.push(match c {
-            'a'...'z' | 'A'...'Z' | '0'...'9' | '_' | '-'  => { tokenizer.advance(1); c },
+            'a'...'z' | 'A'...'Z' | '0'...'9' | '_' | '-'  => {
+                tokenizer.advance(1);
+                c
+            }
             '\\' => {
                 if tokenizer.has_newline_at(1) { break }
                 tokenizer.advance(1);
                 consume_escape(tokenizer)
-            },
+            }
             '\0' => { tokenizer.advance(1); '\u{FFFD}' },
-            _ => if c > '\x7F' { tokenizer.consume_char() }  // Non-ASCII
-                 else { break }
+            c if c.is_ascii() => break,
+            _ => tokenizer.consume_char(),
         })
     }
     Owned(value)
