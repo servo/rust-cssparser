@@ -338,6 +338,23 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
+    pub fn parse_comma_separated<T>(&mut self, parse_one: |&mut Parser| -> Result<T, ()>)
+                                    -> Result<Vec<T>, ()> {
+        let mut values = vec![try!(self.parse_until_before(Delimiter::Comma)
+                                       .parse_entirely(|parser| parse_one(parser)))];
+        loop {
+            match self.next() {
+                Ok(Token::Comma) => {
+                    values.push(try!(self.parse_until_before(Delimiter::Comma)
+                                         .parse_entirely(|parser| parse_one(parser))))
+                }
+                Ok(token) => return self.unexpected(token),
+                Err(()) => return Ok(values),
+            }
+        }
+    }
+
+    #[inline]
     pub fn parse_nested_block<'a>(&'a mut self) -> Parser<'i, 'a> {
         if let Some(block_type) = self.state.at_start_of.take() {
             debug_assert!(!self.state.exhausted);
