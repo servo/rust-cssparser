@@ -112,6 +112,16 @@ impl<'a> Tokenizer<'a> {
         self.buffer = Some(token);
     }
 
+    #[inline]
+    pub fn position(&self) -> TokenizerPosition {
+        TokenizerPosition(self.position)
+    }
+
+    #[inline]
+    pub fn slice_from(&self, start_pos: TokenizerPosition) -> &'a str {
+        self.input.slice(start_pos.0, self.position)
+    }
+
     // If false, `tokenizer.current_char()` will not panic.
     #[inline]
     fn is_eof(&self) -> bool { !self.has_at_least(0) }
@@ -150,12 +160,11 @@ impl<'a> Tokenizer<'a> {
     fn starts_with(&self, needle: &str) -> bool {
         self.input.slice_from(self.position).starts_with(needle)
     }
-
-    #[inline]
-    fn slice_from(&self, start_pos: uint) -> &'a str {
-        self.input.slice(start_pos, self.position)
-    }
 }
+
+
+#[deriving(PartialEq, Eq, Show, Clone, Copy)]
+pub struct TokenizerPosition(uint);
 
 
 fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
@@ -329,7 +338,7 @@ fn consume_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool) -> Toke
 fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
                              -> Result<CowString<'a>, ()> {
     tokenizer.advance(1);  // Skip the initial quote
-    let start_pos = tokenizer.position;
+    let start_pos = tokenizer.position();
     let mut string;
     loop {
         if tokenizer.is_eof() {
@@ -415,7 +424,7 @@ fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 }
 
 fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowString<'a> {
-    let start_pos = tokenizer.position;
+    let start_pos = tokenizer.position();
     let mut value;
     loop {
         if tokenizer.is_eof() {
@@ -468,7 +477,7 @@ fn consume_digits(tokenizer: &mut Tokenizer) {
 fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     // Parse [+-]?\d*(\.\d+)?([eE][+-]?\d+)?
     // But this is always called so that there is at least one digit in \d*(\.\d+)?
-    let start_pos = tokenizer.position;
+    let start_pos = tokenizer.position();
     let mut is_integer = true;
     let signed = matches!(tokenizer.current_char(), '-' | '+');
     if signed {
@@ -542,7 +551,7 @@ fn consume_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     }
 
     fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
-        let start_pos = tokenizer.position;
+        let start_pos = tokenizer.position();
         let mut string;
         loop {
             if tokenizer.is_eof() {
