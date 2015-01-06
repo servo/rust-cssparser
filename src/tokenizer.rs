@@ -329,7 +329,34 @@ fn consume_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool) -> Toke
 fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
                              -> Result<CowString<'a>, ()> {
     tokenizer.advance(1);  // Skip the initial quote
-    let mut string = String::new();
+    let start_pos = tokenizer.position;
+    let mut string;
+    loop {
+        if tokenizer.is_eof() {
+            return Ok(Borrowed(tokenizer.slice_from(start_pos)))
+        }
+        match tokenizer.current_char() {
+            '"' if !single_quote => {
+                let value = tokenizer.slice_from(start_pos);
+                tokenizer.advance(1);
+                return Ok(Borrowed(value))
+            }
+            '\'' if single_quote => {
+                let value = tokenizer.slice_from(start_pos);
+                tokenizer.advance(1);
+                return Ok(Borrowed(value))
+            }
+            '\\' | '\0' => {
+                string = tokenizer.slice_from(start_pos).to_owned();
+                break
+            }
+            '\n' | '\r' | '\x0C' => return Err(()),
+            _ => {
+                tokenizer.consume_char();
+            }
+        }
+    }
+
     while !tokenizer.is_eof() {
         if matches!(tokenizer.current_char(), '\n' | '\r' | '\x0C') {
             return Err(());
@@ -396,19 +423,8 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowString<'a> {
         }
         match tokenizer.current_char() {
             'a'...'z' | 'A'...'Z' | '0'...'9' | '_' | '-'  => tokenizer.advance(1),
-            '\\' => {
-                if tokenizer.has_newline_at(1) {
-                    return Borrowed(tokenizer.slice_from(start_pos))
-                }
+            '\\' | '\0' => {
                 value = tokenizer.slice_from(start_pos).to_owned();
-                tokenizer.advance(1);
-                value.push(consume_escape(tokenizer));
-                break
-            }
-            '\0' => {
-                value = tokenizer.slice_from(start_pos).to_owned();
-                tokenizer.advance(1);
-                value.push_str("\u{FFFD}");
                 break
             }
             c if c.is_ascii() => return Borrowed(tokenizer.slice_from(start_pos)),
