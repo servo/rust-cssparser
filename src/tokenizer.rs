@@ -701,6 +701,7 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
                 REPLACEMENT_CHAR
             }
         },
+        '\0' => '\u{FFFD}',
         c => c
     }
 }
