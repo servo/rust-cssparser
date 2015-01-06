@@ -542,7 +542,37 @@ fn consume_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     }
 
     fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
-        let mut string = String::new();
+        let start_pos = tokenizer.position;
+        let mut string;
+        loop {
+            if tokenizer.is_eof() {
+                return Url(Borrowed(tokenizer.slice_from(start_pos)))
+            }
+            match tokenizer.current_char() {
+                ' ' | '\t' | '\n' | '\r' | '\x0C' => {
+                    let value = tokenizer.slice_from(start_pos);
+                    tokenizer.advance(1);
+                    return consume_url_end(tokenizer, Borrowed(value))
+                }
+                ')' => {
+                    let value = tokenizer.slice_from(start_pos);
+                    tokenizer.advance(1);
+                    return Url(Borrowed(value))
+                }
+                '\x01'...'\x08' | '\x0B' | '\x0E'...'\x1F' | '\x7F'  // non-printable
+                    | '"' | '\'' | '(' => {
+                    tokenizer.advance(1);
+                    return consume_bad_url(tokenizer)
+                },
+                '\\' | '\0' => {
+                    string = tokenizer.slice_from(start_pos).to_owned();
+                    break
+                }
+                _ => {
+                    tokenizer.consume_char();
+                }
+            }
+        }
         while !tokenizer.is_eof() {
             let next_char = match tokenizer.consume_char() {
                 ' ' | '\t' | '\n' | '\r' | '\x0C' => {
