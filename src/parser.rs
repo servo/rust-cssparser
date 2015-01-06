@@ -7,7 +7,7 @@ use super::{Token, NumericValue, Tokenizer};
 
 
 pub struct Parser<'i: 't, 't> {
-    tokenizer: Option<&'t mut Tokenizer<'i>>,
+    tokenizer: &'t mut Tokenizer<'i>,
     parent_state: Option<&'t mut ParserState>,
     state: ParserState,
 }
@@ -20,6 +20,7 @@ struct ParserState {
     stop_at_end_of: Option<BlockType>,
     /// For parsers from `parse_until`
     stop_before: Delimiters,
+    exhausted: bool,
 }
 
 
@@ -90,7 +91,7 @@ impl NestedBlockListExt for NestedBlockList {
 #[unsafe_destructor] // FIXME What does this mean?
 impl<'i, 't> Drop for Parser<'i, 't> {
     fn drop(&mut self) {
-        if self.tokenizer.is_none() {
+        if self.state.exhausted {
             // We’ve already reached the end of our delimited input:
             // nothing to inform the parent of.
             debug_assert!(self.state.nested_blocks.is_none());
@@ -163,13 +164,14 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn new(tokenizer: &'t mut Tokenizer<'i>) -> Parser<'i, 't> {
         Parser {
-            tokenizer: Some(tokenizer),
+            tokenizer: tokenizer,
             parent_state: None,
             state: ParserState {
                 nested_blocks: None,
                 at_start_of: None,
                 stop_at_end_of: None,
                 stop_before: Delimiter::None,
+                exhausted: false,
             },
         }
     }
@@ -199,7 +201,7 @@ impl<'i, 't> Parser<'i, 't> {
         let token = try!(self.next());
         self.push_back(token);
 
-        self.tokenizer().peek()
+        self.tokenizer.peek()
     }
 
     #[inline]
@@ -207,9 +209,7 @@ impl<'i, 't> Parser<'i, 't> {
         if BlockType::opening(&token) == self.state.at_start_of {
             self.state.at_start_of = None;
         }
-        self.tokenizer.as_mut().expect(
-            "Can not use Parser::push_back after the end of the input was reached."
-        ).push_back(token)
+        self.tokenizer.push_back(token)
     }
 
     #[inline]
@@ -225,11 +225,6 @@ impl<'i, 't> Parser<'i, 't> {
         Err(())
     }
 
-    #[inline]
-    fn tokenizer<'a>(&'a mut self) -> &'a mut Tokenizer<'i> {
-        &mut **self.tokenizer.as_mut().unwrap()
-    }
-
     pub fn next(&mut self) -> Result<Token<'i>, ()> {
         loop {
             match self.next_including_whitespace() {
@@ -240,32 +235,33 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     pub fn next_including_whitespace(&mut self) -> Result<Token<'i>, ()> {
-        if self.tokenizer.is_none() {
+        if self.state.exhausted {
             return Err(())
         }
-        if self.state.nested_blocks.take().consume(self.tokenizer()) {
-            self.tokenizer = None;
+        if self.state.nested_blocks.take().consume(self.tokenizer) {
+            self.state.exhausted = true;
             return Err(())
         }
         if let Some(block_type) = self.state.at_start_of.take() {
-            if consume_until_end_of_block(block_type, self.tokenizer()) {
-                self.tokenizer = None;
+            if consume_until_end_of_block(block_type, self.tokenizer) {
+                self.state.exhausted = true;
                 return Err(())
             }
         }
-        match self.tokenizer().next() {
+        match self.tokenizer.next() {
             Err(()) => {
-                self.tokenizer = None;
+                self.state.exhausted = true;
                 Err(())
             },
             Ok(token) => {
                 if self.state.stop_before.contains(Delimiters::from_token(&token)) {
-                    self.tokenizer.take().unwrap().push_back(token);
+                    self.tokenizer.push_back(token);
+                    self.state.exhausted = true;
                     return Err(())
                 }
                 if self.state.stop_at_end_of.is_some() &&
                         BlockType::closing(&token) == self.state.stop_at_end_of {
-                    self.tokenizer = None;
+                    self.state.exhausted = true;
                     return Err(())
                 }
                 if let Some(block_type) = BlockType::opening(&token) {
@@ -283,31 +279,32 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     pub fn consume_until_after(&mut self, stop_after: Delimiters) {
-        if self.tokenizer.is_none() {
+        if self.state.exhausted {
             return
         }
         // FIXME: have a special-purpose tokenizer method for this that does less work.
-        while let Ok(token) = self.tokenizer().next() {
+        while let Ok(token) = self.tokenizer.next() {
             if stop_after.contains(Delimiters::from_token(&token)) {
                 return
             }
             if self.state.stop_before.contains(Delimiters::from_token(&token)) {
-                self.tokenizer.take().unwrap().push_back(token);
+                self.tokenizer.push_back(token);
+                self.state.exhausted = true;
                 return
             }
             if self.state.stop_at_end_of.is_some() &&
                     BlockType::closing(&token) == self.state.stop_at_end_of {
-                self.tokenizer = None;
+                self.state.exhausted = true;
                 return
             }
             if let Some(block_type) = BlockType::opening(&token) {
-                if consume_until_end_of_block(block_type, self.tokenizer()) {
-                    self.tokenizer = None;
+                if consume_until_end_of_block(block_type, self.tokenizer) {
+                    self.state.exhausted = true;
                     return
                 }
             }
         }
-        self.tokenizer = None;
+        self.state.exhausted = true;
     }
 
     // FIXME: Take an unboxed `FnOnce` closure.
@@ -322,16 +319,15 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn parse_nested_block<'a>(&'a mut self) -> Parser<'i, 'a> {
         if let Some(block_type) = self.state.at_start_of.take() {
+            debug_assert!(!self.state.exhausted);
             Parser {
-                // Unwrap here should never fail
-                // because `self.tokenizer` is only ever set to `None`
-                // when `self.state` is also `None`.
-                tokenizer: Some(&mut **self.tokenizer.as_mut().unwrap()),
+                tokenizer: self.tokenizer,
                 state: ParserState {
                     nested_blocks: self.state.nested_blocks.take(),
                     at_start_of: None,
                     stop_at_end_of: Some(block_type),
                     stop_before: Delimiter::None,
+                    exhausted: false,
                 },
                 parent_state: Some(&mut self.state),
             }
@@ -351,12 +347,13 @@ impl<'i, 't> Parser<'i, 't> {
                     that is itself from `parse_until_before`")
         }
         Parser {
-            tokenizer: self.tokenizer.as_mut().map(|t| &mut **t),
+            tokenizer: self.tokenizer,
             state: ParserState {
                 nested_blocks: self.state.nested_blocks.take(),
                 at_start_of: self.state.at_start_of.take(),
                 stop_at_end_of: self.state.stop_at_end_of,
                 stop_before: stop_before,
+                exhausted: self.state.exhausted,
             },
             parent_state: Some(&mut self.state),
         }
