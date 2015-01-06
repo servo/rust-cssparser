@@ -87,8 +87,8 @@ pub trait QualifiedRuleParser<P, R> {
 
 pub struct DeclarationListParser<'i: 't, 't: 'a, 'a, AP, I, P>
 where P: DeclarationParser<I> + AtRuleParser<AP, I> {
-    input: &'a mut Parser<'i, 't>,
-    parser: P,
+    pub input: &'a mut Parser<'i, 't>,
+    pub parser: P,
 }
 
 
@@ -128,8 +128,8 @@ where P: DeclarationParser<I> + AtRuleParser<AP, I> {
 
 pub struct RuleListParser<'i: 't, 't: 'a, 'a, R, QP, AP, P>
 where P: QualifiedRuleParser<QP, R> + AtRuleParser<AP, R> {
-    input: &'a mut Parser<'i, 't>,
-    parser: P,
+    pub input: &'a mut Parser<'i, 't>,
+    pub parser: P,
     is_stylesheet: bool,
 }
 
