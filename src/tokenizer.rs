@@ -61,17 +61,23 @@ pub enum Token<'a> {
 pub struct NumericValue {
     pub value: f64,
     pub int_value: Option<i64>,
-    // Whether the number had a `+` or `-` sign.
+    /// Whether the number had a `+` or `-` sign.
     pub signed: bool,
 }
 
 
 pub struct Tokenizer<'a> {
     input: &'a str,
-    position: uint,  // All counted in bytes, not characters
 
-    /// For `peek` and `push_back`
+    /// Counted in bytes, not code points. From 0.
+    position: uint,
+
+    /// For `peek()` and `push_back()`
     buffer: Option<Token<'a>>,
+
+    /// Cache for `source_location()`
+    last_known_line_number: uint,
+    position_after_last_known_newline: uint,
 }
 
 
@@ -82,6 +88,8 @@ impl<'a> Tokenizer<'a> {
             input: input,
             position: 0,
             buffer: None,
+            last_known_line_number: 1,
+            position_after_last_known_newline: 0,
         }
     }
 
@@ -120,6 +128,46 @@ impl<'a> Tokenizer<'a> {
     #[inline]
     pub fn slice_from(&self, start_pos: TokenizerPosition) -> &'a str {
         self.input.slice(start_pos.0, self.position)
+    }
+
+    #[inline]
+    pub fn current_source_location(&mut self) -> SourceLocation {
+        let position = TokenizerPosition(self.position);
+        self.source_location(position)
+    }
+
+    pub fn source_location(&mut self, position: TokenizerPosition) -> SourceLocation {
+        let target = position.0;
+        let mut line_number;
+        let mut position;
+        if target >= self.position_after_last_known_newline {
+            position = self.position_after_last_known_newline;
+            line_number = self.last_known_line_number;
+        } else {
+            position = 0;
+            line_number = 1;
+        }
+        let mut source = self.input.slice(position, target);
+        while let Some(newline_position) = source.find(['\n', '\r', '\x0C'].as_slice()) {
+            let offset = newline_position +
+            if source.slice_from(newline_position).starts_with("\r\n") {
+                2
+            } else {
+                1
+            };
+            source = source.slice_from(offset);
+            position += offset;
+            line_number += 1;
+        }
+        debug_assert!(position <= target);
+        self.position_after_last_known_newline = position;
+        self.last_known_line_number = line_number;
+        SourceLocation {
+            line: line_number,
+            // `target == position` when `target` is at the beginning of the line,
+            // so add 1 so that the column numbers start at 1.
+            column: target - position + 1,
+        }
     }
 
     // If false, `tokenizer.current_char()` will not panic.
@@ -163,8 +211,17 @@ impl<'a> Tokenizer<'a> {
 }
 
 
-#[deriving(PartialEq, Eq, Show, Clone, Copy)]
+#[deriving(PartialEq, Eq, PartialOrd, Ord, Show, Clone, Copy)]
 pub struct TokenizerPosition(uint);
+
+
+#[deriving(PartialEq, Eq, Show, Clone, Copy)]
+pub struct SourceLocation {
+    /// Starts at 1
+    pub line: uint,
+    /// Starts at 1
+    pub column: uint,
+}
 
 
 fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {

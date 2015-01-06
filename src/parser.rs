@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::str::CowString;
-use super::{Token, NumericValue, Tokenizer, TokenizerPosition};
+use super::{Token, NumericValue, Tokenizer, TokenizerPosition, SourceLocation};
 
 
 pub struct Parser<'i: 't, 't> {
@@ -234,6 +234,17 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn slice_from(&self, start_pos: TokenizerPosition) -> &'i str {
         self.tokenizer.slice_from(start_pos)
     }
+
+    #[inline]
+    pub fn current_source_location(&mut self) -> SourceLocation {
+        self.tokenizer.current_source_location()
+    }
+
+    #[inline]
+    pub fn source_location(&mut self, target: TokenizerPosition) -> SourceLocation {
+        self.tokenizer.source_location(target)
+    }
+
 
     pub fn next(&mut self) -> Result<Token<'i>, ()> {
         loop {
