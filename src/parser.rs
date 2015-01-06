@@ -363,17 +363,13 @@ impl<'i, 't> Parser<'i, 't> {
 
     #[inline]
     pub fn parse_until_before<'a>(&'a mut self, stop_before: Delimiters) -> Parser<'i, 'a> {
-        if self.state.stop_before != Delimiter::None {
-            panic!("`parse_until_before` cannot be used on a `Parser` \
-                    that is itself from `parse_until_before`")
-        }
         Parser {
             tokenizer: self.tokenizer,
             state: ParserState {
                 nested_blocks: self.state.nested_blocks.take(),
                 at_start_of: self.state.at_start_of.take(),
                 stop_at_end_of: self.state.stop_at_end_of,
-                stop_before: stop_before,
+                stop_before: self.state.stop_before | stop_before,
                 exhausted: self.state.exhausted,
             },
             parent_state: Some(&mut self.state),
