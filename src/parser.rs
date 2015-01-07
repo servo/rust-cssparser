@@ -402,8 +402,17 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
-    pub fn expect_quoted_string(&mut self) -> Result<CowString<'i>, ()> {
+    pub fn expect_string(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
+            Token::QuotedString(value) => Ok(value),
+            token => self.unexpected(token)
+        }
+    }
+
+    #[inline]
+    pub fn expect_ident_or_string(&mut self) -> Result<CowString<'i>, ()> {
+        match try!(self.next()) {
+            Token::Ident(value) => Ok(value),
             Token::QuotedString(value) => Ok(value),
             token => self.unexpected(token)
         }
