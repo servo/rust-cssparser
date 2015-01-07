@@ -101,6 +101,13 @@ where P: DeclarationParser<I> + AtRuleParser<AP, I> {
             parser: parser,
         }
     }
+
+    /// Parse until the input is exhausted, and ignore all results.
+    /// This can be useful when `parser` collects results by mutating itself.
+    pub fn run(mut self) -> P {
+        while let Some(_) = self.next() {}
+        self.parser
+    }
 }
 
 impl<'i, 't, 'a, AP, I, P> Iterator<Result<I, ()>>
@@ -152,6 +159,13 @@ where P: QualifiedRuleParser<QP, R> + AtRuleParser<AP, R> {
             parser: parser,
             is_stylesheet: false,
         }
+    }
+
+    /// Parse until the input is exhausted, and ignore all results.
+    /// This can be useful when `parser` collects results by mutating itself.
+    pub fn run(mut self) -> P {
+        while let Some(_) = self.next() {}
+        self.parser
     }
 }
 
