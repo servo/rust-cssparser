@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use std::ascii::AsciiExt;
 use std::str::CowString;
 use super::{Token, NumericValue, Tokenizer, SourcePosition, SourceLocation};
 
@@ -401,6 +402,15 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Expect an *ident* token whose value is an ASCII-insensitive match for the given value.
+    #[inline]
+    pub fn expect_ident_matching<'a>(&mut self, expected_value: &str) -> Result<(), ()> {
+        match try!(self.next()) {
+            Token::Ident(ref value) if value.eq_ignore_ascii_case(expected_value) => Ok(()),
+            token => self.unexpected(token)
+        }
+    }
+
     #[inline]
     pub fn expect_string(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
@@ -484,9 +494,25 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
-    pub fn expect_curly_bracke_block(&mut self) -> Result<(), ()> {
+    pub fn expect_delim(&mut self, expected_value: char) -> Result<(), ()> {
+        match try!(self.next()) {
+            Token::Delim(value) if value == expected_value => Ok(()),
+            token => self.unexpected(token)
+        }
+    }
+
+    #[inline]
+    pub fn expect_curly_bracket_block(&mut self) -> Result<(), ()> {
         match try!(self.next()) {
             Token::CurlyBracketBlock => Ok(()),
+            token => self.unexpected(token)
+        }
+    }
+
+    #[inline]
+    pub fn expect_function(&mut self) -> Result<CowString<'i>, ()> {
+        match try!(self.next()) {
+            Token::Function(name) => Ok(name),
             token => self.unexpected(token)
         }
     }
