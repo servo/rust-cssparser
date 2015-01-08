@@ -13,7 +13,7 @@ use encoding::label::encoding_from_whatwg_label;
 
 use super::{Tokenizer, Parser, Token, NumericValue, SourceLocation,
             DeclarationListParser, DeclarationParser, RuleListParser,
-            AtRulePrelude, AtRuleParser, QualifiedRuleParser, Priority,
+            AtRuleType, AtRuleParser, QualifiedRuleParser, Priority,
             parse_one_declaration, parse_one_rule, parse_important,
             parse_stylesheet_rules_from_bytes,
             Color, RGBA, parse_color_keyword, parse_nth, ToCss};
@@ -466,8 +466,8 @@ impl DeclarationParser<Json> for JsonParser {
 
 impl AtRuleParser<Vec<Json>, Json> for JsonParser {
     fn parse_prelude(&mut self, name: &str, input: &mut Parser)
-                     -> Result<AtRulePrelude<Vec<Json>, Json>, ()> {
-        Ok(AtRulePrelude::OptionalBlock(vec![
+                     -> Result<AtRuleType<Vec<Json>, Json>, ()> {
+        Ok(AtRuleType::OptionalBlock(vec![
             "at-rule".to_json(),
             name.to_json(),
             Json::Array(component_values_to_json(input)),

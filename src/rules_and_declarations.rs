@@ -34,7 +34,7 @@ pub fn parse_important(input: &mut Parser) -> Result<Priority, ()> {
 }
 
 
-pub enum AtRulePrelude<P, R> {
+pub enum AtRuleType<P, R> {
     WithoutBlock(R),
     WithBlock(P),
     OptionalBlock(P),
@@ -52,7 +52,7 @@ pub trait DeclarationParser<D> {
 
 pub trait AtRuleParser<P, R> {
     fn parse_prelude(&mut self, name: &str, input: &mut Parser)
-                     -> Result<AtRulePrelude<P, R>, ()> {
+                     -> Result<AtRuleType<P, R>, ()> {
         let _ = name;
         let _ = input;
         Err(())
@@ -241,13 +241,13 @@ fn parse_at_rule<R, AP, P>(name: CowString, input: &mut Parser, parser: &mut P)
         parser.parse_prelude(name.as_slice(), input)
     }).or_else(|()| input.err_consume_until_after(delimiters)));
     match result {
-        AtRulePrelude::WithoutBlock(rule) => {
+        AtRuleType::WithoutBlock(rule) => {
             match input.next() {
                 Ok(Token::Semicolon) | Err(()) => Ok(rule),
                 _ => input.err_consume_until_after(delimiters)
             }
         }
-        AtRulePrelude::WithBlock(prelude) => {
+        AtRuleType::WithBlock(prelude) => {
             match input.next() {
                 Ok(Token::CurlyBracketBlock) => {
                     // FIXME: Make parse_entirely take `FnOnce`
@@ -260,7 +260,7 @@ fn parse_at_rule<R, AP, P>(name: CowString, input: &mut Parser, parser: &mut P)
                 _ => input.err_consume_until_after(delimiters)
             }
         }
-        AtRulePrelude::OptionalBlock(prelude) => {
+        AtRuleType::OptionalBlock(prelude) => {
             match input.next() {
                 Ok(Token::Semicolon) | Err(()) => parser.rule_without_block(prelude),
                 Ok(Token::CurlyBracketBlock) => {
