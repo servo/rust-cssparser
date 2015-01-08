@@ -227,6 +227,12 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
+    pub fn unexpected_ident<T>(&mut self, value: CowString<'i>) -> Result<T, ()> {
+        self.push_back(Token::Ident(value));
+        Err(())
+    }
+
+    #[inline]
     pub fn position(&self) -> SourcePosition {
         self.tokenizer.position()
     }
