@@ -11,7 +11,7 @@ use test;
 
 use encoding::label::encoding_from_whatwg_label;
 
-use super::{Tokenizer, Parser, Token, NumericValue, SourceLocation,
+use super::{Parser, Token, NumericValue, SourceLocation,
             DeclarationListParser, DeclarationParser, RuleListParser,
             AtRuleType, AtRuleParser, QualifiedRuleParser, Priority,
             parse_one_declaration, parse_one_rule, parse_important,
@@ -155,8 +155,7 @@ fn run_json_tests(json_data: &str, parse: |input: &mut Parser| -> Json) {
     run_raw_json_tests(json_data, |input, expected| {
         match input {
             Json::String(input) => {
-                // FIXME: Use Parser::parse_str when unboxed closures permit.
-                let result = parse(&mut Parser::new(&mut Tokenizer::new(input.as_slice())));
+                let result = parse(&mut Parser::new(input.as_slice()));
                 assert_json_eq(result, expected, input);
             },
             _ => panic!("Unexpected JSON")
@@ -361,7 +360,8 @@ fn serializer() {
         let mut tokens = vec![];
         flatten(input, &mut tokens);
         let serialized = tokens.to_css_string();
-        Json::Array(Parser::parse_str(serialized.as_slice(), component_values_to_json))
+        let parser = &mut Parser::new(serialized.as_slice());
+        Json::Array(component_values_to_json(parser))
     });
 }
 
@@ -388,29 +388,28 @@ fn serialize_rgba() {
 
 #[test]
 fn line_numbers() {
-    Parser::parse_str("foo bar\nbaz\r\n\n\"a\\\r\nb\"", |input| {
-        assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 1 });
-        assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("foo"))));
-        assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 4 });
-        assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace));
-        assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 5 });
-        assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("bar"))));
-        assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 8 });
-        assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace));
-        assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 1 });
-        assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("baz"))));
-        assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 4 });
-        let position = input.position();
+    let mut input = Parser::new("foo bar\nbaz\r\n\n\"a\\\r\nb\"");
+    assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 1 });
+    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("foo"))));
+    assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 4 });
+    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace));
+    assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 5 });
+    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("bar"))));
+    assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 8 });
+    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace));
+    assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 1 });
+    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("baz"))));
+    assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 4 });
+    let position = input.position();
 
-        assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace));
-        assert_eq!(input.current_source_location(), SourceLocation { line: 4, column: 1 });
+    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace));
+    assert_eq!(input.current_source_location(), SourceLocation { line: 4, column: 1 });
 
-        assert_eq!(input.source_location(position), SourceLocation { line: 2, column: 4 });
+    assert_eq!(input.source_location(position), SourceLocation { line: 2, column: 4 });
 
-        assert_eq!(input.next_including_whitespace(), Ok(Token::QuotedString(Borrowed("ab"))));
-        assert_eq!(input.current_source_location(), SourceLocation { line: 5, column: 3 });
-        assert_eq!(input.next_including_whitespace(), Err(()));
-    })
+    assert_eq!(input.next_including_whitespace(), Ok(Token::QuotedString(Borrowed("ab"))));
+    assert_eq!(input.current_source_location(), SourceLocation { line: 5, column: 3 });
+    assert_eq!(input.next_including_whitespace(), Err(()));
 }
 
 impl ToJson for Color {

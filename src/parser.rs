@@ -4,11 +4,40 @@
 
 use std::ascii::AsciiExt;
 use std::str::CowString;
-use super::{Token, NumericValue, Tokenizer, SourcePosition, SourceLocation};
+use std::ops;
+use tokenizer::{Token, NumericValue, Tokenizer, SourcePosition, SourceLocation};
+
+
+/// Like std::borrow::Cow, except:
+///
+/// * The Owned variant is boxed
+/// * The Borrowed variant contains a mutable reference.
+enum MaybeOwned<'a, T: 'a> {
+    Owned(Box<T>),
+    Borrowed(&'a mut T),
+}
+
+impl<'a, T> ops::Deref<T> for MaybeOwned<'a, T> {
+    fn deref<'a>(&'a self) -> &'a T {
+        match *self {
+            MaybeOwned::Owned(ref pointer) => &**pointer,
+            MaybeOwned::Borrowed(ref pointer) => &**pointer,
+        }
+    }
+}
+
+impl<'a, T> ops::DerefMut<T> for MaybeOwned<'a, T> {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut T {
+        match *self {
+            MaybeOwned::Owned(ref mut pointer) => &mut **pointer,
+            MaybeOwned::Borrowed(ref mut pointer) => &mut **pointer,
+        }
+    }
+}
 
 
 pub struct Parser<'i: 't, 't> {
-    tokenizer: &'t mut Tokenizer<'i>,
+    tokenizer: MaybeOwned<'t, Tokenizer<'i>>,
     /// If `Some(_)`, .parse_nested_block() can be called.
     at_start_of: Option<BlockType>,
     /// If `Some(_)`, this parser is from .parse_nested_block()
@@ -98,19 +127,14 @@ impl Delimiters {
 
 impl<'i, 't> Parser<'i, 't> {
     #[inline]
-    pub fn new(tokenizer: &'t mut Tokenizer<'i>) -> Parser<'i, 't> {
+    pub fn new(input: &'i str) -> Parser<'i, 'i> {
         Parser {
-            tokenizer: tokenizer,
+            tokenizer: MaybeOwned::Owned(box Tokenizer::new(input)),
             at_start_of: None,
             parse_until_after_end_of: None,
             parse_until_before: Delimiter::None,
             exhausted: false,
         }
-    }
-
-    #[inline]
-    pub fn parse_str<T>(input: &str, parse: |&mut Parser| -> T) -> T {
-        parse(&mut Parser::new(&mut Tokenizer::new(input.as_slice())))
     }
 
     #[inline]
@@ -199,7 +223,7 @@ impl<'i, 't> Parser<'i, 't> {
             return Err(())
         }
         if let Some(block_type) = self.at_start_of.take() {
-            if consume_until_end_of_block(block_type, self.tokenizer) {
+            if consume_until_end_of_block(block_type, &mut *self.tokenizer) {
                 self.exhausted = true;
                 return Err(())
             }
@@ -265,7 +289,7 @@ impl<'i, 't> Parser<'i, 't> {
         debug_assert!(!self.exhausted);
         let (result, nested_parser_is_exhausted) = {
             let mut nested_parser = Parser {
-                tokenizer: self.tokenizer,
+                tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
                 at_start_of: None,
                 parse_until_after_end_of: Some(block_type),
                 parse_until_before: Delimiter::None,
@@ -274,7 +298,7 @@ impl<'i, 't> Parser<'i, 't> {
             (nested_parser.parse_entirely(parse), nested_parser.exhausted)
         };
         if !nested_parser_is_exhausted {
-            if consume_until_end_of_block(block_type, self.tokenizer) {
+            if consume_until_end_of_block(block_type, &mut *self.tokenizer) {
                 self.exhausted = true;
             }
         }
@@ -287,7 +311,7 @@ impl<'i, 't> Parser<'i, 't> {
                                  -> Result <T, ()> {
         let (result, delimited_parser_is_exhausted) = {
             let mut delimited_parser = Parser {
-                tokenizer: self.tokenizer,
+                tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
                 at_start_of: self.at_start_of.take(),
                 parse_until_after_end_of: self.parse_until_after_end_of,
                 parse_until_before: self.parse_until_before | delimiters,
@@ -306,7 +330,7 @@ impl<'i, 't> Parser<'i, 't> {
                     break
                 }
                 if let Some(block_type) = BlockType::opening(&token) {
-                    if consume_until_end_of_block(block_type, self.tokenizer) {
+                    if consume_until_end_of_block(block_type, &mut *self.tokenizer) {
                         self.exhausted = true;
                         break
                     }

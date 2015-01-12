@@ -91,7 +91,6 @@ pub fn parse_stylesheet_rules_from_bytes<QP, AP, R, P, T>(
         css_bytes, protocol_encoding_label, environment_encoding);
     // FIXME: Remove option dance when unboxed closures permit.
     let mut rules_parser = Some(rules_parser);
-    Parser::parse_str(css_unicode.as_slice(), |input| {
-        parse(encoding, RuleListParser::new_for_stylesheet(input, rules_parser.take().unwrap()))
-    })
+    let input = &mut Parser::new(css_unicode.as_slice());
+    parse(encoding, RuleListParser::new_for_stylesheet(input, rules_parser.take().unwrap()))
 }
