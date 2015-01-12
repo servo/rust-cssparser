@@ -35,7 +35,14 @@ impl<'a, T> ops::DerefMut<T> for MaybeOwned<'a, T> {
     }
 }
 
+impl<'a, T> Clone for MaybeOwned<'a, T> where T: Clone {
+    fn clone(&self) -> MaybeOwned<'a, T> {
+        MaybeOwned::Owned(box() (**self).clone())
+    }
+}
 
+
+#[deriving(Clone)]
 pub struct Parser<'i: 't, 't> {
     tokenizer: MaybeOwned<'t, Tokenizer<'i>>,
     /// If `Some(_)`, .parse_nested_block() can be called.
@@ -48,7 +55,7 @@ pub struct Parser<'i: 't, 't> {
 }
 
 
-#[deriving(Copy, PartialEq, Eq, Show)]
+#[deriving(Copy, Clone, PartialEq, Eq, Show)]
 enum BlockType {
     Parenthesis,
     SquareBracket,
@@ -79,7 +86,7 @@ impl BlockType {
 
 
 
-#[deriving(Copy, PartialEq, Eq, Show)]
+#[deriving(Copy, Clone, PartialEq, Eq, Show)]
 pub struct Delimiters {
     bits: u8,
 }

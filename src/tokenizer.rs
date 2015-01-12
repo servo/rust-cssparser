@@ -106,6 +106,7 @@ pub struct NumericValue {
 }
 
 
+#[deriving(Clone)]
 pub struct Tokenizer<'a> {
     input: &'a str,
 
