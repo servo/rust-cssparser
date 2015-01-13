@@ -118,13 +118,17 @@ where P: DeclarationParser<I> + AtRuleParser<AP, I> {
             match self.input.next() {
                 Ok(Token::Semicolon) => {}
                 Ok(Token::Ident(name)) => {
-                    return Some(parse_declaration(name, self.input, &mut self.parser))
+                    let parser = &mut self.parser;
+                    return Some(self.input.parse_until_after(Delimiter::Semicolon, |input| {
+                        try!(input.expect_colon());
+                        parser.parse_value(name.as_slice(), input)
+                    }))
                 }
                 Ok(Token::AtKeyword(name)) => {
                     return Some(parse_at_rule(name, self.input, &mut self.parser))
                 }
                 Ok(_) => {
-                    return Some(self.input.err_consume_until_after(Delimiter::Semicolon))
+                    return Some(self.input.parse_until_after(Delimiter::Semicolon, |_| Err(())))
                 }
                 Err(()) => return None,
             }
@@ -219,32 +223,19 @@ pub fn parse_one_rule<QP, AP, R, P>(input: &mut Parser, parser: &mut P)
 }
 
 
-fn parse_declaration<D, P>(name: CowString, input: &mut Parser, parser: &mut P)
-                           -> Result<D, ()>
-                           where P: DeclarationParser<D> {
-    let result = input.parse_until_before(Delimiter::Semicolon).parse_entirely(|input| {
-        try!(input.expect_colon());
-        parser.parse_value(name.as_slice(), input)
-    });
-    match input.next() {
-        Ok(Token::Semicolon) | Err(()) => result,
-        _ => input.err_consume_until_after(Delimiter::Semicolon)
-    }
-}
-
-
 fn parse_at_rule<R, AP, P>(name: CowString, input: &mut Parser, parser: &mut P)
                            -> Result<R, ()>
                            where P: AtRuleParser<AP, R> {
     let delimiters = Delimiter::Semicolon | Delimiter::CurlyBracketBlock;
-    let result = try!(input.parse_until_before(delimiters).parse_entirely(|input| {
+    let result = try!(input.parse_until_before(delimiters, |input| {
         parser.parse_prelude(name.as_slice(), input)
-    }).or_else(|()| input.err_consume_until_after(delimiters)));
+    }));
     match result {
         AtRuleType::WithoutBlock(rule) => {
             match input.next() {
                 Ok(Token::Semicolon) | Err(()) => Ok(rule),
-                _ => input.err_consume_until_after(delimiters)
+                Ok(Token::CurlyBracketBlock) => Err(()),
+                Ok(_) => unreachable!()
             }
         }
         AtRuleType::WithBlock(prelude) => {
@@ -253,11 +244,12 @@ fn parse_at_rule<R, AP, P>(name: CowString, input: &mut Parser, parser: &mut P)
                     // FIXME: Make parse_entirely take `FnOnce`
                     // and remove this Option dance.
                     let mut prelude = Some(prelude);
-                    input.parse_nested_block().parse_entirely(|input| {
+                    input.parse_nested_block(|input| {
                         parser.parse_block(prelude.take().unwrap(), input)
                     })
                 }
-                _ => input.err_consume_until_after(delimiters)
+                Ok(Token::Semicolon) | Err(()) => Err(()),
+                Ok(_) => unreachable!()
             }
         }
         AtRuleType::OptionalBlock(prelude) => {
@@ -267,11 +259,11 @@ fn parse_at_rule<R, AP, P>(name: CowString, input: &mut Parser, parser: &mut P)
                     // FIXME: Make parse_entirely take `FnOnce`
                     // and remove this Option dance.
                     let mut prelude = Some(prelude);
-                    input.parse_nested_block().parse_entirely(|input| {
+                    input.parse_nested_block(|input| {
                         parser.parse_block(prelude.take().unwrap(), input)
                     })
                 }
-                _ => input.err_consume_until_after(delimiters)
+                _ => unreachable!()
             }
         }
     }
@@ -281,19 +273,18 @@ fn parse_at_rule<R, AP, P>(name: CowString, input: &mut Parser, parser: &mut P)
 fn parse_qualified_rule<R, AP, P>(input: &mut Parser, parser: &mut P)
                                   -> Result<R, ()>
                                   where P: QualifiedRuleParser<AP, R> {
-    let prelude = try!(input.parse_until_before(Delimiter::CurlyBracketBlock)
-                            .parse_entirely(|input| {
+    let prelude = try!(input.parse_until_before(Delimiter::CurlyBracketBlock, |input| {
         parser.parse_prelude(input)
-    }).or_else(|()| input.err_consume_until_after(Delimiter::CurlyBracketBlock)));
-    match input.next() {
-        Ok(Token::CurlyBracketBlock) => {
+    }));
+    match try!(input.next()) {
+        Token::CurlyBracketBlock => {
             // FIXME: Make parse_entirely take `FnOnce`
             // and remove this Option dance.
             let mut prelude = Some(prelude);
-            input.parse_nested_block().parse_entirely(|input| {
+            input.parse_nested_block(|input| {
                 parser.parse_block(prelude.take().unwrap(), input)
             })
         }
-        _ => input.err_consume_until_after(Delimiter::CurlyBracketBlock)
+        _ => unreachable!()
     }
 }

@@ -340,7 +340,7 @@ fn nth() {
 #[test]
 fn serializer() {
     run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
-        fn flatten<'i, 't>(input: &mut Parser<'i, 't>, tokens: &mut Vec<Token<'i>>) {
+        fn flatten(input: &mut Parser, tokens: &mut Vec<Token<'static>>) {
             while let Ok(token) = input.next_including_whitespace() {
                 let closing_token = match token {
                     Token::Function(_) | Token::ParenthesisBlock => Some(Token::CloseParenthesis),
@@ -348,9 +348,12 @@ fn serializer() {
                     Token::CurlyBracketBlock => Some(Token::CloseCurlyBracket),
                     _ => None
                 };
-                tokens.push(token);
+                tokens.push(token.into_owned());
                 if let Some(closing_token) = closing_token {
-                    flatten(&mut input.parse_nested_block(), tokens);
+                    input.parse_nested_block(|input| {
+                        flatten(input, tokens);
+                        Ok(())
+                    }).unwrap();
                     tokens.push(closing_token);
                 }
             }
@@ -517,6 +520,10 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         ]
     }
 
+    fn nested(input: &mut Parser) -> Vec<Json> {
+        input.parse_nested_block(|input| Ok(component_values_to_json(input))).unwrap()
+    }
+
     match token {
         Token::Ident(value) => JArray!["ident", value],
         Token::AtKeyword(value) => JArray!["at-keyword", value],
@@ -548,22 +555,11 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::CDO => "<!--".to_json(),
         Token::CDC => "-->".to_json(),
 
-        Token::Function(name) => {
-            Json::Array(vec!["function".to_json(), name.to_json()] +
-                       component_values_to_json(&mut input.parse_nested_block()))
-        }
-        Token::ParenthesisBlock => {
-            Json::Array(vec!["()".to_json()] +
-                       component_values_to_json(&mut input.parse_nested_block()))
-        }
-        Token::SquareBracketBlock => {
-            Json::Array(vec!["[]".to_json()] +
-                       component_values_to_json(&mut input.parse_nested_block()))
-        }
-        Token::CurlyBracketBlock => {
-            Json::Array(vec!["{}".to_json()] +
-                       component_values_to_json(&mut input.parse_nested_block()))
-        }
+        Token::Function(name) => Json::Array(vec!["function".to_json(), name.to_json()] +
+                                             nested(input)),
+        Token::ParenthesisBlock => Json::Array(vec!["()".to_json()] + nested(input)),
+        Token::SquareBracketBlock => Json::Array(vec!["[]".to_json()] + nested(input)),
+        Token::CurlyBracketBlock => Json::Array(vec!["{}".to_json()] + nested(input)),
         Token::BadUrl => JArray!["error", "bad-url"],
         Token::BadString => JArray!["error", "bad-string"],
         Token::CloseParenthesis => JArray!["error", ")"],

@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::fmt;
+use std::mem;
 use std::num::Float;
 
 use text_writer::{mod, TextWriter};
@@ -237,59 +238,76 @@ impl<'a, W> TextWriter for CssStringWriter<'a, W> where W: TextWriter {
 
 impl<'a> ToCss for [Token<'a>] {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
-        use Token::*;
+        let mut writer = TokenWriter::new(dest);
+        for token in self.iter() {
+            try!(writer.write(token))
+        }
+        Ok(())
+    }
+}
 
-        let mut iter = self.iter();
-        let mut previous = match iter.next() {
-            None => return Ok(()),
-            Some(first) => { try!(first.to_css(dest)); first }
-        };
-        while let Some(component_value) = iter.next() {
-            let (a, b) = (previous, component_value);
-            if (
-                matches!(*a, Ident(..) | AtKeyword(..) | Hash(..) | IDHash(..) |
-                             Dimension(..) | Delim('#') | Delim('-') | Number(..)) &&
-                matches!(*b, Ident(..) | Function(..) | Url(..) | BadUrl(..) |
-                             Number(..) | Percentage(..) | Dimension(..) | UnicodeRange(..))
-            ) || (
-                matches!(*a, Ident(..)) &&
-                matches!(*b, ParenthesisBlock(..))
-            ) || (
-                matches!(*a, Ident(..) | AtKeyword(..) | Hash(..) | IDHash(..) | Dimension(..)) &&
-                matches!(*b, Delim('-') | CDC)
-            ) || (
-                matches!(*a, Delim('#') | Delim('-') | Number(..) | Delim('@')) &&
-                matches!(*b, Ident(..) | Function(..) | Url(..) | BadUrl(..))
-            ) || (
-                matches!(*a, Delim('@')) &&
-                matches!(*b, Ident(..) | Function(..) | Url(..) | BadUrl(..) |
-                             UnicodeRange(..) | Delim('-'))
-            ) || (
-                matches!(*a, UnicodeRange(..) | Delim('.') | Delim('+')) &&
-                matches!(*b, Number(..) | Percentage(..) | Dimension(..))
-            ) || (
-                matches!(*a, UnicodeRange(..)) &&
-                matches!(*b, Ident(..) | Function(..) | Delim('?'))
-            ) || matches!((a, b), (&Delim(a), &Delim(b)) if matches!((a, b),
-                ('#', '-') |
-                ('$', '=') |
-                ('*', '=') |
-                ('^', '=') |
-                ('~', '=') |
-                ('|', '=') |
-                ('|', '|') |
-                ('/', '*')
-            )) {
-                try!(dest.write_str("/**/"));
-            }
-            // Skip whitespace when '\n' was previously written at the previous iteration.
-            if !matches!((previous, component_value), (&Delim('\\'), &WhiteSpace)) {
-                try!(component_value.to_css(dest));
-            }
-            if component_value == &Delim('\\') {
-                try!(dest.write_char('\n'));
-            }
-            previous = component_value;
+
+pub struct TokenWriter<'i, 'a, W: 'a> {
+    dest: &'a mut W,
+    previous_token: Option<Token<'i>>,
+}
+
+impl<'i, 'a, W> TokenWriter<'i, 'a, W> where W: TextWriter {
+    pub fn new<'a>(dest: &'a mut W) -> TokenWriter<'i, 'a, W> {
+        TokenWriter {
+            dest: dest,
+            previous_token: None,
+        }
+    }
+
+    pub fn write(&mut self, token: &Token<'i>) -> text_writer::Result {
+        use Token::*;
+        let previous = &mem::replace(&mut self.previous_token, Some((*token).clone()))
+                        // A "not special" token:
+                        .unwrap_or(Colon);
+        let (a, b) = (previous, token);
+        if (
+            matches!(*a, Ident(..) | AtKeyword(..) | Hash(..) | IDHash(..) |
+                         Dimension(..) | Delim('#') | Delim('-') | Number(..)) &&
+            matches!(*b, Ident(..) | Function(..) | Url(..) | BadUrl(..) |
+                         Number(..) | Percentage(..) | Dimension(..) | UnicodeRange(..))
+        ) || (
+            matches!(*a, Ident(..)) &&
+            matches!(*b, ParenthesisBlock(..))
+        ) || (
+            matches!(*a, Ident(..) | AtKeyword(..) | Hash(..) | IDHash(..) | Dimension(..)) &&
+            matches!(*b, Delim('-') | CDC)
+        ) || (
+            matches!(*a, Delim('#') | Delim('-') | Number(..) | Delim('@')) &&
+            matches!(*b, Ident(..) | Function(..) | Url(..) | BadUrl(..))
+        ) || (
+            matches!(*a, Delim('@')) &&
+            matches!(*b, Ident(..) | Function(..) | Url(..) | BadUrl(..) |
+                         UnicodeRange(..) | Delim('-'))
+        ) || (
+            matches!(*a, UnicodeRange(..) | Delim('.') | Delim('+')) &&
+            matches!(*b, Number(..) | Percentage(..) | Dimension(..))
+        ) || (
+            matches!(*a, UnicodeRange(..)) &&
+            matches!(*b, Ident(..) | Function(..) | Delim('?'))
+        ) || matches!((a, b), (&Delim(a), &Delim(b)) if matches!((a, b),
+            ('#', '-') |
+            ('$', '=') |
+            ('*', '=') |
+            ('^', '=') |
+            ('~', '=') |
+            ('|', '=') |
+            ('|', '|') |
+            ('/', '*')
+        )) {
+            try!(self.dest.write_str("/**/"));
+        }
+        // Skip whitespace when '\n' was previously written at the previous iteration.
+        if !matches!((previous, token), (&Delim('\\'), &WhiteSpace)) {
+            try!(token.to_css(self.dest));
+        }
+        if token == &Delim('\\') {
+            try!(self.dest.write_char('\n'));
         }
         Ok(())
     }

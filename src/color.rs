@@ -70,7 +70,7 @@ impl Color {
             }
             Token::Ident(ref value) => parse_color_keyword(value.as_slice()),
             Token::Function(ref name) => {
-                input.parse_nested_block().parse_entirely(|arguments| {
+                input.parse_nested_block(|arguments| {
                     parse_color_function(name.as_slice(), arguments)
                 })
             }
