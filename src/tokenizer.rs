@@ -4,7 +4,9 @@
 
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 
-use std::{char, num};
+use std::cell::Cell;
+use std::char;
+use std::num;
 use std::ascii::AsciiExt;
 use std::borrow::{Cow, ToOwned};
 use std::str::CowString;
@@ -117,8 +119,7 @@ pub struct Tokenizer<'a> {
     buffer: Option<Token<'a>>,
 
     /// Cache for `source_location()`
-    last_known_line_number: uint,
-    position_after_last_known_newline: uint,
+    last_known_line_break: Cell<(uint, uint)>,
 }
 
 
@@ -129,8 +130,7 @@ impl<'a> Tokenizer<'a> {
             input: input,
             position: 0,
             buffer: None,
-            last_known_line_number: 1,
-            position_after_last_known_newline: 0,
+            last_known_line_break: Cell::new((1, 0)),
         }
     }
 
@@ -172,18 +172,20 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn current_source_location(&mut self) -> SourceLocation {
+    pub fn current_source_location(&self) -> SourceLocation {
         let position = SourcePosition(self.position);
         self.source_location(position)
     }
 
-    pub fn source_location(&mut self, position: SourcePosition) -> SourceLocation {
+    pub fn source_location(&self, position: SourcePosition) -> SourceLocation {
         let target = position.0;
         let mut line_number;
         let mut position;
-        if target >= self.position_after_last_known_newline {
-            position = self.position_after_last_known_newline;
-            line_number = self.last_known_line_number;
+        let (last_known_line_number, position_after_last_known_newline) =
+            self.last_known_line_break.get();
+        if target >= position_after_last_known_newline {
+            position = position_after_last_known_newline;
+            line_number = last_known_line_number;
         } else {
             position = 0;
             line_number = 1;
@@ -201,8 +203,7 @@ impl<'a> Tokenizer<'a> {
             line_number += 1;
         }
         debug_assert!(position <= target);
-        self.position_after_last_known_newline = position;
-        self.last_known_line_number = line_number;
+        self.last_known_line_break.set((line_number, position));
         SourceLocation {
             line: line_number,
             // `target == position` when `target` is at the beginning of the line,

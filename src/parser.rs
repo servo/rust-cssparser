@@ -206,12 +206,12 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
-    pub fn current_source_location(&mut self) -> SourceLocation {
+    pub fn current_source_location(&self) -> SourceLocation {
         self.tokenizer.current_source_location()
     }
 
     #[inline]
-    pub fn source_location(&mut self, target: SourcePosition) -> SourceLocation {
+    pub fn source_location(&self, target: SourcePosition) -> SourceLocation {
         self.tokenizer.source_location(target)
     }
 
