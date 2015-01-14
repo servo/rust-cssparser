@@ -294,7 +294,10 @@ impl<'i, 't> Parser<'i, 't> {
             token was just consumed.\
         ");
         debug_assert!(!self.exhausted);
-        let (result, nested_parser_is_exhausted) = {
+        let result;
+        let nested_parser_is_exhausted;
+        // Introduce a new scope to limit duration of nested_parser’s borrow
+        {
             let mut nested_parser = Parser {
                 tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
                 at_start_of: None,
@@ -302,8 +305,9 @@ impl<'i, 't> Parser<'i, 't> {
                 parse_until_before: Delimiter::None,
                 exhausted: false,
             };
-            (nested_parser.parse_entirely(parse), nested_parser.exhausted)
-        };
+            result = nested_parser.parse_entirely(parse);
+            nested_parser_is_exhausted = nested_parser.exhausted;
+        }
         if !nested_parser_is_exhausted {
             if consume_until_end_of_block(block_type, &mut *self.tokenizer) {
                 self.exhausted = true;
@@ -316,7 +320,10 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn parse_until_before<T>(&mut self, delimiters: Delimiters,
                                  parse: |&mut Parser| -> Result<T, ()>)
                                  -> Result <T, ()> {
-        let (result, delimited_parser_is_exhausted) = {
+        let result;
+        let delimited_parser_is_exhausted;
+        // Introduce a new scope to limit duration of nested_parser’s borrow
+        {
             let mut delimited_parser = Parser {
                 tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
                 at_start_of: self.at_start_of.take(),
@@ -324,8 +331,9 @@ impl<'i, 't> Parser<'i, 't> {
                 parse_until_before: self.parse_until_before | delimiters,
                 exhausted: self.exhausted,
             };
-            (delimited_parser.parse_entirely(parse), delimited_parser.exhausted)
-        };
+            result = delimited_parser.parse_entirely(parse);
+            delimited_parser_is_exhausted = delimited_parser.exhausted;
+        }
         if !delimited_parser_is_exhausted {
             // FIXME: have a special-purpose tokenizer method for this that does less work.
             while let Ok(token) = self.tokenizer.next() {
