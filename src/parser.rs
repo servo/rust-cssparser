@@ -153,10 +153,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_exhausted(&mut self) -> Result<(), ()> {
         match self.next() {
             Err(()) => Ok(()),
-            Ok(token) => {
-                self.push_back(token);
-                Err(())
-            }
+            Ok(token) => self.unexpected(token),
         }
     }
 
@@ -214,7 +211,6 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn source_location(&self, target: SourcePosition) -> SourceLocation {
         self.tokenizer.source_location(target)
     }
-
 
     pub fn next(&mut self) -> Result<Token<'i>, ()> {
         loop {
@@ -320,6 +316,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn parse_until_before<T>(&mut self, delimiters: Delimiters,
                                  parse: |&mut Parser| -> Result<T, ()>)
                                  -> Result <T, ()> {
+        let delimiters = self.parse_until_before | delimiters;
         let result;
         let delimited_parser_is_exhausted;
         // Introduce a new scope to limit duration of nested_parser’s borrow
@@ -328,7 +325,7 @@ impl<'i, 't> Parser<'i, 't> {
                 tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
                 at_start_of: self.at_start_of.take(),
                 parse_until_after_end_of: self.parse_until_after_end_of,
-                parse_until_before: self.parse_until_before | delimiters,
+                parse_until_before: delimiters,
                 exhausted: self.exhausted,
             };
             result = delimited_parser.parse_entirely(parse);

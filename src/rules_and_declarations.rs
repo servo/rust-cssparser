@@ -273,18 +273,18 @@ fn parse_at_rule<R, AP, P>(name: CowString, input: &mut Parser, parser: &mut P)
 fn parse_qualified_rule<R, AP, P>(input: &mut Parser, parser: &mut P)
                                   -> Result<R, ()>
                                   where P: QualifiedRuleParser<AP, R> {
-    let prelude = try!(input.parse_until_before(Delimiter::CurlyBracketBlock, |input| {
+    let prelude = input.parse_until_before(Delimiter::CurlyBracketBlock, |input| {
         parser.parse_prelude(input)
-    }));
+    });
     match try!(input.next()) {
         Token::CurlyBracketBlock => {
             // FIXME: Make parse_entirely take `FnOnce`
             // and remove this Option dance.
-            let mut prelude = Some(prelude);
+            let mut prelude = Some(try!(prelude));
             input.parse_nested_block(|input| {
                 parser.parse_block(prelude.take().unwrap(), input)
             })
         }
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
