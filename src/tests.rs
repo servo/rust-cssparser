@@ -11,7 +11,7 @@ use test;
 
 use encoding::label::encoding_from_whatwg_label;
 
-use super::{Parser, Token, NumericValue, SourceLocation,
+use super::{Parser, Token, NumericValue, PercentageValue, SourceLocation,
             DeclarationListParser, DeclarationParser, RuleListParser,
             AtRuleType, AtRuleParser, QualifiedRuleParser, Priority,
             parse_one_declaration, parse_one_rule, parse_important,
@@ -534,8 +534,12 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::Delim(value) => String::from_char(1, value).to_json(),
 
         Token::Number(value) => Json::Array(vec!["number".to_json()] + numeric(value)),
-        Token::Percentage(value) => Json::Array(
-            vec!["percentage".to_json()] + numeric(value)),
+        Token::Percentage(PercentageValue { unit_value, int_value, signed }) => Json::Array(
+            vec!["percentage".to_json()] + numeric(NumericValue {
+                value: unit_value * 100.,
+                int_value: int_value,
+                signed: signed,
+            })),
         Token::Dimension(value, unit) => Json::Array(
             vec!["dimension".to_json()] + numeric(value) + [unit.to_json()].as_slice()),
 

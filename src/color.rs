@@ -313,11 +313,11 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
                 blue = try!(arguments.expect_integer()) as f32 / 255.;
             }
             Token::Percentage(ref v) => {
-                red = (v.value / 100.) as f32;
+                red = v.unit_value as f32;
                 try!(arguments.expect_comma());
-                green = (try!(arguments.expect_percentage()) / 100.) as f32;
+                green = try!(arguments.expect_percentage()) as f32;
                 try!(arguments.expect_comma());
-                blue = (try!(arguments.expect_percentage()) / 100.) as f32;
+                blue = try!(arguments.expect_percentage()) as f32;
             }
             _ => return Err(())
         };
@@ -325,9 +325,9 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
         let hue = try!(arguments.expect_number()) / 360.;
         let hue = hue - hue.floor();
         try!(arguments.expect_comma());
-        let saturation = (try!(arguments.expect_percentage()) / 100.).max(0.).min(1.);
+        let saturation = (try!(arguments.expect_percentage())).max(0.).min(1.);
         try!(arguments.expect_comma());
-        let lightness = (try!(arguments.expect_percentage()) / 100.).max(0.).min(1.);
+        let lightness = (try!(arguments.expect_percentage())).max(0.).min(1.);
 
         // http://www.w3.org/TR/css3-color/#hsl-color
         fn hue_to_rgb(m1: f64, m2: f64, mut h: f64) -> f64 {

@@ -5,7 +5,7 @@
 use std::ascii::AsciiExt;
 use std::str::CowString;
 use std::ops;
-use tokenizer::{Token, NumericValue, Tokenizer, SourcePosition, SourceLocation};
+use tokenizer::{Token, NumericValue, PercentageValue, Tokenizer, SourcePosition, SourceLocation};
 
 
 /// Like std::borrow::Cow, except:
@@ -434,7 +434,7 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn expect_percentage(&mut self) -> Result<f64, ()> {
         match try!(self.next()) {
-            Token::Percentage(NumericValue { value, .. }) => Ok(value),
+            Token::Percentage(PercentageValue { unit_value, .. }) => Ok(unit_value),
             token => self.unexpected(token)
         }
     }

@@ -26,7 +26,7 @@ pub enum Token<'a> {
     Url(CowString<'a>),
     Delim(char),
     Number(NumericValue),
-    Percentage(NumericValue),
+    Percentage(PercentageValue),
     Dimension(NumericValue, CowString<'a>),
     UnicodeRange(u32, u32),  // (start, end) of range
     WhiteSpace,
@@ -102,6 +102,16 @@ impl<'a> Token<'a> {
 #[deriving(PartialEq, Show, Copy, Clone)]
 pub struct NumericValue {
     pub value: f64,
+    pub int_value: Option<i64>,
+    /// Whether the number had a `+` or `-` sign.
+    pub signed: bool,
+}
+
+
+#[deriving(PartialEq, Show, Copy, Clone)]
+pub struct PercentageValue {
+    /// This (but not int_value) is divided by 100
+    pub unit_value: f64,
     pub int_value: Option<i64>,
     /// Whether the number had a `+` or `-` sign.
     pub signed: bool,
@@ -616,16 +626,20 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
             None
         })
     };
+    if !tokenizer.is_eof() && tokenizer.current_char() == '%' {
+        tokenizer.advance(1);
+        return Percentage(PercentageValue {
+            unit_value: value / 100.,
+            int_value: int_value,
+            signed: signed,
+        })
+    }
     let value = NumericValue {
         value: value,
         int_value: int_value,
         signed: signed,
     };
-    if !tokenizer.is_eof() && tokenizer.current_char() == '%' {
-        tokenizer.advance(1);
-        Percentage(value)
-    }
-    else if is_ident_start(tokenizer) { Dimension(value, consume_name(tokenizer)) }
+    if is_ident_start(tokenizer) { Dimension(value, consume_name(tokenizer)) }
     else { Number(value) }
 }
 

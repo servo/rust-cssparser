@@ -8,7 +8,7 @@ use std::num::Float;
 
 use text_writer::{mod, TextWriter};
 
-use super::{Token, NumericValue};
+use super::{Token, NumericValue, PercentageValue};
 
 
 pub trait ToCss for Sized? {
@@ -86,7 +86,12 @@ impl<'a> ToCss for Token<'a> {
             Token::Delim(value) => try!(dest.write_char(value)),
 
             Token::Number(value) => try!(write_numeric(value, dest)),
-            Token::Percentage(value) => {
+            Token::Percentage(PercentageValue { unit_value, int_value, signed }) => {
+                let value = NumericValue {
+                    value: unit_value * 100.,
+                    int_value: int_value,
+                    signed: signed,
+                };
                 try!(write_numeric(value, dest));
                 try!(dest.write_char('%'));
             },
