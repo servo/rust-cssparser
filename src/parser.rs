@@ -48,7 +48,7 @@ pub struct Parser<'i: 't, 't> {
     /// If `Some(_)`, .parse_nested_block() can be called.
     at_start_of: Option<BlockType>,
     /// If `Some(_)`, this parser is from .parse_nested_block()
-    parse_until_after_end_of: Option<BlockType>,
+    parse_until_before_end_of: Option<BlockType>,
     /// For parsers from `parse_until`
     parse_until_before: Delimiters,
     exhausted: bool,
@@ -117,10 +117,6 @@ impl Delimiters {
         (self.bits & other.bits) != 0
     }
 
-    fn is_none(&self) -> bool {
-        self.bits == 0
-    }
-
     fn from_token(token: &Token) -> Delimiters {
         match *token {
             Token::Semicolon => Delimiter::Semicolon,
@@ -138,7 +134,7 @@ impl<'i, 't> Parser<'i, 't> {
         Parser {
             tokenizer: MaybeOwned::Owned(box Tokenizer::new(input)),
             at_start_of: None,
-            parse_until_after_end_of: None,
+            parse_until_before_end_of: None,
             parse_until_before: Delimiter::None,
             exhausted: false,
         }
@@ -242,11 +238,9 @@ impl<'i, 't> Parser<'i, 't> {
                     self.exhausted = true;
                     return Err(())
                 }
-                if self.parse_until_after_end_of.is_some() &&
-                        BlockType::closing(&token) == self.parse_until_after_end_of {
-                    if !self.parse_until_before.is_none() {
-                        self.tokenizer.push_back(token);
-                    }
+                if self.parse_until_before_end_of.is_some() &&
+                        BlockType::closing(&token) == self.parse_until_before_end_of {
+                    self.tokenizer.push_back(token);
                     self.exhausted = true;
                     return Err(())
                 }
@@ -291,23 +285,19 @@ impl<'i, 't> Parser<'i, 't> {
         ");
         debug_assert!(!self.exhausted);
         let result;
-        let nested_parser_is_exhausted;
         // Introduce a new scope to limit duration of nested_parser’s borrow
         {
             let mut nested_parser = Parser {
                 tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
                 at_start_of: None,
-                parse_until_after_end_of: Some(block_type),
+                parse_until_before_end_of: Some(block_type),
                 parse_until_before: Delimiter::None,
                 exhausted: false,
             };
             result = nested_parser.parse_entirely(parse);
-            nested_parser_is_exhausted = nested_parser.exhausted;
         }
-        if !nested_parser_is_exhausted {
-            if consume_until_end_of_block(block_type, &mut *self.tokenizer) {
-                self.exhausted = true;
-            }
+        if consume_until_end_of_block(block_type, &mut *self.tokenizer) {
+            self.exhausted = true;
         }
         result
     }
@@ -324,7 +314,7 @@ impl<'i, 't> Parser<'i, 't> {
             let mut delimited_parser = Parser {
                 tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
                 at_start_of: self.at_start_of.take(),
-                parse_until_after_end_of: self.parse_until_after_end_of,
+                parse_until_before_end_of: self.parse_until_before_end_of,
                 parse_until_before: delimiters,
                 exhausted: self.exhausted,
             };
@@ -335,8 +325,8 @@ impl<'i, 't> Parser<'i, 't> {
             // FIXME: have a special-purpose tokenizer method for this that does less work.
             while let Ok(token) = self.tokenizer.next() {
                 if delimiters.contains(Delimiters::from_token(&token)) || (
-                    self.parse_until_after_end_of.is_some() &&
-                    BlockType::closing(&token) == self.parse_until_after_end_of
+                    self.parse_until_before_end_of.is_some() &&
+                    BlockType::closing(&token) == self.parse_until_before_end_of
                 ) {
                     self.tokenizer.push_back(token);
                     break
