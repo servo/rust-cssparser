@@ -4,7 +4,7 @@
 
 use std::ascii::AsciiExt;
 use std::fmt;
-use std::num::{Float, FloatMath};
+use std::num::Float;
 
 use text_writer::{self, TextWriter};
 

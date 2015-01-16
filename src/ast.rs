@@ -17,8 +17,8 @@ pub struct NumericValue {
 
 #[derive(PartialEq, Show, Copy)]
 pub struct SourceLocation {
-    pub line: uint,  // First line is 1
-    pub column: uint,  // First character of a line is at column 1
+    pub line: usize,  // First line is 1
+    pub column: usize,  // First character of a line is at column 1
 }
 
 
@@ -122,7 +122,7 @@ pub enum ErrorReason {
 
 impl fmt::Show for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}:{} {}", self.location.line, self.location.column, self.reason)
+        write!(f, "{}:{} {:?}", self.location.line, self.location.column, self.reason)
     }
 }
 

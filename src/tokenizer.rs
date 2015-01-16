@@ -83,10 +83,10 @@ mod bench_preprocess {
 
 pub struct Tokenizer {
     input: String,
-    length: uint,  // All counted in bytes, not characters
-    position: uint,  // All counted in bytes, not characters
-    line: uint,
-    last_line_start: uint,  // All counted in bytes, not characters
+    length: usize,  // All counted in bytes, not characters
+    position: usize,  // All counted in bytes, not characters
+    line: usize,
+    last_line_start: usize,  // All counted in bytes, not characters
 }
 
 
@@ -99,7 +99,7 @@ impl Tokenizer {
     fn current_char(&self) -> char { self.char_at(0) }
 
     #[inline]
-    fn char_at(&self, offset: uint) -> char {
+    fn char_at(&self, offset: usize) -> char {
         self.input.as_slice().char_at(self.position + offset)
     }
 
@@ -581,8 +581,8 @@ fn consume_unicode_range(tokenizer: &mut Tokenizer) -> ComponentValue {
           && is_match!(tokenizer.current_char(), '0'...'9' | 'A'...'F' | 'a'...'f') {
         hex.push(tokenizer.consume_char());
     }
-    let max_question_marks = 6u - hex.len();
-    let mut question_marks = 0u;
+    let max_question_marks = 6us - hex.len();
+    let mut question_marks = 0us;
     while question_marks < max_question_marks && !tokenizer.is_eof()
             && tokenizer.current_char() == '?' {
         question_marks += 1;
