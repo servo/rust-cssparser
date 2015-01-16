@@ -217,9 +217,7 @@ impl<'i, 't> Parser<'i, 't> {
 
     pub fn next_including_whitespace(&mut self) -> Result<Token<'i>, ()> {
         if let Some(block_type) = self.at_start_of.take() {
-            if consume_until_end_of_block(block_type, &mut *self.tokenizer) {
-                return Err(())
-            }
+            consume_until_end_of_block(block_type, &mut *self.tokenizer);
         }
         let token = try!(self.tokenizer.next());
         if self.parse_until_before.contains(Delimiters::from_token(&token)) {
@@ -309,9 +307,7 @@ impl<'i, 't> Parser<'i, 't> {
                 break
             }
             if let Some(block_type) = BlockType::opening(&token) {
-                if consume_until_end_of_block(block_type, &mut *self.tokenizer) {
-                    break
-                }
+                consume_until_end_of_block(block_type, &mut *self.tokenizer);
             }
         }
         result
@@ -455,17 +451,14 @@ impl<'i, 't> Parser<'i, 't> {
 
 
 /// Return value indicates whether the end of the input was reached.
-fn consume_until_end_of_block(block_type: BlockType, tokenizer: &mut Tokenizer) -> bool {
+fn consume_until_end_of_block(block_type: BlockType, tokenizer: &mut Tokenizer) {
     // FIXME: have a special-purpose tokenizer method for this that does less work.
     while let Ok(ref token) = tokenizer.next() {
         if BlockType::closing(token) == Some(block_type) {
-            return false
+            return
         }
         if let Some(block_type) = BlockType::opening(token) {
-            if consume_until_end_of_block(block_type, tokenizer) {
-                return true
-            }
+            consume_until_end_of_block(block_type, tokenizer);
         }
     }
-    true
 }
