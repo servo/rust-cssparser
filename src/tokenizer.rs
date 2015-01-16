@@ -222,7 +222,7 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    // If false, `tokenizer.current_char()` will not panic.
+    // If false, `tokenizer.next_char()` will not panic.
     #[inline]
     fn is_eof(&self) -> bool { !self.has_at_least(0) }
 
@@ -236,7 +236,7 @@ impl<'a> Tokenizer<'a> {
 
     // Assumes non-EOF
     #[inline]
-    fn current_char(&self) -> char { self.char_at(0) }
+    fn next_char(&self) -> char { self.char_at(0) }
 
     #[inline]
     fn char_at(&self, offset: uint) -> char {
@@ -281,11 +281,11 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
     if tokenizer.is_eof() {
         return None
     }
-    let c = tokenizer.current_char();
+    let c = tokenizer.next_char();
     let token = match c {
         '\t' | '\n' | ' ' | '\r' | '\x0C' => {
             while !tokenizer.is_eof() {
-                match tokenizer.current_char() {
+                match tokenizer.next_char() {
                     ' ' | '\t' | '\n' | '\r' | '\x0C' => tokenizer.advance(1),
                     _ => break,
                 }
@@ -296,7 +296,7 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
         '#' => {
             tokenizer.advance(1);
             if is_ident_start(tokenizer) { IDHash(consume_name(tokenizer)) }
-            else if !tokenizer.is_eof() && match tokenizer.current_char() {
+            else if !tokenizer.is_eof() && match tokenizer.next_char() {
                 'a'...'z' | 'A'...'Z' | '0'...'9' | '-' | '_' => true,
                 '\\' => !tokenizer.has_newline_at(1),
                 _ => c > '\x7F',  // Non-ASCII
@@ -426,7 +426,7 @@ fn consume_comments(tokenizer: &mut Tokenizer) {
         while !tokenizer.is_eof() {
             if tokenizer.consume_char() == '*' &&
                !tokenizer.is_eof() &&
-               tokenizer.current_char() == '/' {
+               tokenizer.next_char() == '/' {
                 tokenizer.advance(1);
                 break
             }
@@ -453,7 +453,7 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
         if tokenizer.is_eof() {
             return Ok(Borrowed(tokenizer.slice_from(start_pos)))
         }
-        match tokenizer.current_char() {
+        match tokenizer.next_char() {
             '"' if !single_quote => {
                 let value = tokenizer.slice_from(start_pos);
                 tokenizer.advance(1);
@@ -476,7 +476,7 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
     }
 
     while !tokenizer.is_eof() {
-        if matches!(tokenizer.current_char(), '\n' | '\r' | '\x0C') {
+        if matches!(tokenizer.next_char(), '\n' | '\r' | '\x0C') {
             return Err(());
         }
         match tokenizer.consume_char() {
@@ -484,12 +484,12 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
             '\'' if single_quote => break,
             '\\' => {
                 if !tokenizer.is_eof() {
-                    match tokenizer.current_char() {
+                    match tokenizer.next_char() {
                         // Escaped newline
                         '\n' | '\x0C' => tokenizer.advance(1),
                         '\r' => {
                             tokenizer.advance(1);
-                            if !tokenizer.is_eof() && tokenizer.current_char() == '\n' {
+                            if !tokenizer.is_eof() && tokenizer.next_char() == '\n' {
                                 tokenizer.advance(1);
                             }
                         }
@@ -508,7 +508,7 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
 
 #[inline]
 fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
-    !tokenizer.is_eof() && match tokenizer.current_char() {
+    !tokenizer.is_eof() && match tokenizer.next_char() {
         'a'...'z' | 'A'...'Z' | '_' | '\0' => true,
         '-' => tokenizer.has_at_least(1) && match tokenizer.char_at(1) {
             'a'...'z' | 'A'...'Z' | '-' | '_' | '\0' => true,
@@ -523,7 +523,7 @@ fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
 
 fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     let value = consume_name(tokenizer);
-    if !tokenizer.is_eof() && tokenizer.current_char() == '(' {
+    if !tokenizer.is_eof() && tokenizer.next_char() == '(' {
         tokenizer.advance(1);
         if value.eq_ignore_ascii_case("url") { consume_url(tokenizer) }
         else { Function(value) }
@@ -539,7 +539,7 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowString<'a> {
         if tokenizer.is_eof() {
             return Borrowed(tokenizer.slice_from(start_pos))
         }
-        match tokenizer.current_char() {
+        match tokenizer.next_char() {
             'a'...'z' | 'A'...'Z' | '0'...'9' | '_' | '-'  => tokenizer.advance(1),
             '\\' | '\0' => {
                 value = tokenizer.slice_from(start_pos).to_owned();
@@ -553,7 +553,7 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowString<'a> {
     }
 
     while !tokenizer.is_eof() {
-        let c = tokenizer.current_char();
+        let c = tokenizer.next_char();
         value.push(match c {
             'a'...'z' | 'A'...'Z' | '0'...'9' | '_' | '-'  => {
                 tokenizer.advance(1);
@@ -575,7 +575,7 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowString<'a> {
 
 fn consume_digits(tokenizer: &mut Tokenizer) {
     while !tokenizer.is_eof() {
-        match tokenizer.current_char() {
+        match tokenizer.next_char() {
             '0'...'9' => tokenizer.advance(1),
             _ => break
         }
@@ -588,12 +588,12 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     // But this is always called so that there is at least one digit in \d*(\.\d+)?
     let start_pos = tokenizer.position();
     let mut is_integer = true;
-    let signed = matches!(tokenizer.current_char(), '-' | '+');
+    let signed = matches!(tokenizer.next_char(), '-' | '+');
     if signed {
         tokenizer.advance(1);
     }
     consume_digits(tokenizer);
-    if tokenizer.has_at_least(1) && tokenizer.current_char() == '.'
+    if tokenizer.has_at_least(1) && tokenizer.next_char() == '.'
             && matches!(tokenizer.char_at(1), '0'...'9') {
         is_integer = false;
         tokenizer.advance(2);  // '.' and first digit
@@ -601,11 +601,11 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     }
     if (
         tokenizer.has_at_least(1)
-        && matches!(tokenizer.current_char(), 'e' | 'E')
+        && matches!(tokenizer.next_char(), 'e' | 'E')
         && matches!(tokenizer.char_at(1), '0'...'9')
     ) || (
         tokenizer.has_at_least(2)
-        && matches!(tokenizer.current_char(), 'e' | 'E')
+        && matches!(tokenizer.next_char(), 'e' | 'E')
         && matches!(tokenizer.char_at(1), '+' | '-')
         && matches!(tokenizer.char_at(2), '0'...'9')
     ) {
@@ -626,7 +626,7 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
             None
         })
     };
-    if !tokenizer.is_eof() && tokenizer.current_char() == '%' {
+    if !tokenizer.is_eof() && tokenizer.next_char() == '%' {
         tokenizer.advance(1);
         return Percentage(PercentageValue {
             unit_value: value / 100.,
@@ -646,7 +646,7 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 
 fn consume_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     while !tokenizer.is_eof() {
-        match tokenizer.current_char() {
+        match tokenizer.next_char() {
             ' ' | '\t' | '\n' | '\r' | '\x0C' => tokenizer.advance(1),
             '"' => return consume_quoted_url(tokenizer, false),
             '\'' => return consume_quoted_url(tokenizer, true),
@@ -670,7 +670,7 @@ fn consume_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
             if tokenizer.is_eof() {
                 return Url(Borrowed(tokenizer.slice_from(start_pos)))
             }
-            match tokenizer.current_char() {
+            match tokenizer.next_char() {
                 ' ' | '\t' | '\n' | '\r' | '\x0C' => {
                     let value = tokenizer.slice_from(start_pos);
                     tokenizer.advance(1);
@@ -747,13 +747,13 @@ fn consume_unicode_range<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     tokenizer.advance(2);  // Skip U+
     let mut hex = String::new();
     while hex.len() < 6 && !tokenizer.is_eof()
-          && matches!(tokenizer.current_char(), '0'...'9' | 'A'...'F' | 'a'...'f') {
+          && matches!(tokenizer.next_char(), '0'...'9' | 'A'...'F' | 'a'...'f') {
         hex.push(tokenizer.consume_char());
     }
     let max_question_marks = 6u - hex.len();
     let mut question_marks = 0u;
     while question_marks < max_question_marks && !tokenizer.is_eof()
-            && tokenizer.current_char() == '?' {
+            && tokenizer.next_char() == '?' {
         question_marks += 1;
         tokenizer.advance(1)
     }
@@ -768,10 +768,10 @@ fn consume_unicode_range<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     } else {
         start = first;
         hex.truncate(0);
-        if !tokenizer.is_eof() && tokenizer.current_char() == '-' {
+        if !tokenizer.is_eof() && tokenizer.next_char() == '-' {
             tokenizer.advance(1);
             while hex.len() < 6 && !tokenizer.is_eof() {
-                let c = tokenizer.current_char();
+                let c = tokenizer.next_char();
                 match c {
                     '0'...'9' | 'A'...'F' | 'a'...'f' => {
                         hex.push(c); tokenizer.advance(1) },
@@ -795,7 +795,7 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
         '0'...'9' | 'A'...'F' | 'a'...'f' => {
             let mut hex = String::from_char(1, c);
             while hex.len() < 6 && !tokenizer.is_eof() {
-                let c = tokenizer.current_char();
+                let c = tokenizer.next_char();
                 match c {
                     '0'...'9' | 'A'...'F' | 'a'...'f' => {
                         hex.push(c); tokenizer.advance(1) },
@@ -803,11 +803,11 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
                 }
             }
             if !tokenizer.is_eof() {
-                match tokenizer.current_char() {
+                match tokenizer.next_char() {
                     ' ' | '\t' | '\n' | '\x0C' => tokenizer.advance(1),
                     '\r' => {
                         tokenizer.advance(1);
-                        if !tokenizer.is_eof() && tokenizer.current_char() == '\n' {
+                        if !tokenizer.is_eof() && tokenizer.next_char() == '\n' {
                             tokenizer.advance(1);
                         }
                     }
