@@ -55,7 +55,7 @@ pub struct Parser<'i: 't, 't> {
     /// If `Some(_)`, .parse_nested_block() can be called.
     at_start_of: Option<BlockType>,
     /// For parsers from `parse_until` or `parse_nested_block`
-    parse_until_before: Delimiters,
+    stop_before: Delimiters,
 }
 
 
@@ -150,7 +150,7 @@ impl<'i, 't> Parser<'i, 't> {
         Parser {
             tokenizer: MaybeOwned::Owned(box Tokenizer::new(input)),
             at_start_of: None,
-            parse_until_before: Delimiter::None,
+            stop_before: Delimiter::None,
         }
     }
 
@@ -223,7 +223,7 @@ impl<'i, 't> Parser<'i, 't> {
         if let Some(block_type) = self.at_start_of.take() {
             consume_until_end_of_block(block_type, &mut *self.tokenizer);
         }
-        if self.parse_until_before.contains(Delimiters::from_byte(self.tokenizer.next_byte())) {
+        if self.stop_before.contains(Delimiters::from_byte(self.tokenizer.next_byte())) {
             return Err(())
         }
         let token = try!(self.tokenizer.next());
@@ -275,7 +275,7 @@ impl<'i, 't> Parser<'i, 't> {
             let mut nested_parser = Parser {
                 tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
                 at_start_of: None,
-                parse_until_before: closing_delimiter,
+                stop_before: closing_delimiter,
             };
             result = nested_parser.parse_entirely(parse);
         }
@@ -287,14 +287,14 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn parse_until_before<T>(&mut self, delimiters: Delimiters,
                                  parse: |&mut Parser| -> Result<T, ()>)
                                  -> Result <T, ()> {
-        let delimiters = self.parse_until_before | delimiters;
+        let delimiters = self.stop_before | delimiters;
         let result;
         // Introduce a new scope to limit duration of nested_parser’s borrow
         {
             let mut delimited_parser = Parser {
                 tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
                 at_start_of: self.at_start_of.take(),
-                parse_until_before: delimiters,
+                stop_before: delimiters,
             };
             result = delimited_parser.parse_entirely(parse);
         }
@@ -320,7 +320,7 @@ impl<'i, 't> Parser<'i, 't> {
                                 -> Result <T, ()> {
         let result = self.parse_until_before(delimiters, parse);
         let next_byte = self.tokenizer.next_byte();
-        if next_byte.is_some() && !self.parse_until_before.contains(Delimiters::from_byte(next_byte)) {
+        if next_byte.is_some() && !self.stop_before.contains(Delimiters::from_byte(next_byte)) {
             debug_assert!(delimiters.contains(Delimiters::from_byte(next_byte)));
             self.tokenizer.advance(1);
         }
