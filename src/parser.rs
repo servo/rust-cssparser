@@ -47,9 +47,7 @@ pub struct Parser<'i: 't, 't> {
     tokenizer: MaybeOwned<'t, Tokenizer<'i>>,
     /// If `Some(_)`, .parse_nested_block() can be called.
     at_start_of: Option<BlockType>,
-    /// If `Some(_)`, this parser is from .parse_nested_block()
-    parse_until_before_end_of: Option<BlockType>,
-    /// For parsers from `parse_until`
+    /// For parsers from `parse_until` or `parse_nested_block`
     parse_until_before: Delimiters,
 }
 
@@ -105,6 +103,15 @@ pub mod Delimiter {
     pub const Comma: Delimiters = Delimiters { bits: 1 << 4 };
 }
 
+#[allow(non_upper_case_globals, non_snake_case)]
+mod ClosingDelimiter {
+    use super::Delimiters;
+
+    pub const CloseCurlyBracket: Delimiters = Delimiters { bits: 1 << 5 };
+    pub const CloseSquareBracket: Delimiters = Delimiters { bits: 1 << 6 };
+    pub const CloseParenthesis: Delimiters = Delimiters { bits: 1 << 7 };
+}
+
 impl BitOr<Delimiters, Delimiters> for Delimiters {
     fn bitor(&self, other: &Delimiters) -> Delimiters {
         Delimiters { bits: self.bits | other.bits }
@@ -112,7 +119,7 @@ impl BitOr<Delimiters, Delimiters> for Delimiters {
 }
 
 impl Delimiters {
-    fn contains(&self, other: Delimiters) -> bool {
+    fn contains(self, other: Delimiters) -> bool {
         (self.bits & other.bits) != 0
     }
 
@@ -122,6 +129,9 @@ impl Delimiters {
             Token::Comma  => Delimiter::Comma,
             Token::Delim('!') => Delimiter::Bang,
             Token::CurlyBracketBlock => Delimiter::CurlyBracketBlock,
+            Token::CloseCurlyBracket => ClosingDelimiter::CloseCurlyBracket,
+            Token::CloseSquareBracket => ClosingDelimiter::CloseSquareBracket,
+            Token::CloseParenthesis => ClosingDelimiter::CloseParenthesis,
             _ => Delimiter::None,
         }
     }
@@ -133,7 +143,6 @@ impl<'i, 't> Parser<'i, 't> {
         Parser {
             tokenizer: MaybeOwned::Owned(box Tokenizer::new(input)),
             at_start_of: None,
-            parse_until_before_end_of: None,
             parse_until_before: Delimiter::None,
         }
     }
@@ -224,11 +233,6 @@ impl<'i, 't> Parser<'i, 't> {
             self.tokenizer.push_back(token);
             return Err(())
         }
-        if self.parse_until_before_end_of.is_some() &&
-                BlockType::closing(&token) == self.parse_until_before_end_of {
-            self.tokenizer.push_back(token);
-            return Err(())
-        }
         if let Some(block_type) = BlockType::opening(&token) {
             self.at_start_of = Some(block_type);
         }
@@ -266,14 +270,18 @@ impl<'i, 't> Parser<'i, 't> {
             ParenthesisBlock, SquareBracketBlock, or CurlyBracketBlock \
             token was just consumed.\
         ");
+        let closing_delimiter = match block_type {
+            BlockType::CurlyBracket => ClosingDelimiter::CloseCurlyBracket,
+            BlockType::SquareBracket => ClosingDelimiter::CloseSquareBracket,
+            BlockType::Parenthesis => ClosingDelimiter::CloseParenthesis,
+        };
         let result;
         // Introduce a new scope to limit duration of nested_parser’s borrow
         {
             let mut nested_parser = Parser {
                 tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
                 at_start_of: None,
-                parse_until_before_end_of: Some(block_type),
-                parse_until_before: Delimiter::None,
+                parse_until_before: closing_delimiter,
             };
             result = nested_parser.parse_entirely(parse);
         }
@@ -292,17 +300,13 @@ impl<'i, 't> Parser<'i, 't> {
             let mut delimited_parser = Parser {
                 tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
                 at_start_of: self.at_start_of.take(),
-                parse_until_before_end_of: self.parse_until_before_end_of,
                 parse_until_before: delimiters,
             };
             result = delimited_parser.parse_entirely(parse);
         }
         // FIXME: have a special-purpose tokenizer method for this that does less work.
         while let Ok(token) = self.tokenizer.next() {
-            if delimiters.contains(Delimiters::from_token(&token)) || (
-                self.parse_until_before_end_of.is_some() &&
-                BlockType::closing(&token) == self.parse_until_before_end_of
-            ) {
+            if delimiters.contains(Delimiters::from_token(&token)) {
                 self.tokenizer.push_back(token);
                 break
             }
