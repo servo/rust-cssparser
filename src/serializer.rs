@@ -10,7 +10,7 @@ use ast::*;
 use ast::ComponentValue::*;
 
 
-pub trait ToCss for Sized? {
+pub trait ToCss where Self: Sized {
     /// Serialize `self` in CSS syntax, writing to `dest`.
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter;
 

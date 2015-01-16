@@ -79,7 +79,7 @@ fn assert_json_eq(results: Json, expected: Json, message: String) {
 }
 
 
-fn run_raw_json_tests(json_data: &str, run: |Json, Json|) {
+fn run_raw_json_tests<F: Fn(Json, Json) -> ()>(json_data: &str, run: F) {
     let items = match json::from_str(json_data) {
         Ok(Json::Array(items)) => items,
         _ => panic!("Invalid JSON")
@@ -98,7 +98,7 @@ fn run_raw_json_tests(json_data: &str, run: |Json, Json|) {
 }
 
 
-fn run_json_tests<T: ToJson>(json_data: &str, parse: |input: &str| -> T) {
+fn run_json_tests<T: ToJson, F: Fn(&str) -> T>(json_data: &str, parse: F) {
     run_raw_json_tests(json_data, |input, expected| {
         match input {
             Json::String(input) => {
@@ -204,7 +204,7 @@ fn stylesheet_from_bytes() {
 }
 
 
-fn run_color_tests(json_data: &str, to_json: |result: Option<Color>| -> Json) {
+fn run_color_tests<F: Fn(Option<Color>) -> Json>(json_data: &str, to_json: F) {
     run_json_tests(json_data, |input| {
         match parse_one_component_value(tokenize(input)) {
             Ok(component_value) => to_json(Color::parse(&component_value).ok()),
