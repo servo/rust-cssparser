@@ -17,17 +17,18 @@ pub enum Priority {
 
 
 pub fn parse_important(input: &mut Parser) -> Result<Priority, ()> {
+    let start_position = input.position();
     match input.next() {
         Ok(Token::Delim('!')) => {
             match try!(input.next()) {
                 Token::Ident(ref value) if value.eq_ignore_ascii_case("important") => {
                     Ok(Priority::Important)
                 }
-                token => input.unexpected(token)
+                _ => Err(())
             }
         }
-        token => {
-            input.push_back_result(token);
+        _ => {
+            input.reset(start_position);
             Ok(Priority::Normal)
         }
     }
@@ -180,13 +181,15 @@ for RuleListParser<'i, 't, 'a, R, QP, AP, P>
 where P: QualifiedRuleParser<QP, R> + AtRuleParser<AP, R> {
     fn next(&mut self) -> Option<Result<R, ()>> {
         loop {
-            match self.input.next() {
+            let start_position = self.input.position();
+            match self.input.next_including_whitespace() {
+                Ok(Token::WhiteSpace) => {}
                 Ok(Token::CDO) | Ok(Token::CDC) if self.is_stylesheet => {}
                 Ok(Token::AtKeyword(name)) => {
                     return Some(parse_at_rule(name, self.input, &mut self.parser))
                 }
-                Ok(token) => {
-                    self.input.push_back(token);
+                Ok(_) => {
+                    self.input.reset(start_position);
                     return Some(parse_qualified_rule(self.input, &mut self.parser))
                 }
                 Err(()) => return None,
@@ -210,13 +213,17 @@ pub fn parse_one_rule<QP, AP, R, P>(input: &mut Parser, parser: &mut P)
                                     -> Result<R, ()>
                                     where P: QualifiedRuleParser<QP, R> + AtRuleParser<AP, R> {
     input.parse_entirely(|input| {
-        match try!(input.next()) {
-            Token::AtKeyword(name) => {
-                parse_at_rule(name, input, parser)
-            }
-            token => {
-                input.push_back(token);
-                parse_qualified_rule(input, parser)
+        loop {
+            let start_position = input.position();
+            match try!(input.next_including_whitespace()) {
+                Token::WhiteSpace => {}
+                Token::AtKeyword(name) => {
+                    return parse_at_rule(name, input, parser)
+                }
+                _ => {
+                    input.reset(start_position);
+                    return parse_qualified_rule(input, parser)
+                }
             }
         }
     })

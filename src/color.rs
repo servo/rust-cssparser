@@ -74,7 +74,7 @@ impl Color {
                     parse_color_function(name.as_slice(), arguments)
                 })
             }
-            token => input.unexpected(token)
+            _ => Err(())
         }
     }
 }

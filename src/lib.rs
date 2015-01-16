@@ -13,7 +13,7 @@ extern crate text_writer;
 #[cfg(test)] extern crate test;
 #[cfg(test)] extern crate serialize;
 
-pub use tokenizer::{Token, NumericValue, PercentageValue, SourcePosition, SourceLocation};
+pub use tokenizer::{Token, NumericValue, PercentageValue, SourceLocation};
 pub use rules_and_declarations::{Priority, parse_important};
 pub use rules_and_declarations::{DeclarationParser, DeclarationListParser, parse_one_declaration};
 pub use rules_and_declarations::{RuleListParser, parse_one_rule};
@@ -22,7 +22,7 @@ pub use from_bytes::{decode_stylesheet_bytes, parse_stylesheet_rules_from_bytes}
 pub use color::{RGBA, Color, parse_color_keyword};
 pub use nth::parse_nth;
 pub use serializer::{ToCss, CssStringWriter, serialize_identifier, serialize_string, TokenWriter};
-pub use parser::{Parser, Delimiter, Delimiters};
+pub use parser::{Parser, Delimiter, Delimiters, SourcePosition};
 
 
 /**

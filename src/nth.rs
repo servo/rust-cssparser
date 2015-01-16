@@ -47,20 +47,21 @@ pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
             }
             _ => Err(())
         },
-        token => input.unexpected(token)
+        _ => Err(())
     }
 }
 
 
 fn parse_b(input: &mut Parser, a: i32) -> Result<(i32, i32), ()> {
+    let start_position = input.position();
     match input.next() {
         Ok(Token::Delim('+')) => parse_signless_b(input, a, 1),
         Ok(Token::Delim('-')) => parse_signless_b(input, a, -1),
         Ok(Token::Number(ref value)) if value.signed => {
             Ok((a, try!(value.int_value.ok_or(())) as i32))
         }
-        token => {
-            input.push_back_result(token);
+        _ => {
+            input.reset(start_position);
             Ok((a, 0))
         }
     }

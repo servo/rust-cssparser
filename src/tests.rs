@@ -431,31 +431,28 @@ impl DeclarationParser<Json> for JsonParser {
     fn parse_value(&mut self, name: &str, input: &mut Parser) -> Result<Json, ()> {
         let mut value = vec![];
         let mut important = false;
-        while let Ok(mut token) = input.next_including_whitespace() {
-            if token == Token::Delim('!') {
-                input.push_back(token);
-                match parse_important(input) {
-                    Ok(Priority::Important) => {
+        loop {
+            let start_position = input.position();
+            if let Ok(mut token) = input.next_including_whitespace() {
+                // Hack to deal with css-parsing-tests assuming that
+                // `!important` in the middle of a declaration value is OK.
+                // This can never happen per spec
+                // (even CSS Variables forbid top-level `!`)
+                if token == Token::Delim('!') {
+                    input.reset(start_position);
+                    if parse_important(input) == Ok(Priority::Important) {
                         if input.is_exhausted() {
                             important = true;
                             break
                         }
-                        // Hack to deal with css-parsing-tests assuming that
-                        // `!important` in the middle of a declaration value is OK.
-                        // This can never happen per spec
-                        // (even CSS Variables forbid top-level `!`)
-                        value.push("!".to_json());
-                        token = Token::Ident(Borrowed("important"));
                     }
-                    // More hacks
-                    Ok(Priority::Normal) => {
-                        token = input.next_including_whitespace().unwrap();
-                        assert!(token == Token::Delim('!'));
-                    }
-                    Err(()) => token = Token::Delim('!')
+                    input.reset(start_position);
+                    token = input.next_including_whitespace().unwrap();
                 }
+                value.push(one_component_value_to_json(token, input));
+            } else {
+                break
             }
-            value.push(one_component_value_to_json(token, input));
         }
         Ok(JArray![
             "declaration",

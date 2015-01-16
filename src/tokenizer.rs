@@ -125,9 +125,6 @@ pub struct Tokenizer<'a> {
     /// Counted in bytes, not code points. From 0.
     position: uint,
 
-    /// For `peek()` and `push_back()`
-    buffer: Option<Token<'a>>,
-
     /// Cache for `source_location()`
     last_known_line_break: Cell<(uint, uint)>,
 }
@@ -139,41 +136,23 @@ impl<'a> Tokenizer<'a> {
         Tokenizer {
             input: input,
             position: 0,
-            buffer: None,
             last_known_line_break: Cell::new((1, 0)),
         }
     }
 
     #[inline]
     pub fn next(&mut self) -> Result<Token<'a>, ()> {
-        if let Some(token) = self.buffer.take() {
-            Ok(token)
-        } else {
-            next_token(self).ok_or(())
-        }
-    }
-
-    #[inline]
-    pub fn peek(&mut self) -> Result<&Token<'a>, ()> {
-        match self.buffer {
-            Some(ref token) => Ok(token),
-            None => {
-                self.buffer = next_token(self);
-                self.buffer.as_ref().ok_or(())
-            }
-        }
-    }
-
-    #[inline]
-    pub fn push_back(&mut self, token: Token<'a>) {
-        assert!(self.buffer.is_none(),
-                "Parser::push_back can only be called after Parser::next");
-        self.buffer = Some(token);
+        next_token(self).ok_or(())
     }
 
     #[inline]
     pub fn position(&self) -> SourcePosition {
         SourcePosition(self.position)
+    }
+
+    #[inline]
+    pub fn reset(&mut self, new_position: SourcePosition) {
+        self.position = new_position.0;
     }
 
     #[inline]
@@ -222,6 +201,15 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
+    #[inline]
+    pub fn next_byte(&self) -> Option<u8> {
+        if self.is_eof() {
+            None
+        } else {
+            Some(self.input.as_bytes()[self.position])
+        }
+    }
+
     // If false, `tokenizer.next_char()` will not panic.
     #[inline]
     fn is_eof(&self) -> bool { !self.has_at_least(0) }
@@ -232,7 +220,7 @@ impl<'a> Tokenizer<'a> {
     fn has_at_least(&self, n: uint) -> bool { self.position + n < self.input.len() }
 
     #[inline]
-    fn advance(&mut self, n: uint) { self.position += n }
+    pub fn advance(&mut self, n: uint) { self.position += n }
 
     // Assumes non-EOF
     #[inline]

@@ -5,7 +5,14 @@
 use std::ascii::AsciiExt;
 use std::str::CowString;
 use std::ops;
-use tokenizer::{Token, NumericValue, PercentageValue, Tokenizer, SourcePosition, SourceLocation};
+use tokenizer::{mod, Token, NumericValue, PercentageValue, Tokenizer, SourceLocation};
+
+
+#[deriving(PartialEq, Eq, Show, Clone, Copy)]
+pub struct SourcePosition {
+    position: tokenizer::SourcePosition,
+    at_start_of: Option<BlockType>,
+}
 
 
 /// Like std::borrow::Cow, except:
@@ -123,15 +130,15 @@ impl Delimiters {
         (self.bits & other.bits) != 0
     }
 
-    fn from_token(token: &Token) -> Delimiters {
-        match *token {
-            Token::Semicolon => Delimiter::Semicolon,
-            Token::Comma  => Delimiter::Comma,
-            Token::Delim('!') => Delimiter::Bang,
-            Token::CurlyBracketBlock => Delimiter::CurlyBracketBlock,
-            Token::CloseCurlyBracket => ClosingDelimiter::CloseCurlyBracket,
-            Token::CloseSquareBracket => ClosingDelimiter::CloseSquareBracket,
-            Token::CloseParenthesis => ClosingDelimiter::CloseParenthesis,
+    fn from_byte(byte: Option<u8>) -> Delimiters {
+        match byte {
+            Some(b';') => Delimiter::Semicolon,
+            Some(b',') => Delimiter::Comma,
+            Some(b'!') => Delimiter::Bang,
+            Some(b'{') => Delimiter::CurlyBracketBlock,
+            Some(b'}') => ClosingDelimiter::CloseCurlyBracket,
+            Some(b']') => ClosingDelimiter::CloseSquareBracket,
+            Some(b')') => ClosingDelimiter::CloseParenthesis,
             _ => Delimiter::None,
         }
     }
@@ -154,55 +161,43 @@ impl<'i, 't> Parser<'i, 't> {
 
     #[inline]
     pub fn expect_exhausted(&mut self) -> Result<(), ()> {
+        let start_position = self.position();
         match self.next() {
             Err(()) => Ok(()),
-            Ok(token) => self.unexpected(token),
+            Ok(_) => {
+                self.reset(start_position);
+                Err(())
+            }
         }
-    }
-
-    #[inline]
-    pub fn peek(&mut self) -> Result<&Token<'i>, ()> {
-        // Consume whatever needs to be consumed (e.g. open blocks).
-        let token = try!(self.next());
-        self.push_back(token);
-        self.tokenizer.peek()
-    }
-
-    #[inline]
-    pub fn push_back(&mut self, token: Token<'i>) {
-        if BlockType::opening(&token) == self.at_start_of {
-            self.at_start_of = None;
-        }
-        self.tokenizer.push_back(token)
-    }
-
-    #[inline]
-    pub fn push_back_result(&mut self, token_result: Result<Token<'i>, ()>) {
-        if let Ok(token) = token_result {
-            self.push_back(token)
-        }
-    }
-
-    #[inline]
-    pub fn unexpected<T>(&mut self, token: Token<'i>) -> Result<T, ()> {
-        self.push_back(token);
-        Err(())
-    }
-
-    #[inline]
-    pub fn unexpected_ident<T>(&mut self, value: CowString<'i>) -> Result<T, ()> {
-        self.push_back(Token::Ident(value));
-        Err(())
     }
 
     #[inline]
     pub fn position(&self) -> SourcePosition {
-        self.tokenizer.position()
+        SourcePosition {
+            position: self.tokenizer.position(),
+            at_start_of: self.at_start_of,
+        }
     }
 
     #[inline]
-    pub fn slice_from(&self, start_pos: SourcePosition) -> &'i str {
-        self.tokenizer.slice_from(start_pos)
+    pub fn reset(&mut self, new_position: SourcePosition) {
+        self.tokenizer.reset(new_position.position);
+        self.at_start_of = new_position.at_start_of;
+    }
+
+    #[inline]
+    pub fn try<T, E>(&mut self, thing: |&mut Parser| -> Result<T, E>) -> Result<T, E> {
+        let start_position = self.position();
+        let result = thing(self);
+        if result.is_err() {
+            self.reset(start_position)
+        }
+        result
+    }
+
+    #[inline]
+    pub fn slice_from(&self, start_position: SourcePosition) -> &'i str {
+        self.tokenizer.slice_from(start_position.position)
     }
 
     #[inline]
@@ -212,7 +207,7 @@ impl<'i, 't> Parser<'i, 't> {
 
     #[inline]
     pub fn source_location(&self, target: SourcePosition) -> SourceLocation {
-        self.tokenizer.source_location(target)
+        self.tokenizer.source_location(target.position)
     }
 
     pub fn next(&mut self) -> Result<Token<'i>, ()> {
@@ -228,11 +223,10 @@ impl<'i, 't> Parser<'i, 't> {
         if let Some(block_type) = self.at_start_of.take() {
             consume_until_end_of_block(block_type, &mut *self.tokenizer);
         }
-        let token = try!(self.tokenizer.next());
-        if self.parse_until_before.contains(Delimiters::from_token(&token)) {
-            self.tokenizer.push_back(token);
+        if self.parse_until_before.contains(Delimiters::from_byte(self.tokenizer.next_byte())) {
             return Err(())
         }
+        let token = try!(self.tokenizer.next());
         if let Some(block_type) = BlockType::opening(&token) {
             self.at_start_of = Some(block_type);
         }
@@ -305,13 +299,16 @@ impl<'i, 't> Parser<'i, 't> {
             result = delimited_parser.parse_entirely(parse);
         }
         // FIXME: have a special-purpose tokenizer method for this that does less work.
-        while let Ok(token) = self.tokenizer.next() {
-            if delimiters.contains(Delimiters::from_token(&token)) {
-                self.tokenizer.push_back(token);
+        loop {
+            if delimiters.contains(Delimiters::from_byte(self.tokenizer.next_byte())) {
                 break
             }
-            if let Some(block_type) = BlockType::opening(&token) {
-                consume_until_end_of_block(block_type, &mut *self.tokenizer);
+            if let Ok(token) = self.tokenizer.next() {
+                if let Some(block_type) = BlockType::opening(&token) {
+                    consume_until_end_of_block(block_type, &mut *self.tokenizer);
+                }
+            } else {
+                break
             }
         }
         result
@@ -322,9 +319,10 @@ impl<'i, 't> Parser<'i, 't> {
                                 parse: |&mut Parser| -> Result<T, ()>)
                                 -> Result <T, ()> {
         let result = self.parse_until_before(delimiters, parse);
-        // Expect exhausted input or a relevant delimiter (which we consume):
-        if let Ok(token) = self.next() {
-            debug_assert!(delimiters.contains(Delimiters::from_token(&token)));
+        let next_byte = self.tokenizer.next_byte();
+        if next_byte.is_some() && !self.parse_until_before.contains(Delimiters::from_byte(next_byte)) {
+            debug_assert!(delimiters.contains(Delimiters::from_byte(next_byte)));
+            self.tokenizer.advance(1);
         }
         result
     }
@@ -333,7 +331,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_ident(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
             Token::Ident(value) => Ok(value),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -342,7 +340,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_ident_matching<'a>(&mut self, expected_value: &str) -> Result<(), ()> {
         match try!(self.next()) {
             Token::Ident(ref value) if value.eq_ignore_ascii_case(expected_value) => Ok(()),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -350,7 +348,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_string(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
             Token::QuotedString(value) => Ok(value),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -359,7 +357,7 @@ impl<'i, 't> Parser<'i, 't> {
         match try!(self.next()) {
             Token::Ident(value) => Ok(value),
             Token::QuotedString(value) => Ok(value),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -367,7 +365,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_url(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
             Token::Url(value) => Ok(value),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -376,7 +374,7 @@ impl<'i, 't> Parser<'i, 't> {
         match try!(self.next()) {
             Token::Url(value) => Ok(value),
             Token::QuotedString(value) => Ok(value),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -384,7 +382,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_number(&mut self) -> Result<f64, ()> {
         match try!(self.next()) {
             Token::Number(NumericValue { value, .. }) => Ok(value),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -392,7 +390,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_integer(&mut self) -> Result<i64, ()> {
         match try!(self.next()) {
             Token::Number(NumericValue { int_value, .. }) => int_value.ok_or(()),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -400,7 +398,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_percentage(&mut self) -> Result<f64, ()> {
         match try!(self.next()) {
             Token::Percentage(PercentageValue { unit_value, .. }) => Ok(unit_value),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -408,7 +406,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_colon(&mut self) -> Result<(), ()> {
         match try!(self.next()) {
             Token::Colon => Ok(()),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -416,7 +414,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_semicolon(&mut self) -> Result<(), ()> {
         match try!(self.next()) {
             Token::Semicolon => Ok(()),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -424,7 +422,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_comma(&mut self) -> Result<(), ()> {
         match try!(self.next()) {
             Token::Comma => Ok(()),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -432,7 +430,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_delim(&mut self, expected_value: char) -> Result<(), ()> {
         match try!(self.next()) {
             Token::Delim(value) if value == expected_value => Ok(()),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -440,7 +438,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_curly_bracket_block(&mut self) -> Result<(), ()> {
         match try!(self.next()) {
             Token::CurlyBracketBlock => Ok(()),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 
@@ -448,7 +446,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_function(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
             Token::Function(name) => Ok(name),
-            token => self.unexpected(token)
+            _ => Err(())
         }
     }
 }
