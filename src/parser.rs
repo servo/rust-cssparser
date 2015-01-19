@@ -186,7 +186,7 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
-    pub fn try<T, E>(&mut self, thing: |&mut Parser| -> Result<T, E>) -> Result<T, E> {
+    pub fn try<T, E>(&mut self, thing: |&mut Parser<'i, 't>| -> Result<T, E>) -> Result<T, E> {
         let start_position = self.position();
         let result = thing(self);
         if result.is_err() {
