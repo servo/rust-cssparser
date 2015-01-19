@@ -443,6 +443,22 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     #[inline]
+    pub fn expect_square_bracket_block(&mut self) -> Result<(), ()> {
+        match try!(self.next()) {
+            Token::SquareBracketBlock => Ok(()),
+            _ => Err(())
+        }
+    }
+
+    #[inline]
+    pub fn expect_parenthesis_block(&mut self) -> Result<(), ()> {
+        match try!(self.next()) {
+            Token::ParenthesisBlock => Ok(()),
+            _ => Err(())
+        }
+    }
+
+    #[inline]
     pub fn expect_function(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
             Token::Function(name) => Ok(name),
