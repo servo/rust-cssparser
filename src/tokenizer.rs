@@ -202,7 +202,8 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn next_byte(&self) -> Option<u8> {
+    pub fn next_byte(&mut self) -> Option<u8> {
+        consume_comments(self);
         if self.is_eof() {
             None
         } else {
