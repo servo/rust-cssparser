@@ -13,7 +13,7 @@ use encoding::label::encoding_from_whatwg_label;
 
 use super::{Parser, Token, NumericValue, PercentageValue, SourceLocation,
             DeclarationListParser, DeclarationParser, RuleListParser,
-            AtRuleType, AtRuleParser, QualifiedRuleParser, Priority,
+            AtRuleType, AtRuleParser, QualifiedRuleParser,
             parse_one_declaration, parse_one_rule, parse_important,
             parse_stylesheet_rules_from_bytes,
             Color, RGBA, parse_color_keyword, parse_nth, ToCss};
@@ -440,7 +440,7 @@ impl DeclarationParser<Json> for JsonParser {
                 // (even CSS Variables forbid top-level `!`)
                 if token == Token::Delim('!') {
                     input.reset(start_position);
-                    if parse_important(input) == Ok(Priority::Important) {
+                    if parse_important(input).is_ok() {
                         if input.is_exhausted() {
                             important = true;
                             break

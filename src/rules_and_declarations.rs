@@ -4,34 +4,13 @@
 
 // http://dev.w3.org/csswg/css-syntax/#parsing
 
-use std::ascii::AsciiExt;
 use std::str::CowString;
 use super::{Token, Parser, Delimiter};
 
 
-#[deriving(Copy, Eq, PartialEq)]
-pub enum Priority {
-    Normal,
-    Important,
-}
-
-
-pub fn parse_important(input: &mut Parser) -> Result<Priority, ()> {
-    let start_position = input.position();
-    match input.next() {
-        Ok(Token::Delim('!')) => {
-            match try!(input.next()) {
-                Token::Ident(ref value) if value.eq_ignore_ascii_case("important") => {
-                    Ok(Priority::Important)
-                }
-                _ => Err(())
-            }
-        }
-        _ => {
-            input.reset(start_position);
-            Ok(Priority::Normal)
-        }
-    }
+pub fn parse_important(input: &mut Parser) -> Result<(), ()> {
+    try!(input.expect_delim('!'));
+    input.expect_ident_matching("important")
 }
 
 

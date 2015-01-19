@@ -14,7 +14,7 @@ extern crate text_writer;
 #[cfg(test)] extern crate serialize;
 
 pub use tokenizer::{Token, NumericValue, PercentageValue, SourceLocation};
-pub use rules_and_declarations::{Priority, parse_important};
+pub use rules_and_declarations::{parse_important};
 pub use rules_and_declarations::{DeclarationParser, DeclarationListParser, parse_one_declaration};
 pub use rules_and_declarations::{RuleListParser, parse_one_rule};
 pub use rules_and_declarations::{AtRuleType, QualifiedRuleParser, AtRuleParser};
