@@ -162,13 +162,14 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn expect_exhausted(&mut self) -> Result<(), ()> {
         let start_position = self.position();
-        match self.next() {
+        let result = match self.next() {
             Err(()) => Ok(()),
             Ok(_) => {
-                self.reset(start_position);
                 Err(())
             }
-        }
+        };
+        self.reset(start_position);
+        result
     }
 
     #[inline]

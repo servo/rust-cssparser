@@ -410,13 +410,13 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
 #[inline]
 fn consume_comments(tokenizer: &mut Tokenizer) {
     while tokenizer.starts_with("/*") {
-        tokenizer.advance(2);  // +2 to consume "/*"
-        while !tokenizer.is_eof() {
-            if tokenizer.consume_char() == '*' &&
-               !tokenizer.is_eof() &&
-               tokenizer.next_char() == '/' {
-                tokenizer.advance(1);
-                break
+        tokenizer.advance(2);  // consume "/*"
+        match tokenizer.input.slice_from(tokenizer.position).match_indices("*/").next() {
+            Some((_start, end)) => {
+                tokenizer.advance(end)
+            }
+            None => {
+                tokenizer.position = tokenizer.input.len()
             }
         }
     }
