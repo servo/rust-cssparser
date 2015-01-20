@@ -214,7 +214,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn next(&mut self) -> Result<Token<'i>, ()> {
         loop {
             match self.next_including_whitespace_and_comments() {
-                Ok(Token::WhiteSpace) | Ok(Token::Comment) => {},
+                Ok(Token::WhiteSpace(_)) | Ok(Token::Comment(_)) => {},
                 result => return result
             }
         }
@@ -223,7 +223,7 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn next_including_whitespace(&mut self) -> Result<Token<'i>, ()> {
         loop {
             match self.next_including_whitespace_and_comments() {
-                Ok(Token::Comment) => {},
+                Ok(Token::Comment(_)) => {},
                 result => return result
             }
         }

@@ -116,8 +116,8 @@ impl<'a> ToCss for Token<'a> {
                 }
             }
 
-            Token::WhiteSpace => try!(dest.write_char(' ')),
-            Token::Comment => try!(dest.write_str("/**/")),
+            Token::WhiteSpace(content) => try!(dest.write_str(content)),
+            Token::Comment(content) => try!(write!(dest, "/*{}*/", content)),
             Token::Colon => try!(dest.write_char(':')),
             Token::Semicolon => try!(dest.write_char(';')),
             Token::Comma => try!(dest.write_char(',')),
@@ -309,7 +309,7 @@ impl<'i, 'a, W> TokenWriter<'i, 'a, W> where W: TextWriter {
             try!(self.dest.write_str("/**/"));
         }
         // Skip whitespace when '\n' was previously written at the previous iteration.
-        if !matches!((previous, token), (&Delim('\\'), &WhiteSpace)) {
+        if !matches!((previous, token), (&Delim('\\'), &WhiteSpace(_))) {
             try!(token.to_css(self.dest));
         }
         if token == &Delim('\\') {

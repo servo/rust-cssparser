@@ -29,8 +29,8 @@ pub enum Token<'a> {
     Percentage(PercentageValue),
     Dimension(NumericValue, CowString<'a>),
     UnicodeRange(u32, u32),  // (start, end) of range
-    WhiteSpace,
-    Comment,
+    WhiteSpace(&'a str),
+    Comment(&'a str),
     Colon,  // :
     Semicolon,  // ;
     Comma,  // ,
@@ -74,8 +74,8 @@ impl<'a> Token<'a> {
             Token::Percentage(value) => Token::Percentage(value),
             Token::Dimension(value, unit) => Token::Dimension(value, Cow::Owned(unit.into_owned())),
             Token::UnicodeRange(start, end) => Token::UnicodeRange(start, end),
-            Token::WhiteSpace => Token::WhiteSpace,
-            Token::Comment => Token::Comment,
+            Token::WhiteSpace(_) => Token::WhiteSpace(" "),
+            Token::Comment(_) => Token::Comment(""),
             Token::Colon => Token::Colon,
             Token::Semicolon => Token::Semicolon,
             Token::Comma => Token::Comma,
@@ -273,13 +273,15 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
     let c = tokenizer.next_char();
     let token = match c {
         '\t' | '\n' | ' ' | '\r' | '\x0C' => {
+            let start_position = tokenizer.position();
+            tokenizer.advance(1);
             while !tokenizer.is_eof() {
                 match tokenizer.next_char() {
                     ' ' | '\t' | '\n' | '\r' | '\x0C' => tokenizer.advance(1),
                     _ => break,
                 }
             }
-            WhiteSpace
+            WhiteSpace(tokenizer.slice_from(start_position))
         },
         '"' => consume_string(tokenizer, false),
         '#' => {
@@ -351,15 +353,20 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
         }
         '/' if tokenizer.starts_with("/*") => {
             tokenizer.advance(2);  // consume "/*"
-            match tokenizer.input.slice_from(tokenizer.position).match_indices("*/").next() {
-                Some((_start, end)) => {
-                    tokenizer.advance(end)
+            let start_position = tokenizer.position();
+            let content;
+            match tokenizer.input.slice_from(tokenizer.position).find_str("*/") {
+                Some(offset) => {
+                    tokenizer.advance(offset);
+                    content = tokenizer.slice_from(start_position);
+                    tokenizer.advance(2);
                 }
                 None => {
-                    tokenizer.position = tokenizer.input.len()
+                    tokenizer.position = tokenizer.input.len();
+                    content = tokenizer.slice_from(start_position);
                 }
             }
-            Comment
+            Comment(content)
         }
         '0'...'9' => consume_numeric(tokenizer),
         ':' => { tokenizer.advance(1); Colon },

@@ -162,7 +162,7 @@ where P: QualifiedRuleParser<QP, R> + AtRuleParser<AP, R> {
         loop {
             let start_position = self.input.position();
             match self.input.next_including_whitespace_and_comments() {
-                Ok(Token::WhiteSpace) | Ok(Token::Comment) => {}
+                Ok(Token::WhiteSpace(_)) | Ok(Token::Comment(_)) => {}
                 Ok(Token::CDO) | Ok(Token::CDC) if self.is_stylesheet => {}
                 Ok(Token::AtKeyword(name)) => {
                     return Some(parse_at_rule(name, self.input, &mut self.parser))
@@ -195,7 +195,7 @@ pub fn parse_one_rule<QP, AP, R, P>(input: &mut Parser, parser: &mut P)
         loop {
             let start_position = input.position();
             match try!(input.next_including_whitespace_and_comments()) {
-                Token::WhiteSpace | Token::Comment => {}
+                Token::WhiteSpace(_) | Token::Comment(_) => {}
                 Token::AtKeyword(name) => {
                     return parse_at_rule(name, input, parser)
                 }

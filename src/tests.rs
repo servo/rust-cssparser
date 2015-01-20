@@ -392,17 +392,17 @@ fn line_numbers() {
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 1 });
     assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("foo"))));
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 4 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace));
+    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace(" ")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 5 });
     assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("bar"))));
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 8 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace));
+    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace("\n")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 1 });
     assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("baz"))));
     assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 4 });
     let position = input.position();
 
-    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace));
+    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace("\r\n\n")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 4, column: 1 });
 
     assert_eq!(input.source_location(position), SourceLocation { line: 2, column: 4 });
@@ -542,8 +542,8 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
 
         Token::UnicodeRange(start, end) => JArray!["unicode-range", start, end],
 
-        Token::WhiteSpace => " ".to_json(),
-        Token::Comment => "/**/".to_json(),
+        Token::WhiteSpace(_) => " ".to_json(),
+        Token::Comment(_) => "/**/".to_json(),
         Token::Colon => ":".to_json(),
         Token::Semicolon => ";".to_json(),
         Token::Comma => ",".to_json(),
