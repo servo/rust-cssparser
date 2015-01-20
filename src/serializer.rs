@@ -117,6 +117,7 @@ impl<'a> ToCss for Token<'a> {
             }
 
             Token::WhiteSpace => try!(dest.write_char(' ')),
+            Token::Comment => try!(dest.write_str("/**/")),
             Token::Colon => try!(dest.write_char(':')),
             Token::Semicolon => try!(dest.write_char(';')),
             Token::Comma => try!(dest.write_char(',')),

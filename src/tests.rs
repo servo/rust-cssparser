@@ -543,6 +543,7 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::UnicodeRange(start, end) => JArray!["unicode-range", start, end],
 
         Token::WhiteSpace => " ".to_json(),
+        Token::Comment => "/**/".to_json(),
         Token::Colon => ":".to_json(),
         Token::Semicolon => ";".to_json(),
         Token::Comma => ",".to_json(),

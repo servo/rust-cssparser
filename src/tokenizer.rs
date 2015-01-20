@@ -30,6 +30,7 @@ pub enum Token<'a> {
     Dimension(NumericValue, CowString<'a>),
     UnicodeRange(u32, u32),  // (start, end) of range
     WhiteSpace,
+    Comment,
     Colon,  // :
     Semicolon,  // ;
     Comma,  // ,
@@ -74,6 +75,7 @@ impl<'a> Token<'a> {
             Token::Dimension(value, unit) => Token::Dimension(value, Cow::Owned(unit.into_owned())),
             Token::UnicodeRange(start, end) => Token::UnicodeRange(start, end),
             Token::WhiteSpace => Token::WhiteSpace,
+            Token::Comment => Token::Comment,
             Token::Colon => Token::Colon,
             Token::Semicolon => Token::Semicolon,
             Token::Comma => Token::Comma,
@@ -202,8 +204,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn next_byte(&mut self) -> Option<u8> {
-        consume_comments(self);
+    pub fn next_byte(&self) -> Option<u8> {
         if self.is_eof() {
             None
         } else {
@@ -266,7 +267,6 @@ pub struct SourceLocation {
 
 
 fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
-    consume_comments(tokenizer);
     if tokenizer.is_eof() {
         return None
     }
@@ -349,6 +349,18 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
                 Delim(c)
             }
         }
+        '/' if tokenizer.starts_with("/*") => {
+            tokenizer.advance(2);  // consume "/*"
+            match tokenizer.input.slice_from(tokenizer.position).match_indices("*/").next() {
+                Some((_start, end)) => {
+                    tokenizer.advance(end)
+                }
+                None => {
+                    tokenizer.position = tokenizer.input.len()
+                }
+            }
+            Comment
+        }
         '0'...'9' => consume_numeric(tokenizer),
         ':' => { tokenizer.advance(1); Colon },
         ';' => { tokenizer.advance(1); Semicolon },
@@ -405,22 +417,6 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
         },
     };
     Some(token)
-}
-
-
-#[inline]
-fn consume_comments(tokenizer: &mut Tokenizer) {
-    while tokenizer.starts_with("/*") {
-        tokenizer.advance(2);  // consume "/*"
-        match tokenizer.input.slice_from(tokenizer.position).match_indices("*/").next() {
-            Some((_start, end)) => {
-                tokenizer.advance(end)
-            }
-            None => {
-                tokenizer.position = tokenizer.input.len()
-            }
-        }
-    }
 }
 
 
