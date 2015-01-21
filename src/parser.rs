@@ -475,6 +475,14 @@ impl<'i, 't> Parser<'i, 't> {
             _ => Err(())
         }
     }
+
+    #[inline]
+    pub fn expect_function_matching(&mut self, expected_name: &str) -> Result<(), ()> {
+        match try!(self.next()) {
+            Token::Function(ref name) if name.eq_ignore_ascii_case(expected_name) => Ok(()),
+            _ => Err(())
+        }
+    }
 }
 
 
