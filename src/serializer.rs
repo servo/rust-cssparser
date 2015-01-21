@@ -77,7 +77,7 @@ impl<'a> ToCss for Token<'a> {
             },
             Token::Hash(ref value) => {
                 try!(dest.write_char('#'));
-                for c in value.as_slice().chars() {
+                for c in value.chars() {
                     try!(serialize_char(c, dest, /* is_identifier_start = */ false));
                 }
             },
@@ -193,7 +193,7 @@ where W:TextWriter {
 fn serialize_char<W>(c: char, dest: &mut W, is_identifier_start: bool) -> text_writer::Result
 where W: TextWriter {
     match c {
-        '0'...'9' if is_identifier_start => try!(dest.write_str(format!("\\3{} ", c).as_slice())),
+        '0'...'9' if is_identifier_start => try!(write!(dest, "\\3{} ", c)),
         '-' if is_identifier_start => try!(dest.write_str("\\-")),
         '0'...'9' | 'A'...'Z' | 'a'...'z' | '_' | '-' => try!(dest.write_char(c)),
         _ if c > '\x7F' => try!(dest.write_char(c)),
