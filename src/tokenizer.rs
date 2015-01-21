@@ -8,7 +8,7 @@ use std::cell::Cell;
 use std::char;
 use std::num;
 use std::ascii::AsciiExt;
-use std::borrow::{Cow, ToOwned};
+use std::borrow::ToOwned;
 use std::str::CowString;
 use std::borrow::Cow::{Owned, Borrowed};
 
@@ -57,49 +57,6 @@ pub enum Token<'a> {
     CloseParenthesis, // )
     CloseSquareBracket, // ]
     CloseCurlyBracket, // }
-}
-
-
-impl<'a> Token<'a> {
-    pub fn into_owned(self) -> Token<'static> {
-        match self {
-            Token::Ident(value) => Token::Ident(Cow::Owned(value.into_owned())),
-            Token::AtKeyword(value) => Token::AtKeyword(Cow::Owned(value.into_owned())),
-            Token::Hash(value) => Token::Hash(Cow::Owned(value.into_owned())),
-            Token::IDHash(value) => Token::IDHash(Cow::Owned(value.into_owned())),
-            Token::QuotedString(value) => Token::QuotedString(Cow::Owned(value.into_owned())),
-            Token::Url(value) => Token::Url(Cow::Owned(value.into_owned())),
-            Token::Delim(ch) => Token::Delim(ch),
-            Token::Number(value) => Token::Number(value),
-            Token::Percentage(value) => Token::Percentage(value),
-            Token::Dimension(value, unit) => Token::Dimension(value, Cow::Owned(unit.into_owned())),
-            Token::UnicodeRange(start, end) => Token::UnicodeRange(start, end),
-            Token::WhiteSpace(content) => {
-                Token::WhiteSpace(if matches!(content.as_bytes()[0], b'\n' | b'\r' | b'\x0C') { "\n" } else { " " })
-            }
-            Token::Comment(_) => Token::Comment(""),
-            Token::Colon => Token::Colon,
-            Token::Semicolon => Token::Semicolon,
-            Token::Comma => Token::Comma,
-            Token::IncludeMatch => Token::IncludeMatch,
-            Token::DashMatch => Token::DashMatch,
-            Token::PrefixMatch => Token::PrefixMatch,
-            Token::SuffixMatch => Token::SuffixMatch,
-            Token::SubstringMatch => Token::SubstringMatch,
-            Token::Column => Token::Column,
-            Token::CDO => Token::CDO,
-            Token::CDC => Token::CDC,
-            Token::Function(name) => Token::Function(Cow::Owned(name.into_owned())),
-            Token::ParenthesisBlock => Token::ParenthesisBlock,
-            Token::SquareBracketBlock => Token::SquareBracketBlock,
-            Token::CurlyBracketBlock => Token::CurlyBracketBlock,
-            Token::BadUrl => Token::BadUrl,
-            Token::BadString => Token::BadString,
-            Token::CloseParenthesis => Token::CloseParenthesis,
-            Token::CloseSquareBracket => Token::CloseSquareBracket,
-            Token::CloseCurlyBracket => Token::CloseCurlyBracket,
-        }
-    }
 }
 
 
