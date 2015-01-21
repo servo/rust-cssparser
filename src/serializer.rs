@@ -4,7 +4,8 @@
 
 use std::fmt;
 use std::mem;
-use std::num::Float;
+use std::cmp;
+use std::num::{Float, Int};
 
 use text_writer::{mod, TextWriter};
 
@@ -117,9 +118,22 @@ impl<'a> ToCss for Token<'a> {
             },
 
             Token::UnicodeRange(start, end) => {
-                try!(dest.write_str(format!("U+{:X}", start).as_slice()));
-                if end != start {
-                    try!(dest.write_str(format!("-{:X}", end).as_slice()));
+                try!(dest.write_str("U+"));
+                let bits = cmp::min(start.trailing_zeros(), (!end).trailing_zeros());
+                if bits >= 4 && start >> bits == end >> bits {
+                    let question_marks = bits / 4;
+                    let common = start >> question_marks * 4;
+                    if common != 0 {
+                        try!(write!(dest, "{:X}", common));
+                    }
+                    for _ in range(0, question_marks) {
+                        try!(dest.write_str("?"));
+                    }
+                } else {
+                    try!(write!(dest, "{:X}", start));
+                    if end != start {
+                        try!(write!(dest, "-{:X}", end));
+                    }
                 }
             }
 
