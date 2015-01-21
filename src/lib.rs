@@ -5,7 +5,65 @@
 #![crate_name = "cssparser"]
 #![crate_type = "rlib"]
 
+#![deny(missing_docs)]
+
 #![feature(globs, macro_rules, unsafe_destructor, phase)]
+
+/*!
+
+Implementation of [CSS Syntax Module Level 3](http://dev.w3.org/csswg/css-syntax-3/) for Rust.
+
+# Input
+
+Everything is based on `Parser` objects, which borrow a `&str` input.
+If you have bytes (from a file, the network, or something),
+see the `decode_stylesheet_bytes` function.
+
+# Conventions for parsing functions
+
+* Take (at least) a `input: &mut cssparser::Parser` parameter
+* Return `Result<_, ()>`
+* When returning `Ok(_)`,
+  the function must have consume exactly the amount of input that represents the parsed value.
+* When returning `Err(())`, any amount of input may have been consumed.
+
+As a consequence, when calling another parsing function, either:
+
+* Any `Err(())` return value must be propagated.
+  This happens by definition for tail calls,
+  and can otherwise be done with the `try!` macro.
+* Or the call must be wrapped in a `Parser::try` call.
+  `try` takes a closure that takes a `Parser` and returns a `Result`,
+  calls it once,
+  and returns itself that same result.
+  If the result is `Err`,
+  it restores the position inside the input to the one saved before calling the closure.
+
+Examples:
+
+```{rust,ignore}
+// 'none' | <image>
+fn parse_background_image(context: &ParserContext, input: &mut Parser)
+                                    -> Result<Option<Image>, ()> {
+    if input.try(|input| input.expect_ident_matching("none")).is_ok() {
+        Ok(None)
+    } else {
+        Image::parse(context, input).map(Some)  // tail call
+    }
+}
+```
+
+```{rust,ignore}
+// [ <length> | <percentage> ] [ <length> | <percentage> ]?
+fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
+                          -> Result<(LengthOrPercentage, LengthOrPercentage), ()> {
+    let first = try!(LengthOrPercentage::parse);
+    let second = input.try(LengthOrPercentage::parse).unwrap_or(first);
+    (first, second)
+}
+```
+
+*/
 
 extern crate encoding;
 extern crate text_writer;

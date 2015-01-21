@@ -8,6 +8,11 @@ use std::ops;
 use tokenizer::{mod, Token, NumericValue, PercentageValue, Tokenizer, SourceLocation};
 
 
+/// A capture of the internal state of a `Parser` (including the position within the input),
+/// obtained from the `Parser::position` method.
+///
+/// Can be used with the `Parser::reset` method to restore that state.
+/// Should only be used with the `Parser` instance it came from.
 #[deriving(PartialEq, Eq, Show, Clone, Copy)]
 pub struct SourcePosition {
     position: tokenizer::SourcePosition,
@@ -49,6 +54,9 @@ impl<'a, T> Clone for MaybeOwned<'a, T> where T: Clone {
 }
 
 
+/// A CSS parser that borrows its `&str` input,
+/// yields `Token`s,
+/// and keeps track of nested blocks and functions.
 #[deriving(Clone)]
 pub struct Parser<'i: 't, 't> {
     tokenizer: MaybeOwned<'t, Tokenizer<'i>>,
@@ -89,24 +97,30 @@ impl BlockType {
 }
 
 
-
+/// A set of characters, to be used with the `Parser::parse_until*` methods.
+///
+/// The union of two sets can be obtained with the `|` operator. Example:
+///
+/// ```{rust,ignore}
+/// input.parse_until_before(Delimiter::CurlyBracketBlock | Delimiter::Semicolon)
+/// ```
 #[deriving(Copy, Clone, PartialEq, Eq, Show)]
 pub struct Delimiters {
     bits: u8,
 }
 
+/// `Delimiters` constants.
 #[allow(non_upper_case_globals, non_snake_case)]
 pub mod Delimiter {
     use super::Delimiters;
 
+    /// The empty delimiter set
     pub const None: Delimiters = Delimiters { bits: 0 };
-    /// `{`
+    /// The delimiter set with only the `{` opening curly bracket
     pub const CurlyBracketBlock: Delimiters = Delimiters { bits: 1 << 1 };
-    /// `;`
+    /// The delimiter set with only the `;` semicolon
     pub const Semicolon: Delimiters = Delimiters { bits: 1 << 2 };
-    /// `!`
-    pub const Bang: Delimiters = Delimiters { bits: 1 << 3 };
-    /// `,`
+    /// The delimiter set with only the `,` comma
     pub const Comma: Delimiters = Delimiters { bits: 1 << 4 };
 }
 
@@ -134,7 +148,6 @@ impl Delimiters {
         match byte {
             Some(b';') => Delimiter::Semicolon,
             Some(b',') => Delimiter::Comma,
-            Some(b'!') => Delimiter::Bang,
             Some(b'{') => Delimiter::CurlyBracketBlock,
             Some(b'}') => ClosingDelimiter::CloseCurlyBracket,
             Some(b']') => ClosingDelimiter::CloseSquareBracket,
@@ -145,6 +158,7 @@ impl Delimiters {
 }
 
 impl<'i, 't> Parser<'i, 't> {
+    /// Create a new parser
     #[inline]
     pub fn new(input: &'i str) -> Parser<'i, 'i> {
         Parser {
@@ -154,11 +168,18 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Check whether the input is exhausted. That is, if `.next()` would return a token.
+    ///
+    /// This ignores whitespace and comments.
     #[inline]
     pub fn is_exhausted(&mut self) -> bool {
         self.expect_exhausted().is_ok()
     }
 
+    /// Check whether the input is exhausted. That is, if `.next()` would return a token.
+    /// Return a `Result` so that the `try!` macro can be used: `try!(input.expect_exhausted())`
+    ///
+    /// This ignores whitespace and comments.
     #[inline]
     pub fn expect_exhausted(&mut self) -> Result<(), ()> {
         let start_position = self.position();
@@ -172,6 +193,9 @@ impl<'i, 't> Parser<'i, 't> {
         result
     }
 
+    /// Return the current internal state of the parser (including position within the input).
+    ///
+    /// This state can later be restored with the `Parser::reset` method.
     #[inline]
     pub fn position(&self) -> SourcePosition {
         SourcePosition {
@@ -180,12 +204,20 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Restore the internal state of the parser (including position within the input)
+    /// to what was previously saved by the `Parser::position` method.
+    ///
+    /// Should only be used with `SourcePosition` values from the same `Parser` instance.
     #[inline]
     pub fn reset(&mut self, new_position: SourcePosition) {
         self.tokenizer.reset(new_position.position);
         self.at_start_of = new_position.at_start_of;
     }
 
+    /// Execute the given closure, passing it the parser.
+    /// If the result (returned unchanged) is `Err`,
+    /// the internal state of the parser  (including position within the input)
+    /// is restored to what it was before the call.
     #[inline]
     pub fn try<T, E>(&mut self, thing: |&mut Parser<'i, 't>| -> Result<T, E>) -> Result<T, E> {
         let start_position = self.position();
@@ -196,21 +228,35 @@ impl<'i, 't> Parser<'i, 't> {
         result
     }
 
+    /// Return a slice of the CSS input, from the given position to the current one.
     #[inline]
     pub fn slice_from(&self, start_position: SourcePosition) -> &'i str {
         self.tokenizer.slice_from(start_position.position)
     }
 
+    /// Return the line and column number within the input for the current position.
     #[inline]
     pub fn current_source_location(&self) -> SourceLocation {
         self.tokenizer.current_source_location()
     }
 
+    /// Return the line and column number within the input for the given position.
     #[inline]
     pub fn source_location(&self, target: SourcePosition) -> SourceLocation {
         self.tokenizer.source_location(target.position)
     }
 
+    /// Return the next token in the input that is neither whitespace or a comment,
+    /// and advance the position accordingly.
+    ///
+    /// After returning a `Function`, `ParenthesisBlock`,
+    /// `CurlyBracketBlock`, or `SquareBracketBlock` token,
+    /// the next call will skip until after the matching `CloseParenthesis`,
+    /// `CloseCurlyBracket`, or `CloseSquareBracket` token.
+    ///
+    /// See the `Parser::parse_nested_block` method to parse the content of functions or blocks.
+    ///
+    /// This only returns a closing token when it is unmatched (and therefore an error).
     pub fn next(&mut self) -> Result<Token<'i>, ()> {
         loop {
             match self.next_including_whitespace_and_comments() {
@@ -220,6 +266,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Same as `Parser::next`, but does not skip whitespace tokens.
     pub fn next_including_whitespace(&mut self) -> Result<Token<'i>, ()> {
         loop {
             match self.next_including_whitespace_and_comments() {
@@ -229,6 +276,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Same as `Parser::next`, but does not skip whitespace or comment tokens.
     pub fn next_including_whitespace_and_comments(&mut self) -> Result<Token<'i>, ()> {
         if let Some(block_type) = self.at_start_of.take() {
             consume_until_end_of_block(block_type, &mut *self.tokenizer);
@@ -243,8 +291,12 @@ impl<'i, 't> Parser<'i, 't> {
         Ok(token)
     }
 
-    // FIXME: Take an unboxed `FnOnce` closure.
+    /// Have the given closure parse something, then check the the input is exhausted.
+    /// The result is overridden to `Err(())` if some input remains.
+    ///
+    /// This can help tell e.g. `color: green;` from `color: green 4px;`
     #[inline]
+    // FIXME: Take an unboxed `FnOnce` closure.
     pub fn parse_entirely<T>(&mut self, parse: |&mut Parser| -> Result<T, ()>)
                              -> Result<T, ()> {
         let result = parse(self);
@@ -252,6 +304,16 @@ impl<'i, 't> Parser<'i, 't> {
         result
     }
 
+    /// Parse a list of comma-separated values, all with the same syntax.
+    ///
+    /// The given closure is called repeatedly with a "delimited" parser
+    /// (see the `Parser::parse_until_before` method)
+    /// so that it can over consume the input past a comma at this block/function nesting level.
+    ///
+    /// Successful results are accumulated in a vector.
+    ///
+    /// This method retuns `Err(())` the first time that a closure call does,
+    /// or if a closure call leaves some input before the next comma or the end of the input.
     #[inline]
     pub fn parse_comma_separated<T>(&mut self, parse_one: |&mut Parser| -> Result<T, ()>)
                                     -> Result<Vec<T>, ()> {
@@ -266,6 +328,17 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse the content of a block or function.
+    ///
+    /// This method panics if the last token yielded by this parser
+    /// (from one of the `next*` methods)
+    /// is not a on that marks the start of a block or function:
+    /// a `Function`, `ParenthesisBlock`, `CurlyBracketBlock`, or `SquareBracketBlock`.
+    ///
+    /// The given closure is called with a "delimited" parser
+    /// that stops at the end of the block or function (at the matching closing token).
+    ///
+    /// The result is overridden to `Err(())` if the closure leaves some input before that point.
     #[inline]
     pub fn parse_nested_block<T>(&mut self, parse: |&mut Parser| -> Result<T, ()>)
                                  -> Result <T, ()> {
@@ -293,6 +366,13 @@ impl<'i, 't> Parser<'i, 't> {
         result
     }
 
+    /// Limit parsing to until a given delimiter. (E.g. a semicolon for a property value.)
+    ///
+    /// The given closure is called with a "delimited" parser
+    /// that stops before the first character at this block/function nesting level
+    /// that matches the given set of delimiters.
+    ///
+    /// The result is overridden to `Err(())` if the closure leaves some input before that point.
     #[inline]
     pub fn parse_until_before<T>(&mut self, delimiters: Delimiters,
                                  parse: |&mut Parser| -> Result<T, ()>)
@@ -324,6 +404,11 @@ impl<'i, 't> Parser<'i, 't> {
         result
     }
 
+    /// Like `parse_until_before`, but also consume the delimiter token.
+    ///
+    /// This can be useful when you don’t need to know which delimiter it was
+    /// (e.g. if these is only one in the given set)
+    /// or if it was there at all (as opposed to reaching the end of the input).
     #[inline]
     pub fn parse_until_after<T>(&mut self, delimiters: Delimiters,
                                 parse: |&mut Parser| -> Result<T, ()>)
@@ -337,6 +422,7 @@ impl<'i, 't> Parser<'i, 't> {
         result
     }
 
+    /// Parse a <ident-token> and return the unescaped value.
     #[inline]
     pub fn expect_ident(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
@@ -345,7 +431,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
-    /// Expect an *ident* token whose value is an ASCII-insensitive match for the given value.
+    /// Parse a <ident-token> whose unescaped value is an ASCII-insensitive match for the given value.
     #[inline]
     pub fn expect_ident_matching<'a>(&mut self, expected_value: &str) -> Result<(), ()> {
         match try!(self.next()) {
@@ -354,6 +440,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a <string-token> and return the unescaped value.
     #[inline]
     pub fn expect_string(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
@@ -362,6 +449,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse either a <ident-token> or a <string-token>, and return the unescaped value.
     #[inline]
     pub fn expect_ident_or_string(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
@@ -371,6 +459,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a <url-token> and return the unescaped value.
     #[inline]
     pub fn expect_url(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
@@ -379,6 +468,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse either a <url-token> or a <string-token>, and return the unescaped value.
     #[inline]
     pub fn expect_url_or_string(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
@@ -388,6 +478,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a <number-token> and return the integer value.
     #[inline]
     pub fn expect_number(&mut self) -> Result<f64, ()> {
         match try!(self.next()) {
@@ -396,6 +487,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a <number-token> that does not have a fractional part, and return the integer value.
     #[inline]
     pub fn expect_integer(&mut self) -> Result<i64, ()> {
         match try!(self.next()) {
@@ -404,6 +496,8 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a <percentage-token> and return the value.
+    /// `0%` and `100%` map to `0.0` and `1.0` (not `100.0`), respectively.
     #[inline]
     pub fn expect_percentage(&mut self) -> Result<f64, ()> {
         match try!(self.next()) {
@@ -412,6 +506,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a `:` <colon-token>.
     #[inline]
     pub fn expect_colon(&mut self) -> Result<(), ()> {
         match try!(self.next()) {
@@ -420,6 +515,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a `;` <semicolon-token>.
     #[inline]
     pub fn expect_semicolon(&mut self) -> Result<(), ()> {
         match try!(self.next()) {
@@ -428,6 +524,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a `,` <comma-token>.
     #[inline]
     pub fn expect_comma(&mut self) -> Result<(), ()> {
         match try!(self.next()) {
@@ -436,6 +533,7 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a <delim-token> with the given value.
     #[inline]
     pub fn expect_delim(&mut self, expected_value: char) -> Result<(), ()> {
         match try!(self.next()) {
@@ -444,6 +542,9 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a `{ /* ... */ }` curly brackets block.
+    ///
+    /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_curly_bracket_block(&mut self) -> Result<(), ()> {
         match try!(self.next()) {
@@ -452,6 +553,9 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a `[ /* ... */ ]` square brackets block.
+    ///
+    /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_square_bracket_block(&mut self) -> Result<(), ()> {
         match try!(self.next()) {
@@ -460,6 +564,9 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a `( /* ... */ )` parenthesis block.
+    ///
+    /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_parenthesis_block(&mut self) -> Result<(), ()> {
         match try!(self.next()) {
@@ -468,6 +575,9 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a <function> token and return its name.
+    ///
+    /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_function(&mut self) -> Result<CowString<'i>, ()> {
         match try!(self.next()) {
@@ -476,6 +586,9 @@ impl<'i, 't> Parser<'i, 't> {
         }
     }
 
+    /// Parse a <function> token whose name is an ASCII-insensitive match for the given value.
+    ///
+    /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_function_matching(&mut self, expected_name: &str) -> Result<(), ()> {
         match try!(self.next()) {

@@ -11,13 +11,16 @@ use text_writer::{mod, TextWriter};
 use super::{Token, Parser, ToCss};
 
 
+/// A color with red, green, blue, and alpha components.
 #[deriving(Clone, Copy, PartialEq)]
 pub struct RGBA {
-    // All in 0...1
-    // Use f32 to try and match rust-azure’s AzFloat
+    /// The red channel. Nominally in 0.0 ... 1.0.
     pub red: f32,
+    /// The green channel. Nominally in 0.0 ... 1.0.
     pub green: f32,
+    /// The blue channel. Nominally in 0.0 ... 1.0.
     pub blue: f32,
+    /// The alpha (opacity) channel. Clamped to 0.0 ... 1.0.
     pub alpha: f32,
 }
 
@@ -38,9 +41,12 @@ impl ToCss for RGBA {
     }
 }
 
+/// A <color> value.
 #[deriving(Clone, Copy, PartialEq)]
 pub enum Color {
+    /// The 'currentColor' keyword
     CurrentColor,
+    /// Everything else gets converted to RGBA during parsing
     RGBA(RGBA),
 }
 
@@ -61,8 +67,10 @@ impl fmt::Show for Color {
     #[inline] fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_to_css(f) }
 }
 
-/// Return `Err(())` on invalid or unsupported value (not a color).
 impl Color {
+    /// Parse a <color> value, per CSS Color Module Level 3.
+    ///
+    /// FIXME(#2) Deprecated CSS2 System Colors are not supported yet.
     pub fn parse(input: &mut Parser) -> Result<Color, ()> {
         match try!(input.next()) {
             Token::Hash(ref value) | Token::IDHash(ref value) => {
@@ -80,6 +88,11 @@ impl Color {
 }
 
 
+/// Return the named color with the given name.
+///
+/// Matching is case-insensitive in the ASCII range.
+/// CSS escaping (if relevant) should be resolved before calling this function.
+/// (For example, the value of an `Ident` token is fine.)
 #[inline]
 pub fn parse_color_keyword(ident: &str) -> Result<Color, ()> {
     macro_rules! rgba {

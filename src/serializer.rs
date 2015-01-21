@@ -11,6 +11,7 @@ use text_writer::{mod, TextWriter};
 use super::{Token, NumericValue, PercentageValue};
 
 
+/// Trait for things the can serialize themselves in CSS syntax.
 pub trait ToCss for Sized? {
     /// Serialize `self` in CSS syntax, writing to `dest`.
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter;
@@ -169,6 +170,7 @@ impl<'a> ToCss for Token<'a> {
 }
 
 
+/// Write a CSS identifier, escaping characters as necessary.
 pub fn serialize_identifier<W>(value: &str, dest: &mut W) -> text_writer::Result
 where W:TextWriter {
     // TODO: avoid decoding/re-encoding UTF-8?
@@ -205,6 +207,7 @@ where W: TextWriter {
 }
 
 
+/// Write a double-quoted CSS string token, escaping content as necessary.
 pub fn serialize_string<W>(value: &str, dest: &mut W) -> text_writer::Result
 where W: TextWriter {
     try!(dest.write_char('"'));
@@ -214,7 +217,7 @@ where W: TextWriter {
 }
 
 
-/// A `TextWriter` adaptor that escapes text for writing as a CSS string.
+/// A `TextWriter` adaptor that escapes text for writing as a double-quoted CSS string.
 /// Quotes are not included.
 ///
 /// Typical usage:
@@ -235,6 +238,7 @@ pub struct CssStringWriter<'a, W: 'a> {
 }
 
 impl<'a, W> CssStringWriter<'a, W> where W: TextWriter {
+    /// Wrap a text writer to create a `CssStringWriter`.
     pub fn new(inner: &'a mut W) -> CssStringWriter<'a, W> {
         CssStringWriter { inner: inner }
     }

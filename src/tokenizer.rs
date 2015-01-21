@@ -15,65 +15,174 @@ use std::borrow::Cow::{Owned, Borrowed};
 use self::Token::*;
 
 
+/// One of the pieces the CSS input is broken into.
+///
+/// Some components use `CowString` in order to borrow from the original input string
+/// and avoid allocating/copying when possible.
 #[deriving(PartialEq, Show, Clone)]
 pub enum Token<'a> {
-    // Preserved tokens.
+
+    /// A [`<ident-token>`](http://dev.w3.org/csswg/css-syntax/#ident-token-diagram)
     Ident(CowString<'a>),
+
+    /// A [`<at-keyword-token>`](http://dev.w3.org/csswg/css-syntax/#at-keyword-token-diagram)
+    ///
+    /// The value does not include the `@` marker.
     AtKeyword(CowString<'a>),
+
+    /// A [`<hash-token>`](http://dev.w3.org/csswg/css-syntax/#hash-token-diagram) with the type flag set to "unrestricted"
+    ///
+    /// The value does not include the `#` marker.
     Hash(CowString<'a>),
+
+    /// A [`<hash-token>`](http://dev.w3.org/csswg/css-syntax/#hash-token-diagram) with the type flag set to "id"
+    ///
+    /// The value does not include the `#` marker.
     IDHash(CowString<'a>),  // Hash that is a valid ID selector.
+
+    /// A [`<string-token>`](http://dev.w3.org/csswg/css-syntax/#string-token-diagram)
+    ///
+    /// The value does not include the quotes.
     QuotedString(CowString<'a>),
+
+    /// A [`<url-token>`](http://dev.w3.org/csswg/css-syntax/#url-token-diagram) or `url( <string-token> )` function
+    ///
+    /// The value does not include the `url(` `)` markers or the quotes.
     Url(CowString<'a>),
+
+    /// A `<delim-token>`
     Delim(char),
+
+    /// A [`<number-token>`](http://dev.w3.org/csswg/css-syntax/#number-token-diagram)
     Number(NumericValue),
+
+    /// A [`<percentage-token>`](http://dev.w3.org/csswg/css-syntax/#percentage-token-diagram)
     Percentage(PercentageValue),
+
+    /// A [`<dimension-token>`](http://dev.w3.org/csswg/css-syntax/#dimension-token-diagram)
     Dimension(NumericValue, CowString<'a>),
-    UnicodeRange(u32, u32),  // (start, end) of range
+
+    /// A [`<unicode-range-token>`](http://dev.w3.org/csswg/css-syntax/#unicode-range-token-diagram)
+    ///
+    /// Components are the start and end code points, respectively.
+    ///
+    /// The tokenizer only reads up to 6 hex digit (up to 0xFF_FFFF),
+    /// but does not check that code points are within the range of Unicode (up to U+10_FFFF).
+    UnicodeRange(u32, u32),
+
+    /// A [`<whitespace-token>`](http://dev.w3.org/csswg/css-syntax/#whitespace-token-diagram)
     WhiteSpace(&'a str),
+
+    /// A comment.
+    ///
+    /// The CSS Syntax spec does not generate tokens for comments,
+    /// But we do, because we can (borrowed &str makes it cheap).
+    ///
+    /// The value does not include the `/*` `*/` markers.
     Comment(&'a str),
+
+    /// A `:` `<colon-token>`
     Colon,  // :
+
+    /// A `;` `<semicolon-token>`
     Semicolon,  // ;
+
+    /// A `,` `<comma-token>`
     Comma,  // ,
-    IncludeMatch, // ~=
-    DashMatch, // |=
-    PrefixMatch, // ^=
-    SuffixMatch, // $=
-    SubstringMatch, // *=
-    Column, // ||
-    CDO,  // <!--
-    CDC,  // -->
 
-    // Function
-    Function(CowString<'a>),  // name
+    /// A `~=` [`<include-match-token>`](http://dev.w3.org/csswg/css-syntax/#include-match-token-diagram)
+    IncludeMatch,
 
-    // Simple block
-    ParenthesisBlock,  // (…)
-    SquareBracketBlock,  // […]
-    CurlyBracketBlock,  // {…}
+    /// A `|=` [`<dash-match-token>`](http://dev.w3.org/csswg/css-syntax/#dash-match-token-diagram)
+    DashMatch,
 
-    // These are always invalid
+    /// A `^=` [`<prefix-match-token>`](http://dev.w3.org/csswg/css-syntax/#prefix-match-token-diagram)
+    PrefixMatch,
+
+    /// A `$=` [`<suffix-match-token>`](http://dev.w3.org/csswg/css-syntax/#suffix-match-token-diagram)
+    SuffixMatch,
+
+    /// A `*=` [`<substring-match-token>`](http://dev.w3.org/csswg/css-syntax/#substring-match-token-diagram)
+    SubstringMatch,
+
+    /// A `||` [`<column-token>`](http://dev.w3.org/csswg/css-syntax/#column-token-diagram)
+    Column,
+
+    /// A `<!--` [`<CDO-token>`](http://dev.w3.org/csswg/css-syntax/#CDO-token-diagram)
+    CDO,
+
+    /// A `-->` [`<CDC-token>`](http://dev.w3.org/csswg/css-syntax/#CDC-token-diagram)
+    CDC,
+
+    /// A [`<function-token>`](http://dev.w3.org/csswg/css-syntax/#function-token-diagram)
+    ///
+    /// The value (name) does not include the `(` marker.
+    Function(CowString<'a>),
+
+    /// A `<(-token>`
+    ParenthesisBlock,
+
+    /// A `<[-token>`
+    SquareBracketBlock,
+
+    /// A `<{-token>`
+    CurlyBracketBlock,
+
+    /// A `<bad-url-token>`
+    ///
+    /// This token always indicates a parse error.
     BadUrl,
+
+    /// A `<bad-string-token>`
+    ///
+    /// This token always indicates a parse error.
     BadString,
-    CloseParenthesis, // )
-    CloseSquareBracket, // ]
-    CloseCurlyBracket, // }
+
+    /// A `<)-token>`
+    ///
+    /// When obtained from one of the `Parser::next*` methods,
+    /// this token is always unmatched and indicates a parse error.
+    CloseParenthesis,
+
+    /// A `<]-token>`
+    ///
+    /// When obtained from one of the `Parser::next*` methods,
+    /// this token is always unmatched and indicates a parse error.
+    CloseSquareBracket,
+
+    /// A `<}-token>`
+    ///
+    /// When obtained from one of the `Parser::next*` methods,
+    /// this token is always unmatched and indicates a parse error.
+    CloseCurlyBracket,
 }
 
 
+/// The numeric value of `Number` and `Dimension` tokens.
 #[deriving(PartialEq, Show, Copy, Clone)]
 pub struct NumericValue {
+    /// The value as a float
     pub value: f64,
+
+    /// If the origin source did not include a fractional part, the value as an integer.
     pub int_value: Option<i64>,
+
     /// Whether the number had a `+` or `-` sign.
+    ///
+    /// This is used is some cases like the <An+B> micro syntax. (See the `parse_nth` function.)
     pub signed: bool,
 }
 
 
+/// The numeric value of `Percentage` tokens.
 #[deriving(PartialEq, Show, Copy, Clone)]
 pub struct PercentageValue {
-    /// This (but not int_value) is divided by 100
+    /// The value as a float, divided by 100 so that the nominal range is 0.0 to 1.0.
     pub unit_value: f64,
+
+    /// If the origin source did not include a fractional part, the value as an integer. It is **not** divided by 100.
     pub int_value: Option<i64>,
+
     /// Whether the number had a `+` or `-` sign.
     pub signed: bool,
 }
@@ -216,11 +325,13 @@ impl<'a> Tokenizer<'a> {
 pub struct SourcePosition(uint);
 
 
+/// The line and column number for a given position within the input.
 #[deriving(PartialEq, Eq, Show, Clone, Copy)]
 pub struct SourceLocation {
-    /// Starts at 1
+    /// The line number, starting at 1 for the first line.
     pub line: uint,
-    /// Starts at 1
+
+    /// The column number within a line, starting at 1 for the character of the line.
     pub column: uint,
 }
 
