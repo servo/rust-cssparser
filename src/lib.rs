@@ -18,7 +18,7 @@ pub use rules_and_declarations::{parse_important};
 pub use rules_and_declarations::{DeclarationParser, DeclarationListParser, parse_one_declaration};
 pub use rules_and_declarations::{RuleListParser, parse_one_rule};
 pub use rules_and_declarations::{AtRuleType, QualifiedRuleParser, AtRuleParser};
-pub use from_bytes::{decode_stylesheet_bytes, parse_stylesheet_rules_from_bytes};
+pub use from_bytes::decode_stylesheet_bytes;
 pub use color::{RGBA, Color, parse_color_keyword};
 pub use nth::parse_nth;
 pub use serializer::{ToCss, CssStringWriter, serialize_identifier, serialize_string};

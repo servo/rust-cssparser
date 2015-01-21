@@ -15,7 +15,7 @@ use super::{Parser, Token, NumericValue, PercentageValue, SourceLocation,
             DeclarationListParser, DeclarationParser, RuleListParser,
             AtRuleType, AtRuleParser, QualifiedRuleParser,
             parse_one_declaration, parse_one_rule, parse_important,
-            parse_stylesheet_rules_from_bytes,
+            decode_stylesheet_bytes,
             Color, RGBA, parse_color_keyword, parse_nth, ToCss};
 
 
@@ -246,16 +246,13 @@ fn stylesheet_from_bytes() {
             let environment_encoding = get_string(&map, "environment_encoding")
                 .and_then(encoding_from_whatwg_label);
 
-            parse_stylesheet_rules_from_bytes(
-                css.as_slice(), protocol_encoding_label, environment_encoding,
-                JsonParser, |encoding, rules| {
-                    Json::Array(vec![
-                        Json::Array(rules.map(|result| {
-                            result.unwrap_or(JArray!["error", "invalid"])
-                        }).collect()),
-                        encoding.name().to_json()
-                    ])
-                })
+            let (css_unicode, encoding) = decode_stylesheet_bytes(
+                css.as_slice(), protocol_encoding_label, environment_encoding);
+            let input = &mut Parser::new(css_unicode.as_slice());
+            let rules = RuleListParser::new_for_stylesheet(input, JsonParser)
+                        .map(|result| result.unwrap_or(JArray!["error", "invalid"]))
+                        .collect::<Vec<_>>();
+            JArray![rules, encoding.name()]
         };
         assert_json_eq(result, expected, Json::Object(map).to_string());
     });
