@@ -51,7 +51,14 @@ where W: TextWriter {
     if value.signed && value.value.is_positive() {
         try!(dest.write_str("+"));
     }
-    try!(write!(dest, "{}", value.value))
+
+    if value.value == 0.0 && value.value.is_negative() {
+        // Negative zero. Work around #20596.
+        try!(dest.write_str("-0"))
+    } else {
+        try!(write!(dest, "{}", value.value))
+    }
+
     if value.int_value.is_none() && value.value.fract() == 0. {
         try!(dest.write_str(".0"));
     }
