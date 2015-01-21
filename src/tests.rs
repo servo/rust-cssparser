@@ -339,27 +339,26 @@ fn nth() {
 #[test]
 fn serializer() {
     run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
-        fn flatten(input: &mut Parser, tokens: &mut Vec<Token<'static>>) {
-            while let Ok(token) = input.next_including_whitespace() {
+        fn write_to(input: &mut Parser, string: &mut String) {
+            while let Ok(token) = input.next_including_whitespace_and_comments() {
+                token.to_css(string).unwrap();
                 let closing_token = match token {
                     Token::Function(_) | Token::ParenthesisBlock => Some(Token::CloseParenthesis),
                     Token::SquareBracketBlock => Some(Token::CloseSquareBracket),
                     Token::CurlyBracketBlock => Some(Token::CloseCurlyBracket),
                     _ => None
                 };
-                tokens.push(token.into_owned());
                 if let Some(closing_token) = closing_token {
                     input.parse_nested_block(|input| {
-                        flatten(input, tokens);
+                        write_to(input, string);
                         Ok(())
                     }).unwrap();
-                    tokens.push(closing_token);
+                    closing_token.to_css(string).unwrap();
                 }
             }
         }
-        let mut tokens = vec![];
-        flatten(input, &mut tokens);
-        let serialized = tokens.to_css_string();
+        let mut serialized = String::new();
+        write_to(input, &mut serialized);
         let parser = &mut Parser::new(serialized.as_slice());
         Json::Array(component_values_to_json(parser))
     });

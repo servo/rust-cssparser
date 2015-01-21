@@ -74,7 +74,9 @@ impl<'a> Token<'a> {
             Token::Percentage(value) => Token::Percentage(value),
             Token::Dimension(value, unit) => Token::Dimension(value, Cow::Owned(unit.into_owned())),
             Token::UnicodeRange(start, end) => Token::UnicodeRange(start, end),
-            Token::WhiteSpace(_) => Token::WhiteSpace(" "),
+            Token::WhiteSpace(content) => {
+                Token::WhiteSpace(if matches!(content.as_bytes()[0], b'\n' | b'\r' | b'\x0C') { "\n" } else { " " })
+            }
             Token::Comment(_) => Token::Comment(""),
             Token::Colon => Token::Colon,
             Token::Semicolon => Token::Semicolon,
