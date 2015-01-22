@@ -12,7 +12,7 @@
     ["percentage", "100", 100, "integer"], ",", " ",
     ["percentage", "0", 0, "integer"], ",", " ",
     ["percentage", "50", 50, "integer"], ",", " ",
-    ["number", ".5", 0.5, "number"]
+    ["number", "0.5", 0.5, "number"]
 ],
 
 " /**/ { foo: bar; @baz [)", ["{}",

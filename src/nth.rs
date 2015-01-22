@@ -4,68 +4,47 @@
 
 use std::ascii::AsciiExt;
 
-use ast::{ComponentValue, NumericValue, SkipWhitespaceIterator, SkipWhitespaceIterable};
-use ast::ComponentValue::{Number, Dimension, Ident, Delim};
+use super::{Token, Parser};
 
 
 /// Parse the *An+B* notation, as found in the `:nth-child()` selector.
-/// The input is typically the arguments of a function component value.
+/// The input is typically the arguments of a function,
+/// in which case the caller needs to check if the arguments’ parser is exhausted.
 /// Return `Ok((A, B))`, or `Err(())` for a syntax error.
-pub fn parse_nth(input: &[ComponentValue]) -> Result<(i32, i32), ()> {
-    let iter = &mut input.skip_whitespace();
-    match iter.next() {
-        Some(&Number(ref value)) => match value.int_value {
-            Some(b) => parse_end(iter, 0, b as i32),
-            _ => Err(()),
-        },
-        Some(&Dimension(ref value, ref unit)) => match value.int_value {
-            Some(a) => {
-                let unit = unit.as_slice().to_ascii_lowercase();
-                let unit = unit.as_slice();
-                match unit {
-                    "n" => parse_b(iter, a as i32),
-                    "n-" => parse_signless_b(iter, a as i32, -1),
-                    _ => match parse_n_dash_digits(unit) {
-                        Some(b) => parse_end(iter, a as i32, b),
-                        _ => Err(())
-                    },
-                }
-            },
-            _ => Err(()),
-        },
-        Some(&Ident(ref value)) => {
-            let ident = value.as_slice().to_ascii_lowercase();
-            let ident = ident.as_slice();
-            match ident {
-                "even" => parse_end(iter, 2, 0),
-                "odd" => parse_end(iter, 2, 1),
-                "n" => parse_b(iter, 1),
-                "-n" => parse_b(iter, -1),
-                "n-" => parse_signless_b(iter, 1, -1),
-                "-n-" => parse_signless_b(iter, -1, -1),
-                _ if ident.starts_with("-") => match parse_n_dash_digits(ident.slice_from(1)) {
-                    Some(b) => parse_end(iter, -1, b),
-                    _ => Err(())
-                },
-                _ =>  match parse_n_dash_digits(ident) {
-                    Some(b) => parse_end(iter, 1, b),
-                    _ => Err(())
-                },
+pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
+    match try!(input.next()) {
+        Token::Number(value) => Ok((0, try!(value.int_value.ok_or(())) as i32)),
+        Token::Dimension(value, unit) => {
+            let a = try!(value.int_value.ok_or(())) as i32;
+            match_ignore_ascii_case! { unit:
+                "n" => parse_b(input, a),
+                "n-" => parse_signless_b(input, a, -1)
+                _ => Ok((a, try!(parse_n_dash_digits(unit.as_slice()))))
             }
-        },
-        Some(&Delim('+')) => match iter.iter_with_whitespace.next() {
-            Some(&Ident(ref value)) => {
-                let ident = value.as_slice().to_ascii_lowercase();
-                let ident = ident.as_slice();
-                match ident {
-                    "n" => parse_b(iter, 1),
-                    "n-" => parse_signless_b(iter, 1, -1),
-                    _ => match parse_n_dash_digits(ident) {
-                        Some(b) => parse_end(iter, 1, b),
-                        _ => Err(())
-                    },
+        }
+        Token::Ident(value) => {
+            match_ignore_ascii_case! { value:
+                "even" => Ok((2, 0)),
+                "odd" => Ok((2, 1)),
+                "n" => parse_b(input, 1),
+                "-n" => parse_b(input, -1),
+                "n-" => parse_signless_b(input, 1, -1),
+                "-n-" => parse_signless_b(input, -1, -1)
+                _ => if value.starts_with("-") {
+                    Ok((-1, try!(parse_n_dash_digits(value.slice_from(1)))))
+                } else {
+                    Ok((1, try!(parse_n_dash_digits(value.as_slice()))))
                 }
-            },
+            }
+        }
+        Token::Delim('+') => match try!(input.next_including_whitespace()) {
+            Token::Ident(value) => {
+                match_ignore_ascii_case! { value:
+                    "n" => parse_b(input, 1),
+                    "n-" => parse_signless_b(input, 1, -1)
+                    _ => Ok((1, try!(parse_n_dash_digits(value.as_slice()))))
+                }
+            }
             _ => Err(())
         },
         _ => Err(())
@@ -73,52 +52,37 @@ pub fn parse_nth(input: &[ComponentValue]) -> Result<(i32, i32), ()> {
 }
 
 
-type Nth = Result<(i32, i32), ()>;
-type Iter<'a> = SkipWhitespaceIterator<'a>;
+fn parse_b(input: &mut Parser, a: i32) -> Result<(i32, i32), ()> {
+    let start_position = input.position();
+    match input.next() {
+        Ok(Token::Delim('+')) => parse_signless_b(input, a, 1),
+        Ok(Token::Delim('-')) => parse_signless_b(input, a, -1),
+        Ok(Token::Number(ref value)) if value.signed => {
+            Ok((a, try!(value.int_value.ok_or(())) as i32))
+        }
+        _ => {
+            input.reset(start_position);
+            Ok((a, 0))
+        }
+    }
+}
 
-fn parse_b(iter: &mut Iter, a: i32) -> Nth {
-    match iter.next() {
-        None => Ok((a, 0)),
-        Some(&Delim('+')) => parse_signless_b(iter, a, 1),
-        Some(&Delim('-')) => parse_signless_b(iter, a, -1),
-        Some(&Number(ref value)) => match value.int_value {
-            Some(b) if has_sign(value) => parse_end(iter, a, b as i32),
-            _ => Err(()),
-        },
+fn parse_signless_b(input: &mut Parser, a: i32, b_sign: i32) -> Result<(i32, i32), ()> {
+    match try!(input.next()) {
+        Token::Number(ref value) if !value.signed => {
+            Ok((a, b_sign * (try!(value.int_value.ok_or(())) as i32)))
+        }
         _ => Err(())
     }
 }
 
-fn parse_signless_b(iter: &mut Iter, a: i32, b_sign: i32) -> Nth {
-    match iter.next() {
-        Some(&Number(ref value)) => match value.int_value {
-            Some(b) if !has_sign(value) => parse_end(iter, a, b_sign * (b as i32)),
-            _ => Err(()),
-        },
-        _ => Err(())
-    }
-}
-
-fn parse_end(iter: &mut Iter, a: i32, b: i32) -> Nth {
-    match iter.next() {
-        None => Ok((a, b)),
-        Some(_) => Err(()),
-    }
-}
-
-fn parse_n_dash_digits(string: &str) -> Option<i32> {
+fn parse_n_dash_digits(string: &str) -> Result<i32, ()> {
     if string.len() >= 3
-    && string.starts_with("n-")
+    && string.slice_to(2).eq_ignore_ascii_case("n-")
     && string.slice_from(2).chars().all(|c| matches!(c, '0'...'9'))
     {
-        let result = string.slice_from(1).parse();  // Include the minus sign
-        assert!(result.is_some());
-        result
+        Ok(from_str(string.slice_from(1)).unwrap())  // Include the minus sign
+    } else {
+        Err(())
     }
-    else { None }
-}
-
-#[inline]
-fn has_sign(value: &NumericValue) -> bool {
-    matches!(value.representation.as_bytes()[0], b'+' | b'-')
 }
