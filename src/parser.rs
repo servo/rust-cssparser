@@ -302,7 +302,6 @@ impl<'i, 't> Parser<'i, 't> {
     ///
     /// This can help tell e.g. `color: green;` from `color: green 4px;`
     #[inline]
-    // FIXME: Take an unboxed `FnOnce` closure.
     pub fn parse_entirely<F, T>(&mut self, parse: F) -> Result<T, ()>
     where F: FnOnce(&mut Parser) -> Result<T, ()> {
         let result = parse(self);

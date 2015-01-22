@@ -386,12 +386,7 @@ fn parse_at_rule<R, AP, P>(name: CowString, input: &mut Parser, parser: &mut P)
         AtRuleType::WithBlock(prelude) => {
             match input.next() {
                 Ok(Token::CurlyBracketBlock) => {
-                    // FIXME: Make parse_entirely take `FnOnce`
-                    // and remove this Option dance.
-                    let mut prelude = Some(prelude);
-                    input.parse_nested_block(|input| {
-                        parser.parse_block(prelude.take().unwrap(), input)
-                    })
+                    input.parse_nested_block(move |input| parser.parse_block(prelude, input))
                 }
                 Ok(Token::Semicolon) | Err(()) => Err(()),
                 Ok(_) => unreachable!()
@@ -401,12 +396,7 @@ fn parse_at_rule<R, AP, P>(name: CowString, input: &mut Parser, parser: &mut P)
             match input.next() {
                 Ok(Token::Semicolon) | Err(()) => parser.rule_without_block(prelude),
                 Ok(Token::CurlyBracketBlock) => {
-                    // FIXME: Make parse_entirely take `FnOnce`
-                    // and remove this Option dance.
-                    let mut prelude = Some(prelude);
-                    input.parse_nested_block(|input| {
-                        parser.parse_block(prelude.take().unwrap(), input)
-                    })
+                    input.parse_nested_block(move |input| parser.parse_block(prelude, input))
                 }
                 _ => unreachable!()
             }
@@ -423,12 +413,8 @@ fn parse_qualified_rule<R, AP, P>(input: &mut Parser, parser: &mut P)
     });
     match try!(input.next()) {
         Token::CurlyBracketBlock => {
-            // FIXME: Make parse_entirely take `FnOnce`
-            // and remove this Option dance.
-            let mut prelude = Some(try!(prelude));
-            input.parse_nested_block(|input| {
-                parser.parse_block(prelude.take().unwrap(), input)
-            })
+            let prelude = try!(prelude);
+            input.parse_nested_block(move |input| parser.parse_block(prelude, input))
         }
         _ => unreachable!(),
     }
