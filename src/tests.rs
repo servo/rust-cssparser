@@ -133,7 +133,7 @@ fn assert_json_eq(results: json::Json, mut expected: json::Json, message: String
 
 
 fn run_raw_json_tests<F: Fn(Json, Json) -> ()>(json_data: &str, run: F) {
-    let items = match json::from_str(json_data) {
+    let items = match Json::from_str(json_data) {
         Ok(Json::Array(items)) => items,
         _ => panic!("Invalid JSON")
     };

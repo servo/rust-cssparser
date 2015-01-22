@@ -67,7 +67,7 @@ extern crate encoding;
 extern crate text_writer;
 #[macro_use] extern crate matches;
 #[cfg(test)] extern crate test;
-#[cfg(test)] extern crate serialize;
+#[cfg(test)] extern crate "rustc-serialize" as serialize;
 
 pub use tokenizer::{Token, NumericValue, PercentageValue, SourceLocation};
 pub use rules_and_declarations::{parse_important};
