@@ -89,7 +89,7 @@ but matching is case-insensitive in the ASCII range.
 Usage example:
 
 ```{rust,ignore}
-match_ignore_ascii_case! { string:
+match_ignore_ascii_case! { string,
     "foo" => Some(Foo),
     "bar" => Some(Bar),
     "baz" => Some(Baz)
