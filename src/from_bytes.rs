@@ -35,13 +35,13 @@ pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>
     if css.starts_with("@charset \"".as_bytes()) {
         // 10 is "@charset \"".len()
         // 100 is arbitrary so that no encoding label is more than 100-10 bytes.
-        match css.slice(10, cmp::min(css.len(), 100)).position_elem(&('"' as u8)) {
+        match css[10..cmp::min(css.len(), 100)].position_elem(&('"' as u8)) {
             None => (),
             Some(label_length)
-            => if css.slice_from(10 + label_length).starts_with("\";".as_bytes()) {
-                let label = css.slice(10, 10 + label_length);
+            => if css[10 + label_length..].starts_with("\";".as_bytes()) {
+                let label = &css[10..10 + label_length];
                 let label = label.iter().map(|&b| b as char).collect::<String>();
-                match encoding_from_whatwg_label(label.as_slice()) {
+                match encoding_from_whatwg_label(&*label) {
                     None => (),
                     Some(fallback) => match fallback.name() {
                         "utf-16be" | "utf-16le"

@@ -88,7 +88,7 @@ fn normalize(json: &mut Json) {
         }
         Json::String(ref mut s) => {
             if s.as_slice() == "extra-input" || s.as_slice() == "empty" {
-                *s = "invalid".into_string()
+                *s = "invalid".to_string()
             }
         }
         _ => {}
@@ -524,17 +524,17 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::QuotedString(value) => JArray!["string", value],
         Token::Url(value) => JArray!["url", value],
         Token::Delim('\\') => "\\".to_json(),
-        Token::Delim(value) => String::from_char(1, value).to_json(),
+        Token::Delim(value) => value.to_string().to_json(),
 
-        Token::Number(value) => Json::Array(vec!["number".to_json()] + numeric(value)),
+        Token::Number(value) => Json::Array(vec!["number".to_json()] + numeric(value).as_slice()),
         Token::Percentage(PercentageValue { unit_value, int_value, signed }) => Json::Array(
             vec!["percentage".to_json()] + numeric(NumericValue {
                 value: unit_value * 100.,
                 int_value: int_value,
                 signed: signed,
-            })),
+            }).as_slice()),
         Token::Dimension(value, unit) => Json::Array(
-            vec!["dimension".to_json()] + numeric(value) + [unit.to_json()].as_slice()),
+            vec!["dimension".to_json()] + numeric(value).as_slice() + [unit.to_json()].as_slice()),
 
         Token::UnicodeRange(start, end) => JArray!["unicode-range", start, end],
 
@@ -553,10 +553,10 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::CDC => "-->".to_json(),
 
         Token::Function(name) => Json::Array(vec!["function".to_json(), name.to_json()] +
-                                             nested(input)),
-        Token::ParenthesisBlock => Json::Array(vec!["()".to_json()] + nested(input)),
-        Token::SquareBracketBlock => Json::Array(vec!["[]".to_json()] + nested(input)),
-        Token::CurlyBracketBlock => Json::Array(vec!["{}".to_json()] + nested(input)),
+                                             nested(input).as_slice()),
+        Token::ParenthesisBlock => Json::Array(vec!["()".to_json()] + nested(input).as_slice()),
+        Token::SquareBracketBlock => Json::Array(vec!["[]".to_json()] + nested(input).as_slice()),
+        Token::CurlyBracketBlock => Json::Array(vec!["{}".to_json()] + nested(input).as_slice()),
         Token::BadUrl => JArray!["error", "bad-url"],
         Token::BadString => JArray!["error", "bad-string"],
         Token::CloseParenthesis => JArray!["error", ")"],

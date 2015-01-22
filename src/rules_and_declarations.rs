@@ -4,7 +4,7 @@
 
 // http://dev.w3.org/csswg/css-syntax/#parsing
 
-use std::str::CowString;
+use std::string::CowString;
 use super::{Token, Parser, Delimiter};
 
 
@@ -217,9 +217,11 @@ where P: DeclarationParser<I> + AtRuleParser<AP, I> {
 
 /// `DeclarationListParser` is an iterator that yields `Ok(_)` for a valid declaration or at-rule
 /// or `Err(())` for an invalid one.
-impl<'i, 't, 'a, AP, I, P> Iterator<Result<I, ()>>
+impl<'i, 't, 'a, AP, I, P> Iterator
 for DeclarationListParser<'i, 't, 'a, AP, I, P>
 where P: DeclarationParser<I> + AtRuleParser<AP, I> {
+    type Item = Result<I, ()>;
+
     fn next(&mut self) -> Option<Result<I, ()>> {
         loop {
             match self.input.next() {
@@ -228,7 +230,7 @@ where P: DeclarationParser<I> + AtRuleParser<AP, I> {
                     let parser = &mut self.parser;
                     return Some(self.input.parse_until_after(Delimiter::Semicolon, |input| {
                         try!(input.expect_colon());
-                        parser.parse_value(name.as_slice(), input)
+                        parser.parse_value(&*name, input)
                     }))
                 }
                 Ok(Token::AtKeyword(name)) => {
@@ -307,9 +309,11 @@ where P: QualifiedRuleParser<QP, R> + AtRuleParser<AP, R> {
 
 
 /// `RuleListParser` is an iterator that yields `Ok(_)` for a rule or `Err(())` for an invalid one.
-impl<'i, 't, 'a, R, QP, AP, P> Iterator<Result<R, ()>>
+impl<'i, 't, 'a, R, QP, AP, P> Iterator
 for RuleListParser<'i, 't, 'a, R, QP, AP, P>
 where P: QualifiedRuleParser<QP, R> + AtRuleParser<AP, R> {
+    type Item = Result<R, ()>;
+
     fn next(&mut self) -> Option<Result<R, ()>> {
         loop {
             let start_position = self.input.position();
@@ -337,7 +341,7 @@ pub fn parse_one_declaration<D, P>(input: &mut Parser, parser: &mut P)
     input.parse_entirely(|input| {
         let name = try!(input.expect_ident());
         try!(input.expect_colon());
-        parser.parse_value(name.as_slice(), input)
+        parser.parse_value(&*name, input)
     })
 }
 
@@ -369,7 +373,7 @@ fn parse_at_rule<R, AP, P>(name: CowString, input: &mut Parser, parser: &mut P)
                            where P: AtRuleParser<AP, R> {
     let delimiters = Delimiter::Semicolon | Delimiter::CurlyBracketBlock;
     let result = try!(input.parse_until_before(delimiters, |input| {
-        parser.parse_prelude(name.as_slice(), input)
+        parser.parse_prelude(&*name, input)
     }));
     match result {
         AtRuleType::WithoutBlock(rule) => {

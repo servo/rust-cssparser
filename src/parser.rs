@@ -3,9 +3,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::ascii::AsciiExt;
-use std::str::CowString;
+use std::ops::BitOr;
+use std::string::CowString;
 use std::ops;
-use tokenizer::{mod, Token, NumericValue, PercentageValue, Tokenizer, SourceLocation};
+use tokenizer::{self, Token, NumericValue, PercentageValue, Tokenizer, SourceLocation};
 
 
 /// A capture of the internal state of a `Parser` (including the position within the input),
@@ -13,7 +14,7 @@ use tokenizer::{mod, Token, NumericValue, PercentageValue, Tokenizer, SourceLoca
 ///
 /// Can be used with the `Parser::reset` method to restore that state.
 /// Should only be used with the `Parser` instance it came from.
-#[deriving(PartialEq, Eq, Show, Clone, Copy)]
+#[derive(PartialEq, Eq, Show, Clone, Copy)]
 pub struct SourcePosition {
     position: tokenizer::SourcePosition,
     at_start_of: Option<BlockType>,
@@ -29,8 +30,10 @@ enum MaybeOwned<'a, T: 'a> {
     Borrowed(&'a mut T),
 }
 
-impl<'a, T> ops::Deref<T> for MaybeOwned<'a, T> {
-    fn deref<'a>(&'a self) -> &'a T {
+impl<'a, T> ops::Deref for MaybeOwned<'a, T> {
+    type Target = T;
+
+    fn deref<'b>(&'b self) -> &'b T {
         match *self {
             MaybeOwned::Owned(ref pointer) => &**pointer,
             MaybeOwned::Borrowed(ref pointer) => &**pointer,
@@ -38,8 +41,8 @@ impl<'a, T> ops::Deref<T> for MaybeOwned<'a, T> {
     }
 }
 
-impl<'a, T> ops::DerefMut<T> for MaybeOwned<'a, T> {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut T {
+impl<'a, T> ops::DerefMut for MaybeOwned<'a, T> {
+    fn deref_mut<'b>(&'b mut self) -> &'b mut T {
         match *self {
             MaybeOwned::Owned(ref mut pointer) => &mut **pointer,
             MaybeOwned::Borrowed(ref mut pointer) => &mut **pointer,
@@ -49,7 +52,7 @@ impl<'a, T> ops::DerefMut<T> for MaybeOwned<'a, T> {
 
 impl<'a, T> Clone for MaybeOwned<'a, T> where T: Clone {
     fn clone(&self) -> MaybeOwned<'a, T> {
-        MaybeOwned::Owned(box() (**self).clone())
+        MaybeOwned::Owned(Box::new((**self).clone()))
     }
 }
 
@@ -57,7 +60,7 @@ impl<'a, T> Clone for MaybeOwned<'a, T> where T: Clone {
 /// A CSS parser that borrows its `&str` input,
 /// yields `Token`s,
 /// and keeps track of nested blocks and functions.
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct Parser<'i: 't, 't> {
     tokenizer: MaybeOwned<'t, Tokenizer<'i>>,
     /// If `Some(_)`, .parse_nested_block() can be called.
@@ -67,7 +70,7 @@ pub struct Parser<'i: 't, 't> {
 }
 
 
-#[deriving(Copy, Clone, PartialEq, Eq, Show)]
+#[derive(Copy, Clone, PartialEq, Eq, Show)]
 enum BlockType {
     Parenthesis,
     SquareBracket,
@@ -104,7 +107,7 @@ impl BlockType {
 /// ```{rust,ignore}
 /// input.parse_until_before(Delimiter::CurlyBracketBlock | Delimiter::Semicolon)
 /// ```
-#[deriving(Copy, Clone, PartialEq, Eq, Show)]
+#[derive(Copy, Clone, PartialEq, Eq, Show)]
 pub struct Delimiters {
     bits: u8,
 }
@@ -133,8 +136,10 @@ mod ClosingDelimiter {
     pub const CloseParenthesis: Delimiters = Delimiters { bits: 1 << 7 };
 }
 
-impl BitOr<Delimiters, Delimiters> for Delimiters {
-    fn bitor(&self, other: &Delimiters) -> Delimiters {
+impl BitOr<Delimiters> for Delimiters {
+    type Output = Delimiters;
+
+    fn bitor(self, other: Delimiters) -> Delimiters {
         Delimiters { bits: self.bits | other.bits }
     }
 }
@@ -162,7 +167,7 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn new(input: &'i str) -> Parser<'i, 'i> {
         Parser {
-            tokenizer: MaybeOwned::Owned(box Tokenizer::new(input)),
+            tokenizer: MaybeOwned::Owned(Box::new(Tokenizer::new(input))),
             at_start_of: None,
             stop_before: Delimiter::None,
         }
@@ -219,7 +224,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// the internal state of the parser  (including position within the input)
     /// is restored to what it was before the call.
     #[inline]
-    pub fn try<T, E>(&mut self, thing: |&mut Parser<'i, 't>| -> Result<T, E>) -> Result<T, E> {
+    pub fn try<F, T, E>(&mut self, thing: F) -> Result<T, E>
+    where F: FnOnce(&mut Parser<'i, 't>) -> Result<T, E> {
         let start_position = self.position();
         let result = thing(self);
         if result.is_err() {
@@ -297,8 +303,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// This can help tell e.g. `color: green;` from `color: green 4px;`
     #[inline]
     // FIXME: Take an unboxed `FnOnce` closure.
-    pub fn parse_entirely<T>(&mut self, parse: |&mut Parser| -> Result<T, ()>)
-                             -> Result<T, ()> {
+    pub fn parse_entirely<F, T>(&mut self, parse: F) -> Result<T, ()>
+    where F: FnOnce(&mut Parser) -> Result<T, ()> {
         let result = parse(self);
         try!(self.expect_exhausted());
         result
@@ -315,8 +321,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// This method retuns `Err(())` the first time that a closure call does,
     /// or if a closure call leaves some input before the next comma or the end of the input.
     #[inline]
-    pub fn parse_comma_separated<T>(&mut self, parse_one: |&mut Parser| -> Result<T, ()>)
-                                    -> Result<Vec<T>, ()> {
+    pub fn parse_comma_separated<F, T>(&mut self, mut parse_one: F) -> Result<Vec<T>, ()>
+    where F: FnMut(&mut Parser) -> Result<T, ()> {
         let mut values = vec![];
         loop {
             values.push(try!(self.parse_until_before(Delimiter::Comma, |parser| parse_one(parser))));
@@ -340,8 +346,8 @@ impl<'i, 't> Parser<'i, 't> {
     ///
     /// The result is overridden to `Err(())` if the closure leaves some input before that point.
     #[inline]
-    pub fn parse_nested_block<T>(&mut self, parse: |&mut Parser| -> Result<T, ()>)
-                                 -> Result <T, ()> {
+    pub fn parse_nested_block<F, T>(&mut self, parse: F) -> Result <T, ()>
+    where F: FnOnce(&mut Parser) -> Result<T, ()> {
         let block_type = self.at_start_of.take().expect("\
             A nested parser can only be created when a Function, \
             ParenthesisBlock, SquareBracketBlock, or CurlyBracketBlock \
@@ -374,9 +380,9 @@ impl<'i, 't> Parser<'i, 't> {
     ///
     /// The result is overridden to `Err(())` if the closure leaves some input before that point.
     #[inline]
-    pub fn parse_until_before<T>(&mut self, delimiters: Delimiters,
-                                 parse: |&mut Parser| -> Result<T, ()>)
-                                 -> Result <T, ()> {
+    pub fn parse_until_before<F, T>(&mut self, delimiters: Delimiters, parse: F)
+                                    -> Result <T, ()>
+    where F: FnOnce(&mut Parser) -> Result<T, ()> {
         let delimiters = self.stop_before | delimiters;
         let result;
         // Introduce a new scope to limit duration of nested_parser’s borrow
@@ -410,9 +416,9 @@ impl<'i, 't> Parser<'i, 't> {
     /// (e.g. if these is only one in the given set)
     /// or if it was there at all (as opposed to reaching the end of the input).
     #[inline]
-    pub fn parse_until_after<T>(&mut self, delimiters: Delimiters,
-                                parse: |&mut Parser| -> Result<T, ()>)
-                                -> Result <T, ()> {
+    pub fn parse_until_after<F, T>(&mut self, delimiters: Delimiters, parse: F)
+                                   -> Result <T, ()>
+    where F: FnOnce(&mut Parser) -> Result<T, ()> {
         let result = self.parse_until_before(delimiters, parse);
         let next_byte = self.tokenizer.next_byte();
         if next_byte.is_some() && !self.stop_before.contains(Delimiters::from_byte(next_byte)) {

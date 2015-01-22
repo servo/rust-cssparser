@@ -16,14 +16,14 @@ pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
         Token::Number(value) => Ok((0, try!(value.int_value.ok_or(())) as i32)),
         Token::Dimension(value, unit) => {
             let a = try!(value.int_value.ok_or(())) as i32;
-            match_ignore_ascii_case! { unit:
+            match_ignore_ascii_case! { unit,
                 "n" => parse_b(input, a),
                 "n-" => parse_signless_b(input, a, -1)
-                _ => Ok((a, try!(parse_n_dash_digits(unit.as_slice()))))
+                _ => Ok((a, try!(parse_n_dash_digits(&*unit))))
             }
         }
         Token::Ident(value) => {
-            match_ignore_ascii_case! { value:
+            match_ignore_ascii_case! { value,
                 "even" => Ok((2, 0)),
                 "odd" => Ok((2, 1)),
                 "n" => parse_b(input, 1),
@@ -31,18 +31,18 @@ pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
                 "n-" => parse_signless_b(input, 1, -1),
                 "-n-" => parse_signless_b(input, -1, -1)
                 _ => if value.starts_with("-") {
-                    Ok((-1, try!(parse_n_dash_digits(value.slice_from(1)))))
+                    Ok((-1, try!(parse_n_dash_digits(&value[1..]))))
                 } else {
-                    Ok((1, try!(parse_n_dash_digits(value.as_slice()))))
+                    Ok((1, try!(parse_n_dash_digits(&*value))))
                 }
             }
         }
         Token::Delim('+') => match try!(input.next_including_whitespace()) {
             Token::Ident(value) => {
-                match_ignore_ascii_case! { value:
+                match_ignore_ascii_case! { value,
                     "n" => parse_b(input, 1),
                     "n-" => parse_signless_b(input, 1, -1)
-                    _ => Ok((1, try!(parse_n_dash_digits(value.as_slice()))))
+                    _ => Ok((1, try!(parse_n_dash_digits(&*value))))
                 }
             }
             _ => Err(())
@@ -78,10 +78,10 @@ fn parse_signless_b(input: &mut Parser, a: i32, b_sign: i32) -> Result<(i32, i32
 
 fn parse_n_dash_digits(string: &str) -> Result<i32, ()> {
     if string.len() >= 3
-    && string.slice_to(2).eq_ignore_ascii_case("n-")
-    && string.slice_from(2).chars().all(|c| matches!(c, '0'...'9'))
+    && string[..2].eq_ignore_ascii_case("n-")
+    && string[2..].chars().all(|c| matches!(c, '0'...'9'))
     {
-        Ok(from_str(string.slice_from(1)).unwrap())  // Include the minus sign
+        Ok(string[1..].parse().unwrap())  // Include the minus sign
     } else {
         Err(())
     }

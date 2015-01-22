@@ -70,10 +70,10 @@ where W: TextWriter {
 impl<'a> ToCss for Token<'a> {
     fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
         match *self {
-            Token::Ident(ref value) => try!(serialize_identifier(value.as_slice(), dest)),
+            Token::Ident(ref value) => try!(serialize_identifier(&**value, dest)),
             Token::AtKeyword(ref value) => {
                 try!(dest.write_char('@'));
-                try!(serialize_identifier(value.as_slice(), dest));
+                try!(serialize_identifier(&**value, dest));
             },
             Token::Hash(ref value) => {
                 try!(dest.write_char('#'));
@@ -83,12 +83,12 @@ impl<'a> ToCss for Token<'a> {
             },
             Token::IDHash(ref value) => {
                 try!(dest.write_char('#'));
-                try!(serialize_identifier(value.as_slice(), dest));
+                try!(serialize_identifier(&**value, dest));
             }
-            Token::QuotedString(ref value) => try!(serialize_string(value.as_slice(), dest)),
+            Token::QuotedString(ref value) => try!(serialize_string(&**value, dest)),
             Token::Url(ref value) => {
                 try!(dest.write_str("url("));
-                try!(serialize_string(value.as_slice(), dest));
+                try!(serialize_string(&**value, dest));
                 try!(dest.write_char(')'));
             },
             Token::Delim(value) => try!(dest.write_char(value)),
@@ -106,10 +106,10 @@ impl<'a> ToCss for Token<'a> {
             Token::Dimension(value, ref unit) => {
                 try!(write_numeric(value, dest));
                 // Disambiguate with scientific notation.
-                let unit = unit.as_slice();
+                let unit = &**unit;
                 if unit == "e" || unit == "E" || unit.starts_with("e-") || unit.starts_with("E-") {
                     try!(dest.write_str("\\65 "));
-                    for c in unit.slice_from(1).chars() {
+                    for c in unit[1..].chars() {
                         try!(serialize_char(c, dest, /* is_identifier_start = */ false));
                     }
                 } else {
@@ -126,7 +126,7 @@ impl<'a> ToCss for Token<'a> {
                     if common != 0 {
                         try!(write!(dest, "{:X}", common));
                     }
-                    for _ in range(0, question_marks) {
+                    for _ in (0..question_marks) {
                         try!(dest.write_str("?"));
                     }
                 } else {
@@ -152,7 +152,7 @@ impl<'a> ToCss for Token<'a> {
             Token::CDC => try!(dest.write_str("-->")),
 
             Token::Function(ref name) => {
-                try!(serialize_identifier(name.as_slice(), dest));
+                try!(serialize_identifier(&**name, dest));
                 try!(dest.write_char('('));
             },
             Token::ParenthesisBlock => try!(dest.write_char('(')),

@@ -73,13 +73,11 @@ impl Color {
     /// FIXME(#2) Deprecated CSS2 System Colors are not supported yet.
     pub fn parse(input: &mut Parser) -> Result<Color, ()> {
         match try!(input.next()) {
-            Token::Hash(ref value) | Token::IDHash(ref value) => {
-                parse_color_hash(value.as_slice())
-            }
-            Token::Ident(ref value) => parse_color_keyword(value.as_slice()),
-            Token::Function(ref name) => {
+            Token::Hash(value) | Token::IDHash(value) => parse_color_hash(&*value),
+            Token::Ident(value) => parse_color_keyword(&*value),
+            Token::Function(name) => {
                 input.parse_nested_block(|arguments| {
-                    parse_color_function(name.as_slice(), arguments)
+                    parse_color_function(&*name, arguments)
                 })
             }
             _ => Err(())
@@ -106,7 +104,7 @@ pub fn parse_color_keyword(ident: &str) -> Result<Color, ()> {
         }
     }
 
-    match_ignore_ascii_case! { ident:
+    match_ignore_ascii_case! { ident,
         "black" => rgba!(0., 0., 0.),
         "silver" => rgba!(192., 192., 192.),
         "gray" => rgba!(128., 128., 128.),
@@ -304,7 +302,7 @@ fn parse_color_hash(value: &str) -> Result<Color, ()> {
 
 #[inline]
 fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()> {
-    let (is_rgb, has_alpha) = match_ignore_ascii_case! { name:
+    let (is_rgb, has_alpha) = match_ignore_ascii_case! { name,
         "rgba" => (true, true),
         "rgb" => (true, false),
         "hsl" => (false, false),

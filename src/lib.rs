@@ -106,7 +106,7 @@ each arm except the fallback and the one before it must end with a comma.
 */
 #[macro_export]
 macro_rules! match_ignore_ascii_case {
-    ( $value: expr: $( $string: expr => $result: expr ),+ _ => $fallback: expr ) => {
+    ( $value: expr, $( $string: expr => $result: expr ),+ _ => $fallback: expr ) => {
         {
             use std::ascii::AsciiExt;
             match $value.as_slice() {

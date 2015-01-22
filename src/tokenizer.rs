@@ -9,7 +9,7 @@ use std::char;
 use std::num;
 use std::ascii::AsciiExt;
 use std::borrow::ToOwned;
-use std::str::CowString;
+use std::string::CowString;
 use std::borrow::Cow::{Owned, Borrowed};
 
 use self::Token::*;
@@ -19,7 +19,7 @@ use self::Token::*;
 ///
 /// Some components use `CowString` in order to borrow from the original input string
 /// and avoid allocating/copying when possible.
-#[deriving(PartialEq, Show, Clone)]
+#[derive(PartialEq, Show, Clone)]
 pub enum Token<'a> {
 
     /// A [`<ident-token>`](http://dev.w3.org/csswg/css-syntax/#ident-token-diagram)
@@ -159,7 +159,7 @@ pub enum Token<'a> {
 
 
 /// The numeric value of `Number` and `Dimension` tokens.
-#[deriving(PartialEq, Show, Copy, Clone)]
+#[derive(PartialEq, Show, Copy, Clone)]
 pub struct NumericValue {
     /// The value as a float
     pub value: f64,
@@ -192,9 +192,9 @@ pub struct PercentageValue {
 pub struct Tokenizer<'a> {
     input: &'a str,
     /// Counted in bytes, not code points. From 0.
-    position: uint,
+    position: usize,
     /// Cache for `source_location()`
-    last_known_line_break: Cell<(uint, uint)>,
+    last_known_line_break: Cell<(usize, usize)>,
 }
 
 
@@ -225,7 +225,7 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     pub fn slice_from(&self, start_pos: SourcePosition) -> &'a str {
-        self.input.slice(start_pos.0, self.position)
+        &self.input[start_pos.0..self.position]
     }
 
     #[inline]
@@ -247,7 +247,7 @@ impl<'a> Tokenizer<'a> {
             position = 0;
             line_number = 1;
         }
-        let mut source = self.input.slice(position, target);
+        let mut source = &self.input[position..target];
         while let Some(newline_position) = source.find(['\n', '\r', '\x0C'].as_slice()) {
             let offset = newline_position +
             if source.slice_from(newline_position).starts_with("\r\n") {
@@ -285,10 +285,10 @@ impl<'a> Tokenizer<'a> {
     // If true, the input has at least `n` bytes left *after* the current one.
     // That is, `tokenizer.char_at(n)` will not panic.
     #[inline]
-    fn has_at_least(&self, n: uint) -> bool { self.position + n < self.input.len() }
+    fn has_at_least(&self, n: usize) -> bool { self.position + n < self.input.len() }
 
     #[inline]
-    pub fn advance(&mut self, n: uint) { self.position += n }
+    pub fn advance(&mut self, n: usize) { self.position += n }
 
     // Assumes non-EOF
     #[inline]
@@ -300,7 +300,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    fn has_newline_at(&self, offset: uint) -> bool {
+    fn has_newline_at(&self, offset: usize) -> bool {
         self.position + offset < self.input.len() &&
         matches!(self.char_at(offset), '\n' | '\r' | '\x0C')
     }
@@ -314,23 +314,23 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn starts_with(&self, needle: &str) -> bool {
-        self.input.slice_from(self.position).starts_with(needle)
+        self.input[self.position..].starts_with(needle)
     }
 }
 
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Show, Clone, Copy)]
-pub struct SourcePosition(uint);
+pub struct SourcePosition(usize);
 
 
 /// The line and column number for a given position within the input.
 #[derive(PartialEq, Eq, Show, Clone, Copy)]
 pub struct SourceLocation {
     /// The line number, starting at 1 for the first line.
-    pub line: uint,
+    pub line: usize,
 
     /// The column number within a line, starting at 1 for the character of the line.
-    pub column: uint,
+    pub column: usize,
 }
 
 
@@ -423,7 +423,7 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
             tokenizer.advance(2);  // consume "/*"
             let start_position = tokenizer.position();
             let content;
-            match tokenizer.input.slice_from(tokenizer.position).find_str("*/") {
+            match tokenizer.input[tokenizer.position..].find_str("*/") {
                 Some(offset) => {
                     tokenizer.advance(offset);
                     content = tokenizer.slice_from(start_position);
@@ -677,7 +677,7 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         let mut repr = tokenizer.slice_from(start_pos);
         // Remove any + sign as int::parse() does not parse them.
         if repr.starts_with("+") {
-            repr = repr.slice_from(1)
+            repr = &repr[1..]
         }
         // TODO: handle overflow
         (repr.parse::<f64>().unwrap(), if is_integer {
@@ -818,7 +818,7 @@ fn consume_unicode_range<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         tokenizer.advance(1)
     }
     let first: u32 = if hex.len() > 0 {
-        num::from_str_radix(hex.as_slice(), 16).unwrap()
+        num::from_str_radix(&*hex, 16).unwrap()
     } else { 0 };
     let start;
     let end;
@@ -839,7 +839,7 @@ fn consume_unicode_range<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
                 }
             }
         }
-        end = if hex.len() > 0 { num::from_str_radix(hex.as_slice(), 16).unwrap() } else { start }
+        end = if hex.len() > 0 { num::from_str_radix(&*hex, 16).unwrap() } else { start }
     }
     UnicodeRange(start, end)
 }
@@ -875,7 +875,7 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
                 }
             }
             static REPLACEMENT_CHAR: char = '\u{FFFD}';
-            let c: u32 = num::from_str_radix(hex.as_slice(), 16).unwrap();
+            let c: u32 = num::from_str_radix(&*hex, 16).unwrap();
             if c != 0 {
                 let c = char::from_u32(c);
                 c.unwrap_or(REPLACEMENT_CHAR)
