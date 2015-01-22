@@ -282,21 +282,21 @@ fn serializer() {
 #[test]
 fn serialize_current_color() {
     let c = Color::CurrentColor;
-    assert!(format!("{}", c).as_slice() == "currentColor");
+    assert!(c.to_css_string() == "currentColor");
 }
 
 
 #[test]
 fn serialize_rgb_full_alpha() {
     let c = Color::RGBA(RGBA { red: 1.0, green: 0.9, blue: 0.8, alpha: 1.0 });
-    assert!(format!("{}", c).as_slice() == "rgb(255, 230, 204)");
+    assert!(c.to_css_string() == "rgb(255, 230, 204)");
 }
 
 
 #[test]
 fn serialize_rgba() {
     let c = Color::RGBA(RGBA { red: 0.1, green: 0.2, blue: 0.3, alpha: 0.5 });
-    assert!(format!("{}", c).as_slice() == "rgba(26, 51, 77, 0.5)");
+    assert!(c.to_css_string() == "rgba(26, 51, 77, 0.5)");
 }
 
 
