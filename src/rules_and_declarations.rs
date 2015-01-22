@@ -76,9 +76,9 @@ pub trait DeclarationParser {
 /// (`@media`, `@font-face`, …)
 /// and for page-margin rules inside `@page`.
 ///
-/// Default implementations that always return `Err(())` are provided for each method,
+/// Default implementations that reject all at-rules are provided,
 /// so that `impl AtRuleParser<(), ()> for ... {}` can be used
-/// for using `DeclarationListParser` to parse a declartions list without any at-rule.
+/// for using `DeclarationListParser` to parse a declartions list with only qualified rules.
 pub trait AtRuleParser {
     type Prelude;
     type AtRule;
@@ -125,12 +125,11 @@ pub trait AtRuleParser {
     /// An `OptionalBlock` prelude was followed by `;`.
     ///
     /// Convert the prelude into the finished representation of the at-rule
-    /// as returned by `RuleListParser::next` or `DeclarationListParser::next`,
-    /// or `Err(())` to ignore the entire at-rule as invalid
-    /// (which is pointless, but allows a default implementation to exist).
-    fn rule_without_block(&mut self, prelude: Self::Prelude) -> Result<Self::AtRule, ()> {
+    /// as returned by `RuleListParser::next` or `DeclarationListParser::next`.
+    fn rule_without_block(&mut self, prelude: Self::Prelude) -> Self::AtRule {
         let _ = prelude;
-        Err(())
+        panic!("The `AtRuleParser::rule_without_block` method must be overriden \
+                if `AtRuleParser::parse_prelude` ever returns `AtRuleType::OptionalBlock`.")
     }
 }
 
@@ -141,9 +140,9 @@ pub trait AtRuleParser {
 /// for top-level qualified rules (i.e. style rules with Selectors as prelude)
 /// and for qualified rules inside `@keyframes` (keyframe rules with keyframe selectors as prelude).
 ///
-/// Default implementations that always return `Err(())` are provided for each method,
+/// Default implementations that reject all qualified rules are provided,
 /// so that `impl QualifiedRuleParser<(), ()> for ... {}` can be used
-/// for using `RuleListParser` to parse a rule list without any qualified rule
+/// for example for using `RuleListParser` to parse a rule list with only at-rules
 /// (such as inside `@font-feature-values`).
 pub trait QualifiedRuleParser {
     type Prelude;
@@ -199,8 +198,7 @@ where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
     /// The given `parser` therefore needs to implement
     /// both `DeclarationParser` and `AtRuleParser` traits.
     /// However, the latter can be an empty `impl`
-    /// since `AtRuleParser` provides default implementations of its methods
-    /// that always return `Err(())`.
+    /// since `AtRuleParser` provides default implementations of its methods.
     ///
     /// The return type for finished declarations and at-rules also needs to be the same,
     /// since `<DeclarationListParser as Iterator>::next` can return either.
@@ -273,8 +271,7 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
     ///
     /// The given `parser` needs to implement both `QualifiedRuleParser` and `AtRuleParser` traits.
     /// However, either of them can be an empty `impl`
-    /// since the traits provide default implementations of their methods
-    /// that always return `Err(())`.
+    /// since the traits provide default implementations of their methods.
     ///
     /// The return type for finished qualified rules and at-rules also needs to be the same,
     /// since `<RuleListParser as Iterator>::next` can return either.
@@ -399,7 +396,7 @@ fn parse_at_rule<P>(name: CowString, input: &mut Parser, parser: &mut P)
         }
         AtRuleType::OptionalBlock(prelude) => {
             match input.next() {
-                Ok(Token::Semicolon) | Err(()) => parser.rule_without_block(prelude),
+                Ok(Token::Semicolon) | Err(()) => Ok(parser.rule_without_block(prelude)),
                 Ok(Token::CurlyBracketBlock) => {
                     input.parse_nested_block(move |input| parser.parse_block(prelude, input))
                 }

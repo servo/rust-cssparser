@@ -479,9 +479,9 @@ impl AtRuleParser for JsonParser {
         Ok(Json::Array(prelude))
     }
 
-    fn rule_without_block(&mut self, mut prelude: Vec<Json>) -> Result<Json, ()> {
+    fn rule_without_block(&mut self, mut prelude: Vec<Json>) -> Json {
         prelude.push(Json::Null);
-        Ok(Json::Array(prelude))
+        Json::Array(prelude)
     }
 }
 
