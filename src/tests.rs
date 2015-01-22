@@ -423,7 +423,9 @@ impl ToJson for Color {
 struct JsonParser;
 
 
-impl DeclarationParser<Json> for JsonParser {
+impl DeclarationParser for JsonParser {
+    type Declaration = Json;
+
     fn parse_value(&mut self, name: &str, input: &mut Parser) -> Result<Json, ()> {
         let mut value = vec![];
         let mut important = false;
@@ -459,7 +461,10 @@ impl DeclarationParser<Json> for JsonParser {
     }
 }
 
-impl AtRuleParser<Vec<Json>, Json> for JsonParser {
+impl AtRuleParser for JsonParser {
+    type Prelude = Vec<Json>;
+    type AtRule = Json;
+
     fn parse_prelude(&mut self, name: &str, input: &mut Parser)
                      -> Result<AtRuleType<Vec<Json>, Json>, ()> {
         Ok(AtRuleType::OptionalBlock(vec![
@@ -480,7 +485,10 @@ impl AtRuleParser<Vec<Json>, Json> for JsonParser {
     }
 }
 
-impl QualifiedRuleParser<Vec<Json>, Json> for JsonParser {
+impl QualifiedRuleParser for JsonParser {
+    type Prelude = Vec<Json>;
+    type QualifiedRule = Json;
+
     fn parse_prelude(&mut self, input: &mut Parser) -> Result<Vec<Json>, ()> {
         Ok(component_values_to_json(input))
     }
