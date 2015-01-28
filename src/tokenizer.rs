@@ -229,6 +229,11 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
+    pub fn slice(&self, start_pos: SourcePosition, end_pos: SourcePosition) -> &'a str {
+        &self.input[start_pos.0..end_pos.0]
+    }
+
+    #[inline]
     pub fn current_source_location(&self) -> SourceLocation {
         let position = SourcePosition(self.position);
         self.source_location(position)

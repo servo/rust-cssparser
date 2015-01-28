@@ -234,6 +234,12 @@ impl<'i, 't> Parser<'i, 't> {
         result
     }
 
+    /// Return a slice of the CSS input
+    #[inline]
+    pub fn slice(&self, start_position: SourcePosition, end_position: SourcePosition) -> &'i str {
+        self.tokenizer.slice(start_position.position, end_position.position)
+    }
+
     /// Return a slice of the CSS input, from the given position to the current one.
     #[inline]
     pub fn slice_from(&self, start_position: SourcePosition) -> &'i str {
