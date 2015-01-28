@@ -11,7 +11,7 @@ use test;
 
 use encoding::label::encoding_from_whatwg_label;
 
-use super::{Parser, Token, NumericValue, PercentageValue, SourceLocation,
+use super::{Parser, Delimiter, Token, NumericValue, PercentageValue, SourceLocation,
             DeclarationListParser, DeclarationParser, RuleListParser,
             AtRuleType, AtRuleParser, QualifiedRuleParser,
             parse_one_declaration, parse_one_rule, parse_important,
@@ -406,6 +406,15 @@ fn line_numbers() {
     assert_eq!(input.next_including_whitespace(), Ok(Token::QuotedString(Borrowed("ab"))));
     assert_eq!(input.current_source_location(), SourceLocation { line: 5, column: 3 });
     assert_eq!(input.next_including_whitespace(), Err(()));
+}
+
+#[test]
+fn line_delimited() {
+    let mut input = Parser::new(" { foo ; bar } baz;,");
+    assert_eq!(input.next(), Ok(Token::CurlyBracketBlock));
+    assert_eq!(input.parse_until_after(Delimiter::Semicolon, |_| Ok(42)), Err(()));
+    assert_eq!(input.next(), Ok(Token::Comma));
+    assert_eq!(input.next(), Err(()));
 }
 
 impl ToJson for Color {

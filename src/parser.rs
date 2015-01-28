@@ -392,6 +392,9 @@ impl<'i, 't> Parser<'i, 't> {
                 stop_before: delimiters,
             };
             result = delimited_parser.parse_entirely(parse);
+            if let Some(block_type) = delimited_parser.at_start_of {
+                consume_until_end_of_block(block_type, &mut *delimited_parser.tokenizer);
+            }
         }
         // FIXME: have a special-purpose tokenizer method for this that does less work.
         loop {

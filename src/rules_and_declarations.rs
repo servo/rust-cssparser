@@ -397,6 +397,7 @@ fn parse_qualified_rule<P>(input: &mut Parser, parser: &mut P)
     });
     match try!(input.next()) {
         Token::CurlyBracketBlock => {
+            // Do this here so that we consume the `{` even if the prelude is `Err`.
             let prelude = try!(prelude);
             input.parse_nested_block(move |input| parser.parse_block(prelude, input))
         }
