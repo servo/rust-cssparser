@@ -4,6 +4,7 @@
 
 // http://dev.w3.org/csswg/css3-syntax/#tokenization
 
+use std::ops::Range;
 use std::cell::Cell;
 use std::char;
 use std::num;
@@ -229,8 +230,8 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn slice(&self, start_pos: SourcePosition, end_pos: SourcePosition) -> &'a str {
-        &self.input[start_pos.0..end_pos.0]
+    pub fn slice(&self, range: Range<SourcePosition>) -> &'a str {
+        &self.input[range.start.0..range.end.0]
     }
 
     #[inline]

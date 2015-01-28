@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use std::ops::Range;
 use std::ascii::AsciiExt;
 use std::ops::BitOr;
 use std::string::CowString;
@@ -236,8 +237,8 @@ impl<'i, 't> Parser<'i, 't> {
 
     /// Return a slice of the CSS input
     #[inline]
-    pub fn slice(&self, start_position: SourcePosition, end_position: SourcePosition) -> &'i str {
-        self.tokenizer.slice(start_position.position, end_position.position)
+    pub fn slice(&self, range: Range<SourcePosition>) -> &'i str {
+        self.tokenizer.slice(range.start.position..range.end.position)
     }
 
     /// Return a slice of the CSS input, from the given position to the current one.

@@ -4,6 +4,7 @@
 
 // http://dev.w3.org/csswg/css-syntax/#parsing
 
+use std::ops::Range;
 use std::string::CowString;
 use super::{Token, Parser, Delimiter, SourcePosition};
 
@@ -216,9 +217,9 @@ where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
 /// or `Err(())` for an invalid one.
 impl<'i, 't, 'a, I, P> Iterator for DeclarationListParser<'i, 't, 'a, I, P>
 where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
-    type Item = Result<I, (SourcePosition, SourcePosition)>;
+    type Item = Result<I, Range<SourcePosition>>;
 
-    fn next(&mut self) -> Option<Result<I, (SourcePosition, SourcePosition)>> {
+    fn next(&mut self) -> Option<Result<I, Range<SourcePosition>>> {
         loop {
             let start_position = self.input.position();
             match self.input.next_including_whitespace_and_comments() {
@@ -230,14 +231,14 @@ where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
                             try!(input.expect_colon());
                             parser.parse_value(&*name, input)
                         })
-                    }.map_err(|()| (start_position, self.input.position())))
+                    }.map_err(|()| start_position..self.input.position()))
                 }
                 Ok(Token::AtKeyword(name)) => {
                     return Some(parse_at_rule(start_position, name, self.input, &mut self.parser))
                 }
                 Ok(_) => {
                     return Some(self.input.parse_until_after(Delimiter::Semicolon, |_| Err(()))
-                                .map_err(|()| (start_position, self.input.position())))
+                                .map_err(|()| start_position..self.input.position()))
                 }
                 Err(()) => return None,
             }
@@ -301,9 +302,9 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
 /// `RuleListParser` is an iterator that yields `Ok(_)` for a rule or `Err(())` for an invalid one.
 impl<'i, 't, 'a, R, P> Iterator for RuleListParser<'i, 't, 'a, R, P>
 where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
-    type Item = Result<R, (SourcePosition, SourcePosition)>;
+    type Item = Result<R, Range<SourcePosition>>;
 
-    fn next(&mut self) -> Option<Result<R, (SourcePosition, SourcePosition)>> {
+    fn next(&mut self) -> Option<Result<R, Range<SourcePosition>>> {
         loop {
             let start_position = self.input.position();
             match self.input.next_including_whitespace_and_comments() {
@@ -315,7 +316,7 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
                 Ok(_) => {
                     self.input.reset(start_position);
                     return Some(parse_qualified_rule(self.input, &mut self.parser)
-                                .map_err(|()| (start_position, self.input.position())))
+                                .map_err(|()| start_position..self.input.position()))
                 }
                 Err(()) => return None,
             }
@@ -327,14 +328,14 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
 /// Parse a single declaration, such as an `( /* ... */ )` parenthesis in an `@supports` prelude.
 pub fn parse_one_declaration<P>(input: &mut Parser, parser: &mut P)
                                 -> Result<<P as DeclarationParser>::Declaration,
-                                          (SourcePosition, SourcePosition)>
+                                          Range<SourcePosition>>
                                 where P: DeclarationParser {
     let start_position = input.position();
     input.parse_entirely(|input| {
         let name = try!(input.expect_ident());
         try!(input.expect_colon());
         parser.parse_value(&*name, input)
-    }).map_err(|()| (start_position, input.position()))
+    }).map_err(|()| start_position..input.position())
 }
 
 
@@ -361,7 +362,7 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
 
 fn parse_at_rule<P>(start_position: SourcePosition, name: CowString,
                     input: &mut Parser, parser: &mut P)
-                    -> Result<<P as AtRuleParser>::AtRule, (SourcePosition, SourcePosition)>
+                    -> Result<<P as AtRuleParser>::AtRule, Range<SourcePosition>>
                     where P: AtRuleParser {
     let delimiters = Delimiter::Semicolon | Delimiter::CurlyBracketBlock;
     let result = input.parse_until_before(delimiters, |input| {
@@ -371,7 +372,7 @@ fn parse_at_rule<P>(start_position: SourcePosition, name: CowString,
         Ok(AtRuleType::WithoutBlock(rule)) => {
             match input.next() {
                 Ok(Token::Semicolon) | Err(()) => Ok(rule),
-                Ok(Token::CurlyBracketBlock) => Err((start_position, input.position())),
+                Ok(Token::CurlyBracketBlock) => Err(start_position..input.position()),
                 Ok(_) => unreachable!()
             }
         }
@@ -379,9 +380,9 @@ fn parse_at_rule<P>(start_position: SourcePosition, name: CowString,
             match input.next() {
                 Ok(Token::CurlyBracketBlock) => {
                     input.parse_nested_block(move |input| parser.parse_block(prelude, input))
-                    .map_err(|()| (start_position, input.position()))
+                    .map_err(|()| start_position..input.position())
                 }
-                Ok(Token::Semicolon) | Err(()) => Err((start_position, input.position())),
+                Ok(Token::Semicolon) | Err(()) => Err(start_position..input.position()),
                 Ok(_) => unreachable!()
             }
         }
@@ -390,7 +391,7 @@ fn parse_at_rule<P>(start_position: SourcePosition, name: CowString,
                 Ok(Token::Semicolon) | Err(()) => Ok(parser.rule_without_block(prelude)),
                 Ok(Token::CurlyBracketBlock) => {
                     input.parse_nested_block(move |input| parser.parse_block(prelude, input))
-                    .map_err(|()| (start_position, input.position()))
+                    .map_err(|()| start_position..input.position())
                 }
                 _ => unreachable!()
             }
@@ -401,7 +402,7 @@ fn parse_at_rule<P>(start_position: SourcePosition, name: CowString,
                 Ok(Token::CurlyBracketBlock) | Ok(Token::Semicolon) | Err(()) => {}
                 _ => unreachable!()
             }
-            Err((start_position, end_position))
+            Err(start_position..end_position)
         }
     }
 }
