@@ -66,7 +66,7 @@ pub trait DeclarationParser {
     /// If `!important` can be used in a given context,
     /// `input.try(parse_important).is_ok()` should be used at the end
     /// of the implementation of this method and the result should be part of the return value.
-    fn parse_value(&mut self, name: &str, input: &mut Parser) -> Result<Self::Declaration, ()>;
+    fn parse_value(&self, name: &str, input: &mut Parser) -> Result<Self::Declaration, ()>;
 }
 
 
@@ -80,8 +80,8 @@ pub trait DeclarationParser {
 /// so that `impl AtRuleParser<(), ()> for ... {}` can be used
 /// for using `DeclarationListParser` to parse a declartions list with only qualified rules.
 pub trait AtRuleParser {
-    type Prelude;
-    type AtRule;
+    type Prelude = ();
+    type AtRule = ();
 
     /// Parse the prelude of an at-rule with the given `name`.
     ///
@@ -100,7 +100,7 @@ pub trait AtRuleParser {
     /// The given `input` is a "delimited" parser
     /// that ends wherever the prelude should end.
     /// (Before the next semicolon, the next `{`, or the end of the current block.)
-    fn parse_prelude(&mut self, name: &str, input: &mut Parser)
+    fn parse_prelude(&self, name: &str, input: &mut Parser)
                      -> Result<AtRuleType<Self::Prelude, Self::AtRule>, ()> {
         let _ = name;
         let _ = input;
@@ -115,7 +115,7 @@ pub trait AtRuleParser {
     ///
     /// This is only called when `parse_prelude` returned `WithBlock` or `OptionalBlock`,
     /// and a block was indeed found following the prelude.
-    fn parse_block(&mut self, prelude: Self::Prelude, input: &mut Parser)
+    fn parse_block(&self, prelude: Self::Prelude, input: &mut Parser)
                    -> Result<Self::AtRule, ()> {
         let _ = prelude;
         let _ = input;
@@ -126,7 +126,7 @@ pub trait AtRuleParser {
     ///
     /// Convert the prelude into the finished representation of the at-rule
     /// as returned by `RuleListParser::next` or `DeclarationListParser::next`.
-    fn rule_without_block(&mut self, prelude: Self::Prelude) -> Self::AtRule {
+    fn rule_without_block(&self, prelude: Self::Prelude) -> Self::AtRule {
         let _ = prelude;
         panic!("The `AtRuleParser::rule_without_block` method must be overriden \
                 if `AtRuleParser::parse_prelude` ever returns `AtRuleType::OptionalBlock`.")
@@ -145,8 +145,8 @@ pub trait AtRuleParser {
 /// for example for using `RuleListParser` to parse a rule list with only at-rules
 /// (such as inside `@font-feature-values`).
 pub trait QualifiedRuleParser {
-    type Prelude;
-    type QualifiedRule;
+    type Prelude = ();
+    type QualifiedRule = ();
 
     /// Parse the prelude of a qualified rule. For style rules, this is as Selector list.
     ///
@@ -157,7 +157,7 @@ pub trait QualifiedRuleParser {
     ///
     /// The given `input` is a "delimited" parser
     /// that ends where the prelude should end (before the next `{`).
-    fn parse_prelude(&mut self, input: &mut Parser) -> Result<Self::Prelude, ()> {
+    fn parse_prelude(&self, input: &mut Parser) -> Result<Self::Prelude, ()> {
         let _ = input;
         Err(())
     }
@@ -167,7 +167,7 @@ pub trait QualifiedRuleParser {
     /// Return the finished representation of the qualified rule
     /// as returned by `RuleListParser::next`,
     /// or `Err(())` to ignore the entire at-rule as invalid.
-    fn parse_block(&mut self, prelude: Self::Prelude, input: &mut Parser)
+    fn parse_block(&self, prelude: Self::Prelude, input: &mut Parser)
                    -> Result<Self::QualifiedRule, ()> {
         let _ = prelude;
         let _ = input;
@@ -209,15 +209,6 @@ where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
             input: input,
             parser: parser,
         }
-    }
-
-    /// Parse until the input is exhausted, and ignore all results.
-    /// This can be useful when the `parser` collects results by mutating itself.
-    ///
-    /// This moves `parser` out of the `DeclarationListParser` and returns it.
-    pub fn run(mut self) -> P {
-        while let Some(_) = self.next() {}
-        self.parser
     }
 }
 
@@ -298,15 +289,6 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
             parser: parser,
             is_stylesheet: false,
         }
-    }
-
-    /// Parse until the input is exhausted, and ignore all results.
-    /// This can be useful when `parser` collects results by mutating itself.
-    ///
-    /// This moves `parser` out of the `DeclarationListParser` and returns it.
-    pub fn run(mut self) -> P {
-        while let Some(_) = self.next() {}
-        self.parser
     }
 }
 

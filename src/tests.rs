@@ -426,7 +426,7 @@ struct JsonParser;
 impl DeclarationParser for JsonParser {
     type Declaration = Json;
 
-    fn parse_value(&mut self, name: &str, input: &mut Parser) -> Result<Json, ()> {
+    fn parse_value(&self, name: &str, input: &mut Parser) -> Result<Json, ()> {
         let mut value = vec![];
         let mut important = false;
         loop {
@@ -465,7 +465,7 @@ impl AtRuleParser for JsonParser {
     type Prelude = Vec<Json>;
     type AtRule = Json;
 
-    fn parse_prelude(&mut self, name: &str, input: &mut Parser)
+    fn parse_prelude(&self, name: &str, input: &mut Parser)
                      -> Result<AtRuleType<Vec<Json>, Json>, ()> {
         Ok(AtRuleType::OptionalBlock(vec![
             "at-rule".to_json(),
@@ -474,12 +474,12 @@ impl AtRuleParser for JsonParser {
         ]))
     }
 
-    fn parse_block(&mut self, mut prelude: Vec<Json>, input: &mut Parser) -> Result<Json, ()> {
+    fn parse_block(&self, mut prelude: Vec<Json>, input: &mut Parser) -> Result<Json, ()> {
         prelude.push(Json::Array(component_values_to_json(input)));
         Ok(Json::Array(prelude))
     }
 
-    fn rule_without_block(&mut self, mut prelude: Vec<Json>) -> Json {
+    fn rule_without_block(&self, mut prelude: Vec<Json>) -> Json {
         prelude.push(Json::Null);
         Json::Array(prelude)
     }
@@ -489,11 +489,11 @@ impl QualifiedRuleParser for JsonParser {
     type Prelude = Vec<Json>;
     type QualifiedRule = Json;
 
-    fn parse_prelude(&mut self, input: &mut Parser) -> Result<Vec<Json>, ()> {
+    fn parse_prelude(&self, input: &mut Parser) -> Result<Vec<Json>, ()> {
         Ok(component_values_to_json(input))
     }
 
-    fn parse_block(&mut self, prelude: Vec<Json>, input: &mut Parser) -> Result<Json, ()> {
+    fn parse_block(&self, prelude: Vec<Json>, input: &mut Parser) -> Result<Json, ()> {
         Ok(JArray![
             "qualified rule",
             prelude,
