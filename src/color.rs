@@ -59,11 +59,11 @@ impl ToCss for Color {
     }
 }
 
-impl fmt::Show for RGBA {
+impl fmt::Debug for RGBA {
     #[inline] fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_to_css(f) }
 }
 
-impl fmt::Show for Color {
+impl fmt::Debug for Color {
     #[inline] fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_to_css(f) }
 }
 

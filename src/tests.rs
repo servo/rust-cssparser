@@ -3,7 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::borrow::Cow::Borrowed;
-use std::io::{self, File, Command, Writer, TempDir, IoResult};
+use std::old_io::{File, Command, Writer, TempDir, IoResult};
+use std::old_io as io;
 use std::num::Float;
 use std::mem;
 use serialize::json::{self, Json, ToJson};
@@ -26,12 +27,12 @@ macro_rules! JArray {
 
 
 fn write_whole_file(path: &Path, data: &str) -> IoResult<()> {
-    (try!(File::open_mode(path, io::Open, io::Write))).write(data.as_bytes())
+    (try!(File::open_mode(path, io::Open, io::Write))).write_all(data.as_bytes())
 }
 
 
 fn print_json_diff(results: &Json, expected: &Json) -> IoResult<()> {
-    use std::io::stdio::stdout;
+    use std::old_io::stdio::stdout;
 
     let temp = try!(TempDir::new("rust-cssparser-tests"));
     let results = results.pretty().to_string() + "\n";
@@ -42,7 +43,7 @@ fn print_json_diff(results: &Json, expected: &Json) -> IoResult<()> {
     expected_path.push("expected.json");
     try!(write_whole_file(&result_path, results.as_slice()));
     try!(write_whole_file(&expected_path, expected.as_slice()));
-    stdout().write(try!(Command::new("colordiff")
+    stdout().write_all(try!(Command::new("colordiff")
         .arg("-u1000")
         .arg(result_path.display().to_string())
         .arg(expected_path.display().to_string())
@@ -103,12 +104,12 @@ fn find_url(list: &mut [Json]) -> Option<Result<String, ()>> {
     } else {
         return None
     };
-    let args = list.slice_from_mut(2);
+    let args = &mut list[2..];
 
     let args = if !args.is_empty() && args[0] == " ".to_json() {
-        args.slice_from_mut(1)
+        &mut args[1..]
     } else {
-        args.as_mut_slice()
+        &mut args[]
     };
 
     if let [Json::Array(ref mut arg1), ref rest..] = args.as_mut_slice() {

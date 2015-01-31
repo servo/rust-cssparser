@@ -20,7 +20,7 @@ use self::Token::*;
 ///
 /// Some components use `CowString` in order to borrow from the original input string
 /// and avoid allocating/copying when possible.
-#[derive(PartialEq, Show, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Token<'a> {
 
     /// A [`<ident-token>`](http://dev.w3.org/csswg/css-syntax/#ident-token-diagram)
@@ -160,7 +160,7 @@ pub enum Token<'a> {
 
 
 /// The numeric value of `Number` and `Dimension` tokens.
-#[derive(PartialEq, Show, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct NumericValue {
     /// The value as a float
     pub value: f64,
@@ -176,7 +176,7 @@ pub struct NumericValue {
 
 
 /// The numeric value of `Percentage` tokens.
-#[derive(PartialEq, Show, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct PercentageValue {
     /// The value as a float, divided by 100 so that the nominal range is 0.0 to 1.0.
     pub unit_value: f64,
@@ -256,12 +256,12 @@ impl<'a> Tokenizer<'a> {
         let mut source = &self.input[position..target];
         while let Some(newline_position) = source.find(['\n', '\r', '\x0C'].as_slice()) {
             let offset = newline_position +
-            if source.slice_from(newline_position).starts_with("\r\n") {
+            if source[newline_position..].starts_with("\r\n") {
                 2
             } else {
                 1
             };
-            source = source.slice_from(offset);
+            source = &source[offset..];
             position += offset;
             line_number += 1;
         }
@@ -325,12 +325,12 @@ impl<'a> Tokenizer<'a> {
 }
 
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Show, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
 pub struct SourcePosition(usize);
 
 
 /// The line and column number for a given position within the input.
-#[derive(PartialEq, Eq, Show, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct SourceLocation {
     /// The line number, starting at 1 for the first line.
     pub line: usize,

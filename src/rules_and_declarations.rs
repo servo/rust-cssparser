@@ -411,7 +411,6 @@ fn parse_at_rule<P>(start_position: SourcePosition, name: CowString,
 fn parse_qualified_rule<P>(input: &mut Parser, parser: &mut P)
                            -> Result<<P as QualifiedRuleParser>::QualifiedRule, ()>
                            where P: QualifiedRuleParser {
-    let start_position = input.position();
     let prelude = input.parse_until_before(Delimiter::CurlyBracketBlock, |input| {
         parser.parse_prelude(input)
     });

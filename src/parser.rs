@@ -15,7 +15,7 @@ use tokenizer::{self, Token, NumericValue, PercentageValue, Tokenizer, SourceLoc
 ///
 /// Can be used with the `Parser::reset` method to restore that state.
 /// Should only be used with the `Parser` instance it came from.
-#[derive(PartialEq, Eq, Show, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct SourcePosition {
     position: tokenizer::SourcePosition,
     at_start_of: Option<BlockType>,
@@ -71,7 +71,7 @@ pub struct Parser<'i: 't, 't> {
 }
 
 
-#[derive(Copy, Clone, PartialEq, Eq, Show)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum BlockType {
     Parenthesis,
     SquareBracket,
@@ -108,7 +108,7 @@ impl BlockType {
 /// ```{rust,ignore}
 /// input.parse_until_before(Delimiter::CurlyBracketBlock | Delimiter::Semicolon)
 /// ```
-#[derive(Copy, Clone, PartialEq, Eq, Show)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Delimiters {
     bits: u8,
 }
