@@ -264,3 +264,25 @@ impl<'a, W> TextWriter for CssStringWriter<'a, W> where W: TextWriter {
         }
     }
 }
+
+
+macro_rules! impl_tocss_for_number {
+    ($T: ty) => {
+        impl<'a> ToCss for $T {
+            fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+                write!(dest, "{}", *self)
+            }
+        }
+    }
+}
+
+impl_tocss_for_number!(f32);
+impl_tocss_for_number!(f64);
+impl_tocss_for_number!(i8);
+impl_tocss_for_number!(u8);
+impl_tocss_for_number!(i16);
+impl_tocss_for_number!(u16);
+impl_tocss_for_number!(i32);
+impl_tocss_for_number!(u32);
+impl_tocss_for_number!(i64);
+impl_tocss_for_number!(u64);
