@@ -5,7 +5,7 @@
 // http://dev.w3.org/csswg/css-syntax/#parsing
 
 use std::ops::Range;
-use std::string::CowString;
+use std::borrow::Cow;
 use super::{Token, Parser, Delimiter, SourcePosition};
 
 
@@ -48,6 +48,7 @@ pub enum AtRuleType<P, R> {
 /// For example, there could be different implementations for property declarations in style rules
 /// and for descriptors in `@font-face` rules.
 pub trait DeclarationParser {
+    /// The finished representation of a declaration.
     type Declaration;
 
     /// Parse the value of a declaration with the given `name`.
@@ -81,7 +82,10 @@ pub trait DeclarationParser {
 /// so that `impl AtRuleParser<(), ()> for ... {}` can be used
 /// for using `DeclarationListParser` to parse a declartions list with only qualified rules.
 pub trait AtRuleParser {
+    /// The intermediate representation of an at-rule prelude.
     type Prelude = ();
+
+    /// The finished representation of an at-rule.
     type AtRule = ();
 
     /// Parse the prelude of an at-rule with the given `name`.
@@ -146,7 +150,10 @@ pub trait AtRuleParser {
 /// for example for using `RuleListParser` to parse a rule list with only at-rules
 /// (such as inside `@font-feature-values`).
 pub trait QualifiedRuleParser {
+    /// The intermediate representation of a qualified rule prelude.
     type Prelude = ();
+
+    /// The finished representation of a qualified rule.
     type QualifiedRule = ();
 
     /// Parse the prelude of a qualified rule. For style rules, this is as Selector list.
@@ -360,7 +367,7 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
 }
 
 
-fn parse_at_rule<P>(start_position: SourcePosition, name: CowString,
+fn parse_at_rule<P>(start_position: SourcePosition, name: Cow<str>,
                     input: &mut Parser, parser: &mut P)
                     -> Result<<P as AtRuleParser>::AtRule, Range<SourcePosition>>
                     where P: AtRuleParser {

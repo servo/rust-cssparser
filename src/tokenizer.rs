@@ -9,8 +9,7 @@ use std::cell::Cell;
 use std::char;
 use std::num;
 use std::ascii::AsciiExt;
-use std::borrow::ToOwned;
-use std::string::CowString;
+use std::borrow::{Cow, ToOwned};
 use std::borrow::Cow::{Owned, Borrowed};
 
 use self::Token::*;
@@ -24,32 +23,32 @@ use self::Token::*;
 pub enum Token<'a> {
 
     /// A [`<ident-token>`](http://dev.w3.org/csswg/css-syntax/#ident-token-diagram)
-    Ident(CowString<'a>),
+    Ident(Cow<'a, str>),
 
     /// A [`<at-keyword-token>`](http://dev.w3.org/csswg/css-syntax/#at-keyword-token-diagram)
     ///
     /// The value does not include the `@` marker.
-    AtKeyword(CowString<'a>),
+    AtKeyword(Cow<'a, str>),
 
     /// A [`<hash-token>`](http://dev.w3.org/csswg/css-syntax/#hash-token-diagram) with the type flag set to "unrestricted"
     ///
     /// The value does not include the `#` marker.
-    Hash(CowString<'a>),
+    Hash(Cow<'a, str>),
 
     /// A [`<hash-token>`](http://dev.w3.org/csswg/css-syntax/#hash-token-diagram) with the type flag set to "id"
     ///
     /// The value does not include the `#` marker.
-    IDHash(CowString<'a>),  // Hash that is a valid ID selector.
+    IDHash(Cow<'a, str>),  // Hash that is a valid ID selector.
 
     /// A [`<string-token>`](http://dev.w3.org/csswg/css-syntax/#string-token-diagram)
     ///
     /// The value does not include the quotes.
-    QuotedString(CowString<'a>),
+    QuotedString(Cow<'a, str>),
 
     /// A [`<url-token>`](http://dev.w3.org/csswg/css-syntax/#url-token-diagram) or `url( <string-token> )` function
     ///
     /// The value does not include the `url(` `)` markers or the quotes.
-    Url(CowString<'a>),
+    Url(Cow<'a, str>),
 
     /// A `<delim-token>`
     Delim(char),
@@ -61,7 +60,7 @@ pub enum Token<'a> {
     Percentage(PercentageValue),
 
     /// A [`<dimension-token>`](http://dev.w3.org/csswg/css-syntax/#dimension-token-diagram)
-    Dimension(NumericValue, CowString<'a>),
+    Dimension(NumericValue, Cow<'a, str>),
 
     /// A [`<unicode-range-token>`](http://dev.w3.org/csswg/css-syntax/#unicode-range-token-diagram)
     ///
@@ -118,7 +117,7 @@ pub enum Token<'a> {
     /// A [`<function-token>`](http://dev.w3.org/csswg/css-syntax/#function-token-diagram)
     ///
     /// The value (name) does not include the `(` marker.
-    Function(CowString<'a>),
+    Function(Cow<'a, str>),
 
     /// A `<(-token>`
     ParenthesisBlock,
@@ -429,7 +428,7 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
             tokenizer.advance(2);  // consume "/*"
             let start_position = tokenizer.position();
             let content;
-            match tokenizer.input[tokenizer.position..].find_str("*/") {
+            match tokenizer.input[tokenizer.position..].find("*/") {
                 Some(offset) => {
                     tokenizer.advance(offset);
                     content = tokenizer.slice_from(start_position);
@@ -511,7 +510,7 @@ fn consume_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool) -> Toke
 
 /// Return `Err(())` on syntax error (ie. unescaped newline)
 fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
-                             -> Result<CowString<'a>, ()> {
+                             -> Result<Cow<'a, str>, ()> {
     tokenizer.advance(1);  // Skip the initial quote
     let start_pos = tokenizer.position();
     let mut string;
@@ -598,7 +597,7 @@ fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     }
 }
 
-fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowString<'a> {
+fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> Cow<'a, str> {
     let start_pos = tokenizer.position();
     let mut value;
     loop {
@@ -783,7 +782,7 @@ fn consume_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         Url(Owned(string))
     }
 
-    fn consume_url_end<'a>(tokenizer: &mut Tokenizer<'a>, string: CowString<'a>) -> Token<'a> {
+    fn consume_url_end<'a>(tokenizer: &mut Tokenizer<'a>, string: Cow<'a, str>) -> Token<'a> {
         while !tokenizer.is_eof() {
             match tokenizer.consume_char() {
                 ' ' | '\t' | '\n' | '\r' | '\x0C' => (),
@@ -816,8 +815,8 @@ fn consume_unicode_range<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
           && matches!(tokenizer.next_char(), '0'...'9' | 'A'...'F' | 'a'...'f') {
         hex.push(tokenizer.consume_char());
     }
-    let max_question_marks = 6us - hex.len();
-    let mut question_marks = 0us;
+    let max_question_marks = 6 - hex.len();
+    let mut question_marks = 0;
     while question_marks < max_question_marks && !tokenizer.is_eof()
             && tokenizer.next_char() == '?' {
         question_marks += 1;

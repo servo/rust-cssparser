@@ -109,7 +109,7 @@ fn find_url(list: &mut [Json]) -> Option<Result<String, ()>> {
     let args = if !args.is_empty() && args[0] == " ".to_json() {
         &mut args[1..]
     } else {
-        &mut args[]
+        &mut args[..]
     };
 
     if let [Json::Array(ref mut arg1), ref rest..] = args.as_mut_slice() {
