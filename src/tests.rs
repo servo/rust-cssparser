@@ -3,11 +3,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::borrow::Cow::Borrowed;
-use std::old_io::{File, Command, Writer, TempDir, IoResult};
-use std::old_io as io;
+use std::fs::File;
+use std::io::{self, Write};
+use std::path::Path;
+use std::process::Command;
 use std::num::Float;
 use std::mem;
 use serialize::json::{self, Json, ToJson};
+use tempdir::TempDir;
 use test;
 
 use encoding::label::encoding_from_whatwg_label;
@@ -26,30 +29,25 @@ macro_rules! JArray {
 }
 
 
-fn write_whole_file(path: &Path, data: &str) -> IoResult<()> {
-    (try!(File::open_mode(path, io::Open, io::Write))).write_all(data.as_bytes())
+fn write_whole_file(path: &Path, data: &str) -> io::Result<()> {
+    (try!(File::create(path))).write_all(data.as_bytes())
 }
 
 
-fn print_json_diff(results: &Json, expected: &Json) -> IoResult<()> {
-    use std::old_io::stdio::stdout;
-
+fn print_json_diff(results: &Json, expected: &Json) -> io::Result<()> {
     let temp = try!(TempDir::new("rust-cssparser-tests"));
     let results = results.pretty().to_string() + "\n";
     let expected = expected.pretty().to_string() + "\n";
-    let mut result_path = temp.path().clone();
-    result_path.push("results.json");
-    let mut expected_path = temp.path().clone();
-    expected_path.push("expected.json");
+    let result_path = temp.path().join("results.json");
+    let expected_path = temp.path().join("expected.json");
     try!(write_whole_file(&result_path, results.as_slice()));
     try!(write_whole_file(&expected_path, expected.as_slice()));
-    stdout().write_all(try!(Command::new("colordiff")
+    try!(Command::new("colordiff")
         .arg("-u1000")
-        .arg(result_path.display().to_string())
-        .arg(expected_path.display().to_string())
-        .output()
-        .map_err(|_| io::standard_error(io::OtherIoError))
-    ).output.as_slice())
+        .arg(&result_path)
+        .arg(&expected_path)
+        .status());
+    Ok(())
 }
 
 

@@ -6,7 +6,7 @@
 #![crate_type = "rlib"]
 
 #![feature(core, collections)]
-#![cfg_attr(test, feature(test, old_io, old_path))]
+#![cfg_attr(test, feature(test, path, io))]
 #![deny(missing_docs)]
 
 /*!
@@ -68,6 +68,7 @@ fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
 extern crate encoding;
 extern crate text_writer;
 #[macro_use] extern crate matches;
+#[cfg(test)] extern crate tempdir;
 #[cfg(test)] extern crate test;
 #[cfg(test)] extern crate "rustc-serialize" as serialize;
 
