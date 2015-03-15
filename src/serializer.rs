@@ -120,11 +120,13 @@ impl<'a> ToCss for Token<'a> {
             Token::UnicodeRange(start, end) => {
                 try!(dest.write_str("U+"));
                 let bits = cmp::min(start.trailing_zeros(), (!end).trailing_zeros());
-                if bits >= 4 && start >> bits == end >> bits {
-                    let question_marks = bits / 4;
-                    let common = start >> question_marks * 4;
-                    if common != 0 {
-                        try!(write!(dest, "{:X}", common));
+                let question_marks = bits / 4;
+                let bits = question_marks * 4;
+                let truncated_start = start >> bits;
+                let truncated_end = end >> bits;
+                if truncated_start == truncated_end {
+                    if truncated_start != 0 {
+                        try!(write!(dest, "{:X}", truncated_start));
                     }
                     for _ in (0..question_marks) {
                         try!(dest.write_str("?"));
