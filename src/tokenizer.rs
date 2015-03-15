@@ -833,7 +833,9 @@ fn consume_unicode_range<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     } else {
         start = first;
         hex.truncate(0);
-        if !tokenizer.is_eof() && tokenizer.next_char() == '-' {
+        if tokenizer.has_at_least(1) &&
+           tokenizer.next_char() == '-' &&
+           matches!(tokenizer.char_at(1), '0'...'9' | 'A'...'F' | 'a'...'f') {
             tokenizer.advance(1);
             while hex.len() < 6 && !tokenizer.is_eof() {
                 let c = tokenizer.next_char();
