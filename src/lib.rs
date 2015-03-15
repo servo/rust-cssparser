@@ -6,7 +6,7 @@
 #![crate_type = "rlib"]
 
 #![feature(core, collections)]
-#![cfg_attr(test, feature(test, path, io))]
+#![cfg_attr(test, feature(test))]
 #![deny(missing_docs)]
 
 /*!
