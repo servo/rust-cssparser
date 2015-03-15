@@ -39,8 +39,8 @@ fn print_json_diff(results: &Json, expected: &Json) -> io::Result<()> {
     let expected = expected.pretty().to_string() + "\n";
     let result_path = temp.path().join("results.json");
     let expected_path = temp.path().join("expected.json");
-    try!(write_whole_file(&result_path, results.as_slice()));
-    try!(write_whole_file(&expected_path, expected.as_slice()));
+    try!(write_whole_file(&result_path, &results));
+    try!(write_whole_file(&expected_path, &expected));
     try!(Command::new("colordiff")
         .arg("-u1000")
         .arg(&result_path)
@@ -85,7 +85,7 @@ fn normalize(json: &mut Json) {
             }
         }
         Json::String(ref mut s) => {
-            if s.as_slice() == "extra-input" || s.as_slice() == "empty" {
+            if *s == "extra-input" || *s == "empty" {
                 *s = "invalid".to_string()
             }
         }
@@ -95,7 +95,7 @@ fn normalize(json: &mut Json) {
 
 fn find_url(list: &mut [Json]) -> Option<Result<String, ()>> {
     if let [Json::String(ref a1), Json::String(ref a2), ..] = list.as_mut_slice() {
-        if !(a1.as_slice() == "function" && a2.as_slice() == "url") {
+        if !(*a1 == "function" && *a2 == "url") {
             return None
         }
     } else {
@@ -111,7 +111,7 @@ fn find_url(list: &mut [Json]) -> Option<Result<String, ()>> {
 
     if let [Json::Array(ref mut arg1), ref rest..] = args.as_mut_slice() {
         if let [Json::String(ref a11), Json::String(ref mut a12)] = arg1.as_mut_slice() {
-            if a11.as_slice() == "string" && rest.iter().all(|a| a == &" ".to_json()) {
+            if *a11 == "string" && rest.iter().all(|a| a == &" ".to_json()) {
                 return Some(Ok(mem::replace(a12, String::new())))
             }
         }
@@ -153,7 +153,7 @@ fn run_json_tests<F: Fn(&mut Parser) -> Json>(json_data: &str, parse: F) {
     run_raw_json_tests(json_data, |input, expected| {
         match input {
             Json::String(input) => {
-                let result = parse(&mut Parser::new(input.as_slice()));
+                let result = parse(&mut Parser::new(&input));
                 assert_json_eq(result, expected, input);
             },
             _ => panic!("Unexpected JSON")
@@ -245,8 +245,8 @@ fn stylesheet_from_bytes() {
                 .and_then(encoding_from_whatwg_label);
 
             let (css_unicode, encoding) = decode_stylesheet_bytes(
-                css.as_slice(), protocol_encoding_label, environment_encoding);
-            let input = &mut Parser::new(css_unicode.as_slice());
+                &css, protocol_encoding_label, environment_encoding);
+            let input = &mut Parser::new(&css_unicode);
             let rules = RuleListParser::new_for_stylesheet(input, JsonParser)
                         .map(|result| result.unwrap_or(JArray!["error", "invalid"]))
                         .collect::<Vec<_>>();
@@ -257,7 +257,7 @@ fn stylesheet_from_bytes() {
 
     fn get_string<'a>(map: &'a json::Object, key: &str) -> Option<&'a str> {
         match map.get(key) {
-            Some(&Json::String(ref s)) => Some(s.as_slice()),
+            Some(&Json::String(ref s)) => Some(s),
             Some(&Json::Null) => None,
             None => None,
             _ => panic!("Unexpected JSON"),
@@ -330,7 +330,7 @@ fn serializer() {
         }
         let mut serialized = String::new();
         write_to(input, &mut serialized);
-        let parser = &mut Parser::new(serialized.as_slice());
+        let parser = &mut Parser::new(&serialized);
         Json::Array(component_values_to_json(parser))
     });
 }
@@ -517,15 +517,15 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::Delim('\\') => "\\".to_json(),
         Token::Delim(value) => value.to_string().to_json(),
 
-        Token::Number(value) => Json::Array(vec!["number".to_json()] + numeric(value).as_slice()),
+        Token::Number(value) => Json::Array(vec!["number".to_json()] + &*numeric(value)),
         Token::Percentage(PercentageValue { unit_value, int_value, signed }) => Json::Array(
-            vec!["percentage".to_json()] + numeric(NumericValue {
+            vec!["percentage".to_json()] + &*numeric(NumericValue {
                 value: unit_value * 100.,
                 int_value: int_value,
                 signed: signed,
-            }).as_slice()),
+            })),
         Token::Dimension(value, unit) => Json::Array(
-            vec!["dimension".to_json()] + numeric(value).as_slice() + [unit.to_json()].as_slice()),
+            vec!["dimension".to_json()] + &*numeric(value) + &[unit.to_json()][..]),
 
         Token::UnicodeRange(start, end) => JArray!["unicode-range", start, end],
 
@@ -544,10 +544,10 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::CDC => "-->".to_json(),
 
         Token::Function(name) => Json::Array(vec!["function".to_json(), name.to_json()] +
-                                             nested(input).as_slice()),
-        Token::ParenthesisBlock => Json::Array(vec!["()".to_json()] + nested(input).as_slice()),
-        Token::SquareBracketBlock => Json::Array(vec!["[]".to_json()] + nested(input).as_slice()),
-        Token::CurlyBracketBlock => Json::Array(vec!["{}".to_json()] + nested(input).as_slice()),
+                                             &*nested(input)),
+        Token::ParenthesisBlock => Json::Array(vec!["()".to_json()] + &*nested(input)),
+        Token::SquareBracketBlock => Json::Array(vec!["[]".to_json()] + &*nested(input)),
+        Token::CurlyBracketBlock => Json::Array(vec!["{}".to_json()] + &nested(input)),
         Token::BadUrl => JArray!["error", "bad-url"],
         Token::BadString => JArray!["error", "bad-string"],
         Token::CloseParenthesis => JArray!["error", ")"],

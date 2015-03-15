@@ -5,7 +5,7 @@
 #![crate_name = "cssparser"]
 #![crate_type = "rlib"]
 
-#![feature(collections)]
+#![feature(core, collections)]
 #![deny(missing_docs)]
 
 /*!
@@ -98,7 +98,7 @@ match_ignore_ascii_case! { string,
 }
 ```
 
-The macro also calls `.as_slice()` on the value,
+The macro also takes a slice of the value,
 so that a `String` or `CowString` could be passed directly instead of a `&str`.
 
 Note that because of `macro_rules` ambiguity resolutions quirks,
@@ -110,7 +110,7 @@ macro_rules! match_ignore_ascii_case {
     ( $value: expr, $( $string: expr => $result: expr ),+ _ => $fallback: expr ) => {
         {
             use std::ascii::AsciiExt;
-            match $value.as_slice() {
+            match &$value[..] {
                 $(
                     s if s.eq_ignore_ascii_case($string) => $result,
                 )+

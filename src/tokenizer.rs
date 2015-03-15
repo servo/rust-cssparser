@@ -253,7 +253,7 @@ impl<'a> Tokenizer<'a> {
             line_number = 1;
         }
         let mut source = &self.input[position..target];
-        while let Some(newline_position) = source.find(['\n', '\r', '\x0C'].as_slice()) {
+        while let Some(newline_position) = source.find(&['\n', '\r', '\x0C'][..]) {
             let offset = newline_position +
             if source[newline_position..].starts_with("\r\n") {
                 2
