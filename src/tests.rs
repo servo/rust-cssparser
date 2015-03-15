@@ -11,7 +11,6 @@ use std::num::Float;
 use std::mem;
 use serialize::json::{self, Json, ToJson};
 use tempdir::TempDir;
-use test;
 
 use encoding::label::encoding_from_whatwg_label;
 
@@ -20,7 +19,7 @@ use super::{Parser, Delimiter, Token, NumericValue, PercentageValue, SourceLocat
             AtRuleType, AtRuleParser, QualifiedRuleParser,
             parse_one_declaration, parse_one_rule, parse_important,
             decode_stylesheet_bytes,
-            Color, RGBA, parse_color_keyword, parse_nth, ToCss};
+            Color, RGBA, parse_nth, ToCss};
 
 
 macro_rules! JArray {
@@ -296,30 +295,6 @@ fn color3_keywords() {
             Ok(Color::CurrentColor) => "currentColor".to_json(),
             Err(()) => Json::Null,
         }
-    });
-}
-
-
-#[bench]
-fn bench_color_lookup_red(b: &mut test::Bencher) {
-    b.iter(|| {
-        test::black_box(parse_color_keyword("red"))
-    });
-}
-
-
-#[bench]
-fn bench_color_lookup_lightgoldenrodyellow(b: &mut test::Bencher) {
-    b.iter(|| {
-        test::black_box(parse_color_keyword("lightgoldenrodyellow"))
-    });
-}
-
-
-#[bench]
-fn bench_color_lookup_fail(b: &mut test::Bencher) {
-    b.iter(|| {
-        test::black_box(parse_color_keyword("lightgoldenrodyellowbazinga"))
     });
 }
 
