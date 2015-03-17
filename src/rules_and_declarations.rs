@@ -230,8 +230,8 @@ where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
         loop {
             let start_position = self.input.position();
             match self.input.next_including_whitespace_and_comments() {
-                Ok(Token::WhiteSpace(_)) | Ok(Token::Comment(_)) | Ok(Token::Semicolon) => {}
-                Ok(Token::Ident(name)) => {
+                Some(Token::WhiteSpace(_)) | Some(Token::Comment(_)) | Some(Token::Semicolon) => {}
+                Some(Token::Ident(name)) => {
                     return Some({
                         let parser = &mut self.parser;
                         self.input.parse_until_after(Delimiter::Semicolon, |input| {
@@ -240,14 +240,14 @@ where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
                         })
                     }.map_err(|()| start_position..self.input.position()))
                 }
-                Ok(Token::AtKeyword(name)) => {
+                Some(Token::AtKeyword(name)) => {
                     return Some(parse_at_rule(start_position, name, self.input, &mut self.parser))
                 }
-                Ok(_) => {
+                Some(_) => {
                     return Some(self.input.parse_until_after(Delimiter::Semicolon, |_| Err(()))
                                 .map_err(|()| start_position..self.input.position()))
                 }
-                Err(()) => return None,
+                None => return None,
             }
         }
     }
@@ -315,17 +315,17 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
         loop {
             let start_position = self.input.position();
             match self.input.next_including_whitespace_and_comments() {
-                Ok(Token::WhiteSpace(_)) | Ok(Token::Comment(_)) => {}
-                Ok(Token::CDO) | Ok(Token::CDC) if self.is_stylesheet => {}
-                Ok(Token::AtKeyword(name)) => {
+                Some(Token::WhiteSpace(_)) | Some(Token::Comment(_)) => {}
+                Some(Token::CDO) | Some(Token::CDC) if self.is_stylesheet => {}
+                Some(Token::AtKeyword(name)) => {
                     return Some(parse_at_rule(start_position, name, self.input, &mut self.parser))
                 }
-                Ok(_) => {
+                Some(_) => {
                     self.input.reset(start_position);
                     return Some(parse_qualified_rule(self.input, &mut self.parser)
                                 .map_err(|()| start_position..self.input.position()))
                 }
-                Err(()) => return None,
+                None => return None,
             }
         }
     }
@@ -352,11 +352,12 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
     input.parse_entirely(|input| {
         loop {
             let start_position = input.position();
-            match try!(input.next_including_whitespace_and_comments()) {
-                Token::WhiteSpace(_) | Token::Comment(_) => {}
-                Token::AtKeyword(name) => {
+            match input.next_including_whitespace_and_comments() {
+                Some(Token::WhiteSpace(_)) | Some(Token::Comment(_)) => {}
+                Some(Token::AtKeyword(name)) => {
                     return parse_at_rule(start_position, name, input, parser).map_err(|_| ())
                 }
+                None => return,
                 _ => {
                     input.reset(start_position);
                     return parse_qualified_rule(input, parser).map_err(|_| ())
@@ -378,25 +379,25 @@ fn parse_at_rule<P>(start_position: SourcePosition, name: Cow<str>,
     match result {
         Ok(AtRuleType::WithoutBlock(rule)) => {
             match input.next() {
-                Ok(Token::Semicolon) | Err(()) => Ok(rule),
-                Ok(Token::CurlyBracketBlock) => Err(start_position..input.position()),
-                Ok(_) => unreachable!()
+                Some(Token::Semicolon) | None => Ok(rule),
+                Some(Token::CurlyBracketBlock) => Err(start_position..input.position()),
+                Some(_) => unreachable!()
             }
         }
         Ok(AtRuleType::WithBlock(prelude)) => {
             match input.next() {
-                Ok(Token::CurlyBracketBlock) => {
+                Some(Token::CurlyBracketBlock) => {
                     input.parse_nested_block(move |input| parser.parse_block(prelude, input))
                     .map_err(|()| start_position..input.position())
                 }
-                Ok(Token::Semicolon) | Err(()) => Err(start_position..input.position()),
-                Ok(_) => unreachable!()
+                Some(Token::Semicolon) | None => Err(start_position..input.position()),
+                Some(_) => unreachable!()
             }
         }
         Ok(AtRuleType::OptionalBlock(prelude)) => {
             match input.next() {
-                Ok(Token::Semicolon) | Err(()) => Ok(parser.rule_without_block(prelude)),
-                Ok(Token::CurlyBracketBlock) => {
+                Some(Token::Semicolon) | None => Ok(parser.rule_without_block(prelude)),
+                Some(Token::CurlyBracketBlock) => {
                     input.parse_nested_block(move |input| parser.parse_block(prelude, input))
                     .map_err(|()| start_position..input.position())
                 }
@@ -406,7 +407,7 @@ fn parse_at_rule<P>(start_position: SourcePosition, name: Cow<str>,
         Err(()) => {
             let end_position = input.position();
             match input.next() {
-                Ok(Token::CurlyBracketBlock) | Ok(Token::Semicolon) | Err(()) => {}
+                Some(Token::CurlyBracketBlock) | Some(Token::Semicolon) | None => {}
                 _ => unreachable!()
             }
             Err(start_position..end_position)
@@ -421,12 +422,12 @@ fn parse_qualified_rule<P>(input: &mut Parser, parser: &mut P)
     let prelude = input.parse_until_before(Delimiter::CurlyBracketBlock, |input| {
         parser.parse_prelude(input)
     });
-    match try!(input.next()) {
-        Token::CurlyBracketBlock => {
+    match input.next() {
+        Some(Token::CurlyBracketBlock) => {
             // Do this here so that we consume the `{` even if the prelude is `Err`.
             let prelude = try!(prelude);
             input.parse_nested_block(move |input| parser.parse_block(prelude, input))
         }
-        _ => unreachable!()
+        _ => Err(())
     }
 }

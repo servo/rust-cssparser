@@ -208,8 +208,8 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn next(&mut self) -> Result<Token<'a>, ()> {
-        next_token(self).ok_or(())
+    pub fn next(&mut self) -> Option<Token<'a>> {
+        next_token(self)
     }
 
     #[inline]

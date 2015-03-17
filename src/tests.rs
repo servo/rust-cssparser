@@ -174,7 +174,11 @@ fn component_value_list() {
 fn one_component_value() {
     run_json_tests(include_str!("css-parsing-tests/one_component_value.json"), |input| {
         input.parse_entirely(|input| {
-            Ok(one_component_value_to_json(try!(input.next()), input))
+            let value = match input.next() {
+                Some(v) => v,
+                None => return Err(()),
+            };
+            Ok(one_component_value_to_json(value, input))
         }).unwrap_or(JArray!["error", "invalid"])
     });
 }
@@ -311,7 +315,7 @@ fn nth() {
 fn serializer() {
     run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
         fn write_to(input: &mut Parser, string: &mut String) {
-            while let Ok(token) = input.next_including_whitespace_and_comments() {
+            while let Some(token) = input.next_including_whitespace_and_comments() {
                 token.to_css(string).unwrap();
                 let closing_token = match token {
                     Token::Function(_) | Token::ParenthesisBlock => Some(Token::CloseParenthesis),
@@ -360,35 +364,35 @@ fn serialize_rgba() {
 fn line_numbers() {
     let mut input = Parser::new("foo bar\nbaz\r\n\n\"a\\\r\nb\"");
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 1 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("foo"))));
+    assert_eq!(input.next_including_whitespace(), Some(Token::Ident(Borrowed("foo"))));
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 4 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace(" ")));
+    assert_eq!(input.next_including_whitespace(), Some(Token::WhiteSpace(" ")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 5 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("bar"))));
+    assert_eq!(input.next_including_whitespace(), Some(Token::Ident(Borrowed("bar"))));
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 8 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace("\n")));
+    assert_eq!(input.next_including_whitespace(), Some(Token::WhiteSpace("\n")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 1 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("baz"))));
+    assert_eq!(input.next_including_whitespace(), Some(Token::Ident(Borrowed("baz"))));
     assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 4 });
     let position = input.position();
 
-    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace("\r\n\n")));
+    assert_eq!(input.next_including_whitespace(), Some(Token::WhiteSpace("\r\n\n")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 4, column: 1 });
 
     assert_eq!(input.source_location(position), SourceLocation { line: 2, column: 4 });
 
-    assert_eq!(input.next_including_whitespace(), Ok(Token::QuotedString(Borrowed("ab"))));
+    assert_eq!(input.next_including_whitespace(), Some(Token::QuotedString(Borrowed("ab"))));
     assert_eq!(input.current_source_location(), SourceLocation { line: 5, column: 3 });
-    assert_eq!(input.next_including_whitespace(), Err(()));
+    assert_eq!(input.next_including_whitespace(), None);
 }
 
 #[test]
 fn line_delimited() {
     let mut input = Parser::new(" { foo ; bar } baz;,");
-    assert_eq!(input.next(), Ok(Token::CurlyBracketBlock));
+    assert_eq!(input.next(), Some(Token::CurlyBracketBlock));
     assert_eq!(input.parse_until_after(Delimiter::Semicolon, |_| Ok(42)), Err(()));
-    assert_eq!(input.next(), Ok(Token::Comma));
-    assert_eq!(input.next(), Err(()));
+    assert_eq!(input.next(), Some(Token::Comma));
+    assert_eq!(input.next(), None);
 }
 
 impl ToJson for Color {
@@ -414,7 +418,7 @@ impl DeclarationParser for JsonParser {
         let mut important = false;
         loop {
             let start_position = input.position();
-            if let Ok(mut token) = input.next_including_whitespace() {
+            if let Some(mut token) = input.next_including_whitespace() {
                 // Hack to deal with css-parsing-tests assuming that
                 // `!important` in the middle of a declaration value is OK.
                 // This can never happen per spec
@@ -487,7 +491,7 @@ impl QualifiedRuleParser for JsonParser {
 
 fn component_values_to_json(input: &mut Parser) -> Vec<Json> {
     let mut values = vec![];
-    while let Ok(token) = input.next_including_whitespace() {
+    while let Some(token) = input.next_including_whitespace() {
         values.push(one_component_value_to_json(token, input));
     }
     values

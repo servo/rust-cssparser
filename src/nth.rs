@@ -12,9 +12,9 @@ use super::{Token, Parser};
 /// in which case the caller needs to check if the arguments’ parser is exhausted.
 /// Return `Ok((A, B))`, or `Err(())` for a syntax error.
 pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
-    match try!(input.next()) {
-        Token::Number(value) => Ok((0, try!(value.int_value.ok_or(())) as i32)),
-        Token::Dimension(value, unit) => {
+    match input.next() {
+        Some(Token::Number(value)) => Ok((0, try!(value.int_value.ok_or(())) as i32)),
+        Some(Token::Dimension(value, unit)) => {
             let a = try!(value.int_value.ok_or(())) as i32;
             match_ignore_ascii_case! { unit,
                 "n" => parse_b(input, a),
@@ -22,7 +22,7 @@ pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
                 _ => Ok((a, try!(parse_n_dash_digits(&*unit))))
             }
         }
-        Token::Ident(value) => {
+        Some(Token::Ident(value)) => {
             match_ignore_ascii_case! { value,
                 "even" => Ok((2, 0)),
                 "odd" => Ok((2, 1)),
@@ -37,8 +37,8 @@ pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
                 }
             }
         }
-        Token::Delim('+') => match try!(input.next_including_whitespace()) {
-            Token::Ident(value) => {
+        Some(Token::Delim('+')) => match input.next_including_whitespace() {
+            Some(Token::Ident(value)) => {
                 match_ignore_ascii_case! { value,
                     "n" => parse_b(input, 1),
                     "n-" => parse_signless_b(input, 1, -1)
@@ -55,9 +55,9 @@ pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
 fn parse_b(input: &mut Parser, a: i32) -> Result<(i32, i32), ()> {
     let start_position = input.position();
     match input.next() {
-        Ok(Token::Delim('+')) => parse_signless_b(input, a, 1),
-        Ok(Token::Delim('-')) => parse_signless_b(input, a, -1),
-        Ok(Token::Number(ref value)) if value.signed => {
+        Some(Token::Delim('+')) => parse_signless_b(input, a, 1),
+        Some(Token::Delim('-')) => parse_signless_b(input, a, -1),
+        Some(Token::Number(ref value)) if value.signed => {
             Ok((a, try!(value.int_value.ok_or(())) as i32))
         }
         _ => {
@@ -68,8 +68,8 @@ fn parse_b(input: &mut Parser, a: i32) -> Result<(i32, i32), ()> {
 }
 
 fn parse_signless_b(input: &mut Parser, a: i32, b_sign: i32) -> Result<(i32, i32), ()> {
-    match try!(input.next()) {
-        Token::Number(ref value) if !value.signed => {
+    match input.next() {
+        Some(Token::Number(ref value)) if !value.signed => {
             Ok((a, b_sign * (try!(value.int_value.ok_or(())) as i32)))
         }
         _ => Err(())
