@@ -72,10 +72,10 @@ impl Color {
     ///
     /// FIXME(#2) Deprecated CSS2 System Colors are not supported yet.
     pub fn parse(input: &mut Parser) -> Result<Color, ()> {
-        match try!(input.next()) {
-            Token::Hash(value) | Token::IDHash(value) => parse_color_hash(&*value),
-            Token::Ident(value) => parse_color_keyword(&*value),
-            Token::Function(name) => {
+        match input.next() {
+            Some(Token::Hash(value)) | Some(Token::IDHash(value)) => parse_color_hash(&*value),
+            Some(Token::Ident(value)) => parse_color_keyword(&*value),
+            Some(Token::Function(name)) => {
                 input.parse_nested_block(|arguments| {
                     parse_color_function(&*name, arguments)
                 })
@@ -307,15 +307,15 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
     let blue: f32;
     if is_rgb {
         // Either integers or percentages, but all the same type.
-        match try!(arguments.next()) {
-            Token::Number(ref v) if v.int_value.is_some() => {
+        match arguments.next() {
+            Some(Token::Number(ref v)) if v.int_value.is_some() => {
                 red = (v.value / 255.) as f32;
                 try!(arguments.expect_comma());
                 green = try!(arguments.expect_integer()) as f32 / 255.;
                 try!(arguments.expect_comma());
                 blue = try!(arguments.expect_integer()) as f32 / 255.;
             }
-            Token::Percentage(ref v) => {
+            Some(Token::Percentage(ref v)) => {
                 red = v.unit_value as f32;
                 try!(arguments.expect_comma());
                 green = try!(arguments.expect_percentage()) as f32;

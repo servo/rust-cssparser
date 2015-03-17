@@ -190,10 +190,8 @@ impl<'i, 't> Parser<'i, 't> {
     pub fn expect_exhausted(&mut self) -> Result<(), ()> {
         let start_position = self.position();
         let result = match self.next() {
-            Err(()) => Ok(()),
-            Ok(_) => {
-                Err(())
-            }
+            None => Ok(()),
+            Some(_) => Err(()),
         };
         self.reset(start_position);
         result
@@ -270,38 +268,41 @@ impl<'i, 't> Parser<'i, 't> {
     /// See the `Parser::parse_nested_block` method to parse the content of functions or blocks.
     ///
     /// This only returns a closing token when it is unmatched (and therefore an error).
-    pub fn next(&mut self) -> Result<Token<'i>, ()> {
+    pub fn next(&mut self) -> Option<Token<'i>> {
         loop {
             match self.next_including_whitespace_and_comments() {
-                Ok(Token::WhiteSpace(_)) | Ok(Token::Comment(_)) => {},
+                Some(Token::WhiteSpace(_)) | Some(Token::Comment(_)) => {},
                 result => return result
             }
         }
     }
 
     /// Same as `Parser::next`, but does not skip whitespace tokens.
-    pub fn next_including_whitespace(&mut self) -> Result<Token<'i>, ()> {
+    pub fn next_including_whitespace(&mut self) -> Option<Token<'i>> {
         loop {
             match self.next_including_whitespace_and_comments() {
-                Ok(Token::Comment(_)) => {},
+                Some(Token::Comment(_)) => {},
                 result => return result
             }
         }
     }
 
     /// Same as `Parser::next`, but does not skip whitespace or comment tokens.
-    pub fn next_including_whitespace_and_comments(&mut self) -> Result<Token<'i>, ()> {
+    pub fn next_including_whitespace_and_comments(&mut self) -> Option<Token<'i>> {
         if let Some(block_type) = self.at_start_of.take() {
             consume_until_end_of_block(block_type, &mut *self.tokenizer);
         }
         if self.stop_before.contains(Delimiters::from_byte(self.tokenizer.next_byte())) {
-            return Err(())
+            return None
         }
-        let token = try!(self.tokenizer.next());
+        let token = match self.tokenizer.next() {
+            Some(t) => t,
+            None => return None,
+        };
         if let Some(block_type) = BlockType::opening(&token) {
             self.at_start_of = Some(block_type);
         }
-        Ok(token)
+        Some(token)
     }
 
     /// Have the given closure parse something, then check the the input is exhausted.
@@ -333,9 +334,9 @@ impl<'i, 't> Parser<'i, 't> {
         loop {
             values.push(try!(self.parse_until_before(Delimiter::Comma, |parser| parse_one(parser))));
             match self.next() {
-                Err(()) => return Ok(values),
-                Ok(Token::Comma) => continue,
-                Ok(_) => unreachable!(),
+                None => return Ok(values),
+                Some(Token::Comma) => continue,
+                Some(_) => unreachable!(),
             }
         }
     }
@@ -408,7 +409,7 @@ impl<'i, 't> Parser<'i, 't> {
             if delimiters.contains(Delimiters::from_byte(self.tokenizer.next_byte())) {
                 break
             }
-            if let Ok(token) = self.tokenizer.next() {
+            if let Some(token) = self.tokenizer.next() {
                 if let Some(block_type) = BlockType::opening(&token) {
                     consume_until_end_of_block(block_type, &mut *self.tokenizer);
                 }
@@ -440,8 +441,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse a <ident-token> and return the unescaped value.
     #[inline]
     pub fn expect_ident(&mut self) -> Result<Cow<'i, str>, ()> {
-        match try!(self.next()) {
-            Token::Ident(value) => Ok(value),
+        match self.next() {
+            Some(Token::Ident(value)) => Ok(value),
             _ => Err(())
         }
     }
@@ -449,8 +450,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse a <ident-token> whose unescaped value is an ASCII-insensitive match for the given value.
     #[inline]
     pub fn expect_ident_matching<'a>(&mut self, expected_value: &str) -> Result<(), ()> {
-        match try!(self.next()) {
-            Token::Ident(ref value) if value.eq_ignore_ascii_case(expected_value) => Ok(()),
+        match self.next() {
+            Some(Token::Ident(ref value)) if value.eq_ignore_ascii_case(expected_value) => Ok(()),
             _ => Err(())
         }
     }
@@ -458,8 +459,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse a <string-token> and return the unescaped value.
     #[inline]
     pub fn expect_string(&mut self) -> Result<Cow<'i, str>, ()> {
-        match try!(self.next()) {
-            Token::QuotedString(value) => Ok(value),
+        match self.next() {
+            Some(Token::QuotedString(value)) => Ok(value),
             _ => Err(())
         }
     }
@@ -467,9 +468,9 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse either a <ident-token> or a <string-token>, and return the unescaped value.
     #[inline]
     pub fn expect_ident_or_string(&mut self) -> Result<Cow<'i, str>, ()> {
-        match try!(self.next()) {
-            Token::Ident(value) => Ok(value),
-            Token::QuotedString(value) => Ok(value),
+        match self.next() {
+            Some(Token::Ident(value)) => Ok(value),
+            Some(Token::QuotedString(value)) => Ok(value),
             _ => Err(())
         }
     }
@@ -477,8 +478,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse a <url-token> and return the unescaped value.
     #[inline]
     pub fn expect_url(&mut self) -> Result<Cow<'i, str>, ()> {
-        match try!(self.next()) {
-            Token::Url(value) => Ok(value),
+        match self.next() {
+            Some(Token::Url(value)) => Ok(value),
             _ => Err(())
         }
     }
@@ -486,9 +487,9 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse either a <url-token> or a <string-token>, and return the unescaped value.
     #[inline]
     pub fn expect_url_or_string(&mut self) -> Result<Cow<'i, str>, ()> {
-        match try!(self.next()) {
-            Token::Url(value) => Ok(value),
-            Token::QuotedString(value) => Ok(value),
+        match self.next() {
+            Some(Token::Url(value)) => Ok(value),
+            Some(Token::QuotedString(value)) => Ok(value),
             _ => Err(())
         }
     }
@@ -496,8 +497,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse a <number-token> and return the integer value.
     #[inline]
     pub fn expect_number(&mut self) -> Result<f64, ()> {
-        match try!(self.next()) {
-            Token::Number(NumericValue { value, .. }) => Ok(value),
+        match self.next() {
+            Some(Token::Number(NumericValue { value, .. })) => Ok(value),
             _ => Err(())
         }
     }
@@ -505,8 +506,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse a <number-token> that does not have a fractional part, and return the integer value.
     #[inline]
     pub fn expect_integer(&mut self) -> Result<i64, ()> {
-        match try!(self.next()) {
-            Token::Number(NumericValue { int_value, .. }) => int_value.ok_or(()),
+        match self.next() {
+            Some(Token::Number(NumericValue { int_value, .. })) => int_value.ok_or(()),
             _ => Err(())
         }
     }
@@ -515,8 +516,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// `0%` and `100%` map to `0.0` and `1.0` (not `100.0`), respectively.
     #[inline]
     pub fn expect_percentage(&mut self) -> Result<f64, ()> {
-        match try!(self.next()) {
-            Token::Percentage(PercentageValue { unit_value, .. }) => Ok(unit_value),
+        match self.next() {
+            Some(Token::Percentage(PercentageValue { unit_value, .. })) => Ok(unit_value),
             _ => Err(())
         }
     }
@@ -524,8 +525,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse a `:` <colon-token>.
     #[inline]
     pub fn expect_colon(&mut self) -> Result<(), ()> {
-        match try!(self.next()) {
-            Token::Colon => Ok(()),
+        match self.next() {
+            Some(Token::Colon) => Ok(()),
             _ => Err(())
         }
     }
@@ -533,8 +534,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse a `;` <semicolon-token>.
     #[inline]
     pub fn expect_semicolon(&mut self) -> Result<(), ()> {
-        match try!(self.next()) {
-            Token::Semicolon => Ok(()),
+        match self.next() {
+            Some(Token::Semicolon) => Ok(()),
             _ => Err(())
         }
     }
@@ -542,8 +543,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse a `,` <comma-token>.
     #[inline]
     pub fn expect_comma(&mut self) -> Result<(), ()> {
-        match try!(self.next()) {
-            Token::Comma => Ok(()),
+        match self.next() {
+            Some(Token::Comma) => Ok(()),
             _ => Err(())
         }
     }
@@ -551,8 +552,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse a <delim-token> with the given value.
     #[inline]
     pub fn expect_delim(&mut self, expected_value: char) -> Result<(), ()> {
-        match try!(self.next()) {
-            Token::Delim(value) if value == expected_value => Ok(()),
+        match self.next() {
+            Some(Token::Delim(value)) if value == expected_value => Ok(()),
             _ => Err(())
         }
     }
@@ -562,8 +563,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_curly_bracket_block(&mut self) -> Result<(), ()> {
-        match try!(self.next()) {
-            Token::CurlyBracketBlock => Ok(()),
+        match self.next() {
+            Some(Token::CurlyBracketBlock) => Ok(()),
             _ => Err(())
         }
     }
@@ -573,8 +574,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_square_bracket_block(&mut self) -> Result<(), ()> {
-        match try!(self.next()) {
-            Token::SquareBracketBlock => Ok(()),
+        match self.next() {
+            Some(Token::SquareBracketBlock) => Ok(()),
             _ => Err(())
         }
     }
@@ -584,8 +585,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_parenthesis_block(&mut self) -> Result<(), ()> {
-        match try!(self.next()) {
-            Token::ParenthesisBlock => Ok(()),
+        match self.next() {
+            Some(Token::ParenthesisBlock) => Ok(()),
             _ => Err(())
         }
     }
@@ -595,8 +596,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_function(&mut self) -> Result<Cow<'i, str>, ()> {
-        match try!(self.next()) {
-            Token::Function(name) => Ok(name),
+        match self.next() {
+            Some(Token::Function(name)) => Ok(name),
             _ => Err(())
         }
     }
@@ -606,8 +607,8 @@ impl<'i, 't> Parser<'i, 't> {
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_function_matching(&mut self, expected_name: &str) -> Result<(), ()> {
-        match try!(self.next()) {
-            Token::Function(ref name) if name.eq_ignore_ascii_case(expected_name) => Ok(()),
+        match self.next() {
+            Some(Token::Function(ref name)) if name.eq_ignore_ascii_case(expected_name) => Ok(()),
             _ => Err(())
         }
     }
@@ -617,7 +618,7 @@ impl<'i, 't> Parser<'i, 't> {
 /// Return value indicates whether the end of the input was reached.
 fn consume_until_end_of_block(block_type: BlockType, tokenizer: &mut Tokenizer) {
     // FIXME: have a special-purpose tokenizer method for this that does less work.
-    while let Ok(ref token) = tokenizer.next() {
+    while let Some(ref token) = tokenizer.next() {
         if BlockType::closing(token) == Some(block_type) {
             return
         }
