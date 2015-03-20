@@ -290,6 +290,11 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     /// Same as `Parser::next`, but does not skip whitespace or comment tokens.
+    ///
+    /// **Note**: This should only be used in contexts like a CSS pre-processor
+    /// where comments are preserved.
+    /// When parsing higher-level values, per the CSS Syntax specification,
+    /// comments should always be ignored between tokens.
     pub fn next_including_whitespace_and_comments(&mut self) -> Result<Token<'i>, ()> {
         if let Some(block_type) = self.at_start_of.take() {
             consume_until_end_of_block(block_type, &mut *self.tokenizer);
