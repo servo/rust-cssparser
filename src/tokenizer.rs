@@ -158,6 +158,22 @@ pub enum Token<'a> {
 }
 
 
+impl<'a> Token<'a> {
+    /// Return whether this token represents a parse error.
+    ///
+    /// `BadUrl` and `BadString` are tokenizer-level parse errors.
+    ///
+    /// `CloseParenthesis`, `CloseSquareBracket`, and `CloseCurlyBracket` are *unmatched*
+    /// and therefore parse errors when returned by one of the `Parser::next*` methods.
+    pub fn is_parse_error(&self) -> bool {
+        matches!(
+            *self,
+            BadUrl | BadString | CloseParenthesis | CloseSquareBracket | CloseCurlyBracket
+        )
+    }
+}
+
+
 /// The numeric value of `Number` and `Dimension` tokens.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct NumericValue {

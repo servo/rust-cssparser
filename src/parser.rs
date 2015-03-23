@@ -620,6 +620,27 @@ impl<'i, 't> Parser<'i, 't> {
             _ => Err(())
         }
     }
+
+    /// Parse the input until exhaustion and check that it contains no “error” token.
+    ///
+    /// See `Token::is_parse_error`. This also checks nested blocks and functions recursively.
+    #[inline]
+    pub fn expect_no_error_token(&mut self) -> Result<(), ()> {
+        loop {
+            match self.next_including_whitespace_and_comments() {
+                Ok(Token::Function(_)) | Ok(Token::ParenthesisBlock) |
+                Ok(Token::SquareBracketBlock) | Ok(Token::CurlyBracketBlock) => {
+                    try!(self.parse_nested_block(|input| input.expect_no_error_token()))
+                }
+                Ok(token) => {
+                    if token.is_parse_error() {
+                        return Err(())
+                    }
+                }
+                Err(()) => return Ok(())
+            }
+        }
+    }
 }
 
 

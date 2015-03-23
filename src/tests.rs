@@ -267,6 +267,19 @@ fn stylesheet_from_bytes() {
 }
 
 
+#[test]
+fn expect_no_error_token() {
+    assert!(Parser::new("foo 4px ( / { !bar }").expect_no_error_token().is_ok());
+    assert!(Parser::new(")").expect_no_error_token().is_err());
+    assert!(Parser::new("}").expect_no_error_token().is_err());
+    assert!(Parser::new("(a){]").expect_no_error_token().is_err());
+    assert!(Parser::new("'\n'").expect_no_error_token().is_err());
+    assert!(Parser::new("url('\n'").expect_no_error_token().is_err());
+    assert!(Parser::new("url(a b)").expect_no_error_token().is_err());
+    assert!(Parser::new("url(\u{7F})").expect_no_error_token().is_err());
+}
+
+
 fn run_color_tests<F: Fn(Result<Color, ()>) -> Json>(json_data: &str, to_json: F) {
     run_json_tests(json_data, |input| {
         to_json(input.parse_entirely(Color::parse))
