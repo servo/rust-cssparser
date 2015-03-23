@@ -437,6 +437,15 @@ impl<'i, 't> Parser<'i, 't> {
         result
     }
 
+    /// Parse a <whitespace-token> and return its value.
+    #[inline]
+    pub fn expect_whitespace(&mut self) -> Result<&'i str, ()> {
+        match try!(self.next_including_whitespace()) {
+            Token::WhiteSpace(value) => Ok(value),
+            _ => Err(())
+        }
+    }
+
     /// Parse a <ident-token> and return the unescaped value.
     #[inline]
     pub fn expect_ident(&mut self) -> Result<Cow<'i, str>, ()> {
