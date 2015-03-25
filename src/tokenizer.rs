@@ -316,7 +316,7 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn char_at(&self, offset: usize) -> char {
-        self.input.char_at(self.position + offset)
+        self.input[self.position + offset..].chars().next().unwrap()
     }
 
     #[inline]
@@ -327,9 +327,9 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn consume_char(&mut self) -> char {
-        let range = self.input.char_range_at(self.position);
-        self.position = range.next;
-        range.ch
+        let c = self.next_char();
+        self.position += c.len_utf8();
+        c
     }
 
     #[inline]
