@@ -9,7 +9,7 @@ use std::path::Path;
 use std::process::Command;
 use std::num::Float;
 use std::mem;
-use serialize::json::{self, Json, ToJson};
+use rustc_serialize::json::{self, Json, ToJson};
 use tempdir::TempDir;
 
 use encoding::label::encoding_from_whatwg_label;
