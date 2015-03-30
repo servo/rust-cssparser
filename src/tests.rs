@@ -74,7 +74,7 @@ fn almost_equals(a: &Json, b: &Json) -> bool {
 fn normalize(json: &mut Json) {
     match *json {
         Json::Array(ref mut list) => {
-            match find_url(list.as_mut_slice()) {
+            match find_url(list) {
                 Some(Ok(url)) => *list = vec!["url".to_json(), Json::String(url)],
                 Some(Err(())) => *list = vec!["error".to_json(), "bad-url".to_json()],
                 None => {
@@ -94,25 +94,17 @@ fn normalize(json: &mut Json) {
 }
 
 fn find_url(list: &mut [Json]) -> Option<Result<String, ()>> {
-    if let [Json::String(ref a1), Json::String(ref a2), ..] = list.as_mut_slice() {
-        if !(*a1 == "function" && *a2 == "url") {
-            return None
-        }
-    } else {
+    if list.len() < 2 ||
+        list[0].as_string() != Some("function") ||
+        list[1].as_string() != Some("url") {
         return None
-    };
-    let args = &mut list[2..];
+    }
 
-    let args = if !args.is_empty() && args[0] == " ".to_json() {
-        &mut args[1..]
-    } else {
-        &mut args[..]
-    };
-
-    if let [Json::Array(ref mut arg1), ref rest..] = args.as_mut_slice() {
-        if let [Json::String(ref a11), Json::String(ref mut a12)] = arg1.as_mut_slice() {
-            if *a11 == "string" && rest.iter().all(|a| a == &" ".to_json()) {
-                return Some(Ok(mem::replace(a12, String::new())))
+    let mut args = list[2..].iter_mut().filter(|a| a.as_string() != Some(" "));
+    if let (Some(&mut Json::Array(ref mut arg)), None) = (args.next(), args.next()) {
+        if arg.len() == 2 && arg[0].as_string() == Some("string") {
+            if let &mut Json::String(ref mut value) = &mut arg[1] {
+                return Some(Ok(mem::replace(value, String::new())))
             }
         }
     }
