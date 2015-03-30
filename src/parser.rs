@@ -373,6 +373,9 @@ impl<'i, 't> Parser<'i, 't> {
                 stop_before: closing_delimiter,
             };
             result = nested_parser.parse_entirely(parse);
+            if let Some(block_type) = nested_parser.at_start_of {
+                consume_until_end_of_block(block_type, &mut *nested_parser.tokenizer);
+            }
         }
         consume_until_end_of_block(block_type, &mut *self.tokenizer);
         result

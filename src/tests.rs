@@ -280,6 +280,17 @@ fn expect_no_error_token() {
 }
 
 
+/// https://github.com/servo/rust-cssparser/issues/71
+#[test]
+fn outer_block_end_consumed() {
+    let mut input = Parser::new("(calc(true))");
+    assert!(input.expect_parenthesis_block().is_ok());
+    assert!(input.parse_nested_block(|input| input.expect_function_matching("calc")).is_ok());
+    println!("{:?}", input.position());
+    assert_eq!(input.next(), Err(()));
+}
+
+
 fn run_color_tests<F: Fn(Result<Color, ()>) -> Json>(json_data: &str, to_json: F) {
     run_json_tests(json_data, |input| {
         to_json(input.parse_entirely(Color::parse))
