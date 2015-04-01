@@ -4,7 +4,6 @@
 
 use std::fmt;
 use std::cmp;
-use std::num::{Float, Int};
 
 use text_writer::{self, TextWriter};
 
@@ -49,11 +48,11 @@ pub trait ToCss {
 fn write_numeric<W>(value: NumericValue, dest: &mut W) -> text_writer::Result
 where W: TextWriter {
     // `value.value >= 0` is true for negative 0.
-    if value.signed && value.value.is_positive() {
+    if value.signed && value.value.is_sign_positive() {
         try!(dest.write_str("+"));
     }
 
-    if value.value == 0.0 && value.value.is_negative() {
+    if value.value == 0.0 && value.value.is_sign_negative() {
         // Negative zero. Work around #20596.
         try!(dest.write_str("-0"))
     } else {
