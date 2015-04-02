@@ -685,7 +685,7 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     if tokenizer.has_at_least(1) && tokenizer.next_char() == '.'
             && matches!(tokenizer.char_at(1), '0'...'9') {
         is_integer = false;
-        tokenizer.advance(1);  // '.' and first digit
+        tokenizer.advance(1);  // Consume '.'
         let mut divisor = 10.;
         while let Some(digit) = tokenizer.next_char().to_digit(10) {
             fractional_part += digit as f64 / divisor;
@@ -757,8 +757,7 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     };
     if is_ident_start(tokenizer) {
         Dimension(value, consume_name(tokenizer))
-    }
-    else {
+    } else {
         Number(value)
     }
 }
