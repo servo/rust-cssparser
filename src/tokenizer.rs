@@ -162,10 +162,10 @@ pub enum Token<'a> {
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct NumericValue {
     /// The value as a float
-    pub value: f64,
+    pub value: f32,
 
     /// If the origin source did not include a fractional part, the value as an integer.
-    pub int_value: Option<i64>,
+    pub int_value: Option<i32>,
 
     /// Whether the number had a `+` or `-` sign.
     ///
@@ -178,10 +178,10 @@ pub struct NumericValue {
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct PercentageValue {
     /// The value as a float, divided by 100 so that the nominal range is 0.0 to 1.0.
-    pub unit_value: f64,
+    pub unit_value: f32,
 
     /// If the origin source did not include a fractional part, the value as an integer. It is **not** divided by 100.
-    pub int_value: Option<i64>,
+    pub int_value: Option<i32>,
 
     /// Whether the number had a `+` or `-` sign.
     pub signed: bool,
@@ -685,8 +685,8 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
             repr = &repr[1..]
         }
         // TODO: handle overflow
-        (repr.parse::<f64>().unwrap(), if is_integer {
-            Some(repr.parse::<i64>().unwrap())
+        (repr.parse::<f32>().unwrap(), if is_integer {
+            Some(repr.parse::<i32>().unwrap())
         } else {
             None
         })

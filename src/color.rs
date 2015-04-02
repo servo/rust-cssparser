@@ -309,18 +309,18 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
         // Either integers or percentages, but all the same type.
         match try!(arguments.next()) {
             Token::Number(ref v) if v.int_value.is_some() => {
-                red = (v.value / 255.) as f32;
+                red = v.value / 255.;
                 try!(arguments.expect_comma());
                 green = try!(arguments.expect_integer()) as f32 / 255.;
                 try!(arguments.expect_comma());
                 blue = try!(arguments.expect_integer()) as f32 / 255.;
             }
             Token::Percentage(ref v) => {
-                red = v.unit_value as f32;
+                red = v.unit_value;
                 try!(arguments.expect_comma());
-                green = try!(arguments.expect_percentage()) as f32;
+                green = try!(arguments.expect_percentage());
                 try!(arguments.expect_comma());
-                blue = try!(arguments.expect_percentage()) as f32;
+                blue = try!(arguments.expect_percentage());
             }
             _ => return Err(())
         };
@@ -333,7 +333,7 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
         let lightness = (try!(arguments.expect_percentage())).max(0.).min(1.);
 
         // http://www.w3.org/TR/css3-color/#hsl-color
-        fn hue_to_rgb(m1: f64, m2: f64, mut h: f64) -> f64 {
+        fn hue_to_rgb(m1: f32, m2: f32, mut h: f32) -> f32 {
             if h < 0. { h += 1. }
             if h > 1. { h -= 1. }
 
@@ -345,14 +345,14 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
         let m2 = if lightness <= 0.5 { lightness * (saturation + 1.) }
                  else { lightness + saturation - lightness * saturation };
         let m1 = lightness * 2. - m2;
-        red = hue_to_rgb(m1, m2, hue + 1. / 3.) as f32;
-        green = hue_to_rgb(m1, m2, hue) as f32;
-        blue = hue_to_rgb(m1, m2, hue - 1. / 3.) as f32;
+        red = hue_to_rgb(m1, m2, hue + 1. / 3.);
+        green = hue_to_rgb(m1, m2, hue);
+        blue = hue_to_rgb(m1, m2, hue - 1. / 3.);
     }
 
     let alpha = if has_alpha {
         try!(arguments.expect_comma());
-        (try!(arguments.expect_number())).max(0.).min(1.) as f32
+        (try!(arguments.expect_number())).max(0.).min(1.)
     } else {
         1.
     };

@@ -495,7 +495,7 @@ impl<'i, 't> Parser<'i, 't> {
 
     /// Parse a <number-token> and return the integer value.
     #[inline]
-    pub fn expect_number(&mut self) -> Result<f64, ()> {
+    pub fn expect_number(&mut self) -> Result<f32, ()> {
         match try!(self.next()) {
             Token::Number(NumericValue { value, .. }) => Ok(value),
             _ => Err(())
@@ -504,7 +504,7 @@ impl<'i, 't> Parser<'i, 't> {
 
     /// Parse a <number-token> that does not have a fractional part, and return the integer value.
     #[inline]
-    pub fn expect_integer(&mut self) -> Result<i64, ()> {
+    pub fn expect_integer(&mut self) -> Result<i32, ()> {
         match try!(self.next()) {
             Token::Number(NumericValue { int_value, .. }) => int_value.ok_or(()),
             _ => Err(())
@@ -514,7 +514,7 @@ impl<'i, 't> Parser<'i, 't> {
     /// Parse a <percentage-token> and return the value.
     /// `0%` and `100%` map to `0.0` and `1.0` (not `100.0`), respectively.
     #[inline]
-    pub fn expect_percentage(&mut self) -> Result<f64, ()> {
+    pub fn expect_percentage(&mut self) -> Result<f32, ()> {
         match try!(self.next()) {
             Token::Percentage(PercentageValue { unit_value, .. }) => Ok(unit_value),
             _ => Err(())
