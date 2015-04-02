@@ -10,6 +10,7 @@ use std::char;
 use std::ascii::AsciiExt;
 use std::borrow::{Cow, ToOwned};
 use std::borrow::Cow::{Owned, Borrowed};
+use std::i32;
 
 use self::Token::*;
 
@@ -177,15 +178,15 @@ impl<'a> Token<'a> {
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct NumericValue {
     /// The value as a float
-    pub value: f64,
+    pub value: f32,
 
     /// If the origin source did not include a fractional part, the value as an integer.
-    pub int_value: Option<i64>,
+    pub int_value: Option<i32>,
 
     /// Whether the number had a `+` or `-` sign.
     ///
     /// This is used is some cases like the <An+B> micro syntax. (See the `parse_nth` function.)
-    pub signed: bool,
+    pub has_sign: bool,
 }
 
 
@@ -193,13 +194,13 @@ pub struct NumericValue {
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct PercentageValue {
     /// The value as a float, divided by 100 so that the nominal range is 0.0 to 1.0.
-    pub unit_value: f64,
+    pub unit_value: f32,
 
     /// If the origin source did not include a fractional part, the value as an integer. It is **not** divided by 100.
-    pub int_value: Option<i64>,
+    pub int_value: Option<i32>,
 
     /// Whether the number had a `+` or `-` sign.
-    pub signed: bool,
+    pub has_sign: bool,
 }
 
 
@@ -653,32 +654,51 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> Cow<'a, str> {
 }
 
 
-fn consume_digits(tokenizer: &mut Tokenizer) {
-    while !tokenizer.is_eof() {
-        match tokenizer.next_char() {
-            '0'...'9' => tokenizer.advance(1),
-            _ => break
-        }
-    }
-}
-
-
 fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     // Parse [+-]?\d*(\.\d+)?([eE][+-]?\d+)?
     // But this is always called so that there is at least one digit in \d*(\.\d+)?
-    let start_pos = tokenizer.position();
-    let mut is_integer = true;
-    let signed = matches!(tokenizer.next_char(), '-' | '+');
-    if signed {
+
+    // Do all the math in f64 so that large numbers overflow to +/-inf
+    // and i32::{MIN, MAX} are within range.
+
+    let (has_sign, sign) = match tokenizer.next_char() {
+        '-' => (true, -1.),
+        '+' => (true, 1.),
+        _ => (false, 1.),
+    };
+    if has_sign {
         tokenizer.advance(1);
     }
-    consume_digits(tokenizer);
+
+    let mut integral_part: f64 = 0.;
+    while let Some(digit) = tokenizer.next_char().to_digit(10) {
+        integral_part = integral_part * 10. + digit as f64;
+        tokenizer.advance(1);
+        if tokenizer.is_eof() {
+            break
+        }
+    }
+
+    let mut is_integer = true;
+
+    let mut fractional_part: f64 = 0.;
     if tokenizer.has_at_least(1) && tokenizer.next_char() == '.'
             && matches!(tokenizer.char_at(1), '0'...'9') {
         is_integer = false;
-        tokenizer.advance(2);  // '.' and first digit
-        consume_digits(tokenizer);
+        tokenizer.advance(1);  // Consume '.'
+        let mut divisor = 10.;
+        while let Some(digit) = tokenizer.next_char().to_digit(10) {
+            fractional_part += digit as f64 / divisor;
+            divisor *= 10.;
+            tokenizer.advance(1);
+            if tokenizer.is_eof() {
+                break
+            }
+        }
     }
+
+    let mut value = sign * (integral_part + fractional_part);
+
     if (
         tokenizer.has_at_least(1)
         && matches!(tokenizer.next_char(), 'e' | 'E')
@@ -690,37 +710,56 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         && matches!(tokenizer.char_at(2), '0'...'9')
     ) {
         is_integer = false;
-        tokenizer.advance(2);  // 'e' or 'E', and sign or first digit
-        consume_digits(tokenizer);
-    }
-    let (value, int_value) = {
-        let mut repr = tokenizer.slice_from(start_pos);
-        // Remove any + sign as int::parse() does not parse them.
-        if repr.starts_with("+") {
-            repr = &repr[1..]
+        tokenizer.advance(1);
+        let (has_sign, sign) = match tokenizer.next_char() {
+            '-' => (true, -1.),
+            '+' => (true, 1.),
+            _ => (false, 1.),
+        };
+        if has_sign {
+            tokenizer.advance(1);
         }
-        // TODO: handle overflow
-        (repr.parse::<f64>().unwrap(), if is_integer {
-            Some(repr.parse::<i64>().unwrap())
+        let mut exponent: f64 = 0.;
+        while let Some(digit) = tokenizer.next_char().to_digit(10) {
+            exponent = exponent * 10. + digit as f64;
+            tokenizer.advance(1);
+            if tokenizer.is_eof() {
+                break
+            }
+        }
+        value *= f64::powf(10., sign * exponent);
+    }
+
+    let int_value = if is_integer {
+        Some(if value >= i32::MAX as f64 {
+            i32::MAX
+        } else if value <= i32::MIN as f64 {
+            i32::MIN
         } else {
-            None
+            value as i32
         })
+    } else {
+        None
     };
+
     if !tokenizer.is_eof() && tokenizer.next_char() == '%' {
         tokenizer.advance(1);
         return Percentage(PercentageValue {
-            unit_value: value / 100.,
+            unit_value: value as f32 / 100.,
             int_value: int_value,
-            signed: signed,
+            has_sign: has_sign,
         })
     }
     let value = NumericValue {
-        value: value,
+        value: value as f32,
         int_value: int_value,
-        signed: signed,
+        has_sign: has_sign,
     };
-    if is_ident_start(tokenizer) { Dimension(value, consume_name(tokenizer)) }
-    else { Number(value) }
+    if is_ident_start(tokenizer) {
+        Dimension(value, consume_name(tokenizer))
+    } else {
+        Number(value)
+    }
 }
 
 

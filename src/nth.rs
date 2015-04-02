@@ -57,7 +57,7 @@ fn parse_b(input: &mut Parser, a: i32) -> Result<(i32, i32), ()> {
     match input.next() {
         Ok(Token::Delim('+')) => parse_signless_b(input, a, 1),
         Ok(Token::Delim('-')) => parse_signless_b(input, a, -1),
-        Ok(Token::Number(ref value)) if value.signed => {
+        Ok(Token::Number(ref value)) if value.has_sign => {
             Ok((a, try!(value.int_value.ok_or(())) as i32))
         }
         _ => {
@@ -69,7 +69,7 @@ fn parse_b(input: &mut Parser, a: i32) -> Result<(i32, i32), ()> {
 
 fn parse_signless_b(input: &mut Parser, a: i32, b_sign: i32) -> Result<(i32, i32), ()> {
     match try!(input.next()) {
-        Token::Number(ref value) if !value.signed => {
+        Token::Number(ref value) if !value.has_sign => {
             Ok((a, b_sign * (try!(value.int_value.ok_or(())) as i32)))
         }
         _ => Err(())

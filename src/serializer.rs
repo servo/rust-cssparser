@@ -48,7 +48,7 @@ pub trait ToCss {
 fn write_numeric<W>(value: NumericValue, dest: &mut W) -> text_writer::Result
 where W: TextWriter {
     // `value.value >= 0` is true for negative 0.
-    if value.signed && value.value.is_sign_positive() {
+    if value.has_sign && value.value.is_sign_positive() {
         try!(dest.write_str("+"));
     }
 
@@ -93,11 +93,11 @@ impl<'a> ToCss for Token<'a> {
             Token::Delim(value) => try!(dest.write_char(value)),
 
             Token::Number(value) => try!(write_numeric(value, dest)),
-            Token::Percentage(PercentageValue { unit_value, int_value, signed }) => {
+            Token::Percentage(PercentageValue { unit_value, int_value, has_sign }) => {
                 let value = NumericValue {
                     value: unit_value * 100.,
                     int_value: int_value,
-                    signed: signed,
+                    has_sign: has_sign,
                 };
                 try!(write_numeric(value, dest));
                 try!(dest.write_char('%'));
