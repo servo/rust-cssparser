@@ -5,8 +5,6 @@
 #![crate_name = "cssparser"]
 #![crate_type = "rlib"]
 
-#![feature(core, collections)]
-#![cfg_attr(test, feature(test, old_io, old_path))]
 #![deny(missing_docs)]
 
 /*!
@@ -68,8 +66,8 @@ fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
 extern crate encoding;
 extern crate text_writer;
 #[macro_use] extern crate matches;
-#[cfg(test)] extern crate test;
-#[cfg(test)] extern crate "rustc-serialize" as serialize;
+#[cfg(test)] extern crate tempdir;
+#[cfg(test)] extern crate rustc_serialize;
 
 pub use tokenizer::{Token, NumericValue, PercentageValue, SourceLocation};
 pub use rules_and_declarations::{parse_important};
@@ -99,7 +97,7 @@ match_ignore_ascii_case! { string,
 }
 ```
 
-The macro also calls `.as_slice()` on the value,
+The macro also takes a slice of the value,
 so that a `String` or `CowString` could be passed directly instead of a `&str`.
 
 Note that because of `macro_rules` ambiguity resolutions quirks,
@@ -111,7 +109,7 @@ macro_rules! match_ignore_ascii_case {
     ( $value: expr, $( $string: expr => $result: expr ),+ _ => $fallback: expr ) => {
         {
             use std::ascii::AsciiExt;
-            match $value.as_slice() {
+            match &$value[..] {
                 $(
                     s if s.eq_ignore_ascii_case($string) => $result,
                 )+

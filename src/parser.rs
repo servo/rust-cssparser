@@ -290,6 +290,11 @@ impl<'i, 't> Parser<'i, 't> {
     }
 
     /// Same as `Parser::next`, but does not skip whitespace or comment tokens.
+    ///
+    /// **Note**: This should only be used in contexts like a CSS pre-processor
+    /// where comments are preserved.
+    /// When parsing higher-level values, per the CSS Syntax specification,
+    /// comments should always be ignored between tokens.
     pub fn next_including_whitespace_and_comments(&mut self) -> Result<Token<'i>, ()> {
         if let Some(block_type) = self.at_start_of.take() {
             consume_until_end_of_block(block_type, &mut *self.tokenizer);
@@ -373,6 +378,9 @@ impl<'i, 't> Parser<'i, 't> {
                 stop_before: closing_delimiter,
             };
             result = nested_parser.parse_entirely(parse);
+            if let Some(block_type) = nested_parser.at_start_of {
+                consume_until_end_of_block(block_type, &mut *nested_parser.tokenizer);
+            }
         }
         consume_until_end_of_block(block_type, &mut *self.tokenizer);
         result
@@ -435,6 +443,15 @@ impl<'i, 't> Parser<'i, 't> {
             self.tokenizer.advance(1);
         }
         result
+    }
+
+    /// Parse a <whitespace-token> and return its value.
+    #[inline]
+    pub fn expect_whitespace(&mut self) -> Result<&'i str, ()> {
+        match try!(self.next_including_whitespace()) {
+            Token::WhiteSpace(value) => Ok(value),
+            _ => Err(())
+        }
     }
 
     /// Parse a <ident-token> and return the unescaped value.
@@ -609,6 +626,27 @@ impl<'i, 't> Parser<'i, 't> {
         match try!(self.next()) {
             Token::Function(ref name) if name.eq_ignore_ascii_case(expected_name) => Ok(()),
             _ => Err(())
+        }
+    }
+
+    /// Parse the input until exhaustion and check that it contains no “error” token.
+    ///
+    /// See `Token::is_parse_error`. This also checks nested blocks and functions recursively.
+    #[inline]
+    pub fn expect_no_error_token(&mut self) -> Result<(), ()> {
+        loop {
+            match self.next_including_whitespace_and_comments() {
+                Ok(Token::Function(_)) | Ok(Token::ParenthesisBlock) |
+                Ok(Token::SquareBracketBlock) | Ok(Token::CurlyBracketBlock) => {
+                    try!(self.parse_nested_block(|input| input.expect_no_error_token()))
+                }
+                Ok(token) => {
+                    if token.is_parse_error() {
+                        return Err(())
+                    }
+                }
+                Err(()) => return Ok(())
+            }
         }
     }
 }

@@ -7,7 +7,6 @@
 use std::ops::Range;
 use std::cell::Cell;
 use std::char;
-use std::num::{self, Float};
 use std::ascii::AsciiExt;
 use std::borrow::{Cow, ToOwned};
 use std::borrow::Cow::{Owned, Borrowed};
@@ -159,6 +158,22 @@ pub enum Token<'a> {
 }
 
 
+impl<'a> Token<'a> {
+    /// Return whether this token represents a parse error.
+    ///
+    /// `BadUrl` and `BadString` are tokenizer-level parse errors.
+    ///
+    /// `CloseParenthesis`, `CloseSquareBracket`, and `CloseCurlyBracket` are *unmatched*
+    /// and therefore parse errors when returned by one of the `Parser::next*` methods.
+    pub fn is_parse_error(&self) -> bool {
+        matches!(
+            *self,
+            BadUrl | BadString | CloseParenthesis | CloseSquareBracket | CloseCurlyBracket
+        )
+    }
+}
+
+
 /// The numeric value of `Number` and `Dimension` tokens.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct NumericValue {
@@ -254,7 +269,7 @@ impl<'a> Tokenizer<'a> {
             line_number = 1;
         }
         let mut source = &self.input[position..target];
-        while let Some(newline_position) = source.find(['\n', '\r', '\x0C'].as_slice()) {
+        while let Some(newline_position) = source.find(&['\n', '\r', '\x0C'][..]) {
             let offset = newline_position +
             if source[newline_position..].starts_with("\r\n") {
                 2
@@ -302,7 +317,7 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn char_at(&self, offset: usize) -> char {
-        self.input.char_at(self.position + offset)
+        self.input[self.position + offset..].chars().next().unwrap()
     }
 
     #[inline]
@@ -313,9 +328,9 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn consume_char(&mut self) -> char {
-        let range = self.input.char_range_at(self.position);
-        self.position = range.next;
-        range.ch
+        let c = self.next_char();
+        self.position += c.len_utf8();
+        c
     }
 
     #[inline]
@@ -712,7 +727,7 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
                 break
             }
         }
-        value *= Float::powf(10., sign * exponent);
+        value *= f64::powf(10., sign * exponent);
     }
 
     let int_value = if is_integer {
@@ -850,43 +865,50 @@ fn consume_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 
 fn consume_unicode_range<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     tokenizer.advance(2);  // Skip U+
-    let mut hex = String::new();
-    while hex.len() < 6 && !tokenizer.is_eof()
-          && matches!(tokenizer.next_char(), '0'...'9' | 'A'...'F' | 'a'...'f') {
-        hex.push(tokenizer.consume_char());
-    }
-    let max_question_marks = 6 - hex.len();
+    let (hex_value, hex_digits) = consume_hex_digits(tokenizer);
+    let max_question_marks = 6 - hex_digits;
     let mut question_marks = 0;
     while question_marks < max_question_marks && !tokenizer.is_eof()
             && tokenizer.next_char() == '?' {
         question_marks += 1;
         tokenizer.advance(1)
     }
-    let first: u32 = if hex.len() > 0 {
-        num::from_str_radix(&*hex, 16).unwrap()
-    } else { 0 };
     let start;
     let end;
     if question_marks > 0 {
-        start = first << (question_marks * 4);
-        end = ((first + 1) << (question_marks * 4)) - 1;
+        start = hex_value << (question_marks * 4);
+        end = ((hex_value + 1) << (question_marks * 4)) - 1;
     } else {
-        start = first;
-        hex.truncate(0);
-        if !tokenizer.is_eof() && tokenizer.next_char() == '-' {
+        start = hex_value;
+        if tokenizer.has_at_least(1) &&
+           tokenizer.next_char() == '-' &&
+           matches!(tokenizer.char_at(1), '0'...'9' | 'A'...'F' | 'a'...'f') {
             tokenizer.advance(1);
-            while hex.len() < 6 && !tokenizer.is_eof() {
-                let c = tokenizer.next_char();
-                match c {
-                    '0'...'9' | 'A'...'F' | 'a'...'f' => {
-                        hex.push(c); tokenizer.advance(1) },
-                    _ => break
-                }
-            }
+            let (hex_value, _) = consume_hex_digits(tokenizer);
+            end = hex_value;
+        } else {
+            end = start;
         }
-        end = if hex.len() > 0 { num::from_str_radix(&*hex, 16).unwrap() } else { start }
     }
     UnicodeRange(start, end)
+}
+
+
+// (value, number of digits up to 6)
+fn consume_hex_digits<'a>(tokenizer: &mut Tokenizer<'a>) -> (u32, u32) {
+    let mut value = 0;
+    let mut digits = 0;
+    while digits < 6 && !tokenizer.is_eof() {
+        match tokenizer.next_char().to_digit(16) {
+            Some(digit) => {
+                value = value * 16 + digit;
+                digits += 1;
+                tokenizer.advance(1);
+            }
+            None => break
+        }
+    }
+    (value, digits)
 }
 
 
@@ -895,18 +917,9 @@ fn consume_unicode_range<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 // to not be a newline.
 fn consume_escape(tokenizer: &mut Tokenizer) -> char {
     if tokenizer.is_eof() { return '\u{FFFD}' }  // Escaped EOF
-    let c = tokenizer.consume_char();
-    match c {
+    match tokenizer.next_char() {
         '0'...'9' | 'A'...'F' | 'a'...'f' => {
-            let mut hex = c.to_string();
-            while hex.len() < 6 && !tokenizer.is_eof() {
-                let c = tokenizer.next_char();
-                match c {
-                    '0'...'9' | 'A'...'F' | 'a'...'f' => {
-                        hex.push(c); tokenizer.advance(1) },
-                    _ => break
-                }
-            }
+            let (c, _) = consume_hex_digits(tokenizer);
             if !tokenizer.is_eof() {
                 match tokenizer.next_char() {
                     ' ' | '\t' | '\n' | '\x0C' => tokenizer.advance(1),
@@ -920,7 +933,6 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
                 }
             }
             static REPLACEMENT_CHAR: char = '\u{FFFD}';
-            let c: u32 = num::from_str_radix(&*hex, 16).unwrap();
             if c != 0 {
                 let c = char::from_u32(c);
                 c.unwrap_or(REPLACEMENT_CHAR)
@@ -928,7 +940,10 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
                 REPLACEMENT_CHAR
             }
         },
-        '\0' => '\u{FFFD}',
-        c => c
+        '\0' => {
+            tokenizer.advance(1);
+            '\u{FFFD}'
+        }
+        _ => tokenizer.consume_char()
     }
 }

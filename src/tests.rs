@@ -3,12 +3,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::borrow::Cow::Borrowed;
-use std::old_io::{File, Command, Writer, TempDir, IoResult};
-use std::old_io as io;
-use std::num::Float;
+use std::fs::File;
+use std::io::{self, Write};
+use std::path::Path;
+use std::process::Command;
 use std::mem;
-use serialize::json::{self, Json, ToJson};
-use test;
+use rustc_serialize::json::{self, Json, ToJson};
+use tempdir::TempDir;
 
 use encoding::label::encoding_from_whatwg_label;
 
@@ -17,7 +18,7 @@ use super::{Parser, Delimiter, Token, NumericValue, PercentageValue, SourceLocat
             AtRuleType, AtRuleParser, QualifiedRuleParser,
             parse_one_declaration, parse_one_rule, parse_important,
             decode_stylesheet_bytes,
-            Color, RGBA, parse_color_keyword, parse_nth, ToCss};
+            Color, RGBA, parse_nth, ToCss};
 
 
 macro_rules! JArray {
@@ -26,30 +27,25 @@ macro_rules! JArray {
 }
 
 
-fn write_whole_file(path: &Path, data: &str) -> IoResult<()> {
-    (try!(File::open_mode(path, io::Open, io::Write))).write_all(data.as_bytes())
+fn write_whole_file(path: &Path, data: &str) -> io::Result<()> {
+    (try!(File::create(path))).write_all(data.as_bytes())
 }
 
 
-fn print_json_diff(results: &Json, expected: &Json) -> IoResult<()> {
-    use std::old_io::stdio::stdout;
-
+fn print_json_diff(results: &Json, expected: &Json) -> io::Result<()> {
     let temp = try!(TempDir::new("rust-cssparser-tests"));
     let results = results.pretty().to_string() + "\n";
     let expected = expected.pretty().to_string() + "\n";
-    let mut result_path = temp.path().clone();
-    result_path.push("results.json");
-    let mut expected_path = temp.path().clone();
-    expected_path.push("expected.json");
-    try!(write_whole_file(&result_path, results.as_slice()));
-    try!(write_whole_file(&expected_path, expected.as_slice()));
-    stdout().write_all(try!(Command::new("colordiff")
+    let result_path = temp.path().join("results.json");
+    let expected_path = temp.path().join("expected.json");
+    try!(write_whole_file(&result_path, &results));
+    try!(write_whole_file(&expected_path, &expected));
+    try!(Command::new("colordiff")
         .arg("-u1000")
-        .arg(result_path.display().to_string())
-        .arg(expected_path.display().to_string())
-        .output()
-        .map_err(|_| io::standard_error(io::OtherIoError))
-    ).output.as_slice())
+        .arg(&result_path)
+        .arg(&expected_path)
+        .status());
+    Ok(())
 }
 
 
@@ -77,7 +73,7 @@ fn almost_equals(a: &Json, b: &Json) -> bool {
 fn normalize(json: &mut Json) {
     match *json {
         Json::Array(ref mut list) => {
-            match find_url(list.as_mut_slice()) {
+            match find_url(list) {
                 Some(Ok(url)) => *list = vec!["url".to_json(), Json::String(url)],
                 Some(Err(())) => *list = vec!["error".to_json(), "bad-url".to_json()],
                 None => {
@@ -88,7 +84,7 @@ fn normalize(json: &mut Json) {
             }
         }
         Json::String(ref mut s) => {
-            if s.as_slice() == "extra-input" || s.as_slice() == "empty" {
+            if *s == "extra-input" || *s == "empty" {
                 *s = "invalid".to_string()
             }
         }
@@ -97,25 +93,17 @@ fn normalize(json: &mut Json) {
 }
 
 fn find_url(list: &mut [Json]) -> Option<Result<String, ()>> {
-    if let [Json::String(ref a1), Json::String(ref a2), ..] = list.as_mut_slice() {
-        if !(a1.as_slice() == "function" && a2.as_slice() == "url") {
-            return None
-        }
-    } else {
+    if list.len() < 2 ||
+        list[0].as_string() != Some("function") ||
+        list[1].as_string() != Some("url") {
         return None
-    };
-    let args = &mut list[2..];
+    }
 
-    let args = if !args.is_empty() && args[0] == " ".to_json() {
-        &mut args[1..]
-    } else {
-        &mut args[..]
-    };
-
-    if let [Json::Array(ref mut arg1), ref rest..] = args.as_mut_slice() {
-        if let [Json::String(ref a11), Json::String(ref mut a12)] = arg1.as_mut_slice() {
-            if a11.as_slice() == "string" && rest.iter().all(|a| a == &" ".to_json()) {
-                return Some(Ok(mem::replace(a12, String::new())))
+    let mut args = list[2..].iter_mut().filter(|a| a.as_string() != Some(" "));
+    if let (Some(&mut Json::Array(ref mut arg)), None) = (args.next(), args.next()) {
+        if arg.len() == 2 && arg[0].as_string() == Some("string") {
+            if let &mut Json::String(ref mut value) = &mut arg[1] {
+                return Some(Ok(mem::replace(value, String::new())))
             }
         }
     }
@@ -156,7 +144,7 @@ fn run_json_tests<F: Fn(&mut Parser) -> Json>(json_data: &str, parse: F) {
     run_raw_json_tests(json_data, |input, expected| {
         match input {
             Json::String(input) => {
-                let result = parse(&mut Parser::new(input.as_slice()));
+                let result = parse(&mut Parser::new(&input));
                 assert_json_eq(result, expected, input);
             },
             _ => panic!("Unexpected JSON")
@@ -248,8 +236,8 @@ fn stylesheet_from_bytes() {
                 .and_then(encoding_from_whatwg_label);
 
             let (css_unicode, encoding) = decode_stylesheet_bytes(
-                css.as_slice(), protocol_encoding_label, environment_encoding);
-            let input = &mut Parser::new(css_unicode.as_slice());
+                &css, protocol_encoding_label, environment_encoding);
+            let input = &mut Parser::new(&css_unicode);
             let rules = RuleListParser::new_for_stylesheet(input, JsonParser)
                         .map(|result| result.unwrap_or(JArray!["error", "invalid"]))
                         .collect::<Vec<_>>();
@@ -260,12 +248,36 @@ fn stylesheet_from_bytes() {
 
     fn get_string<'a>(map: &'a json::Object, key: &str) -> Option<&'a str> {
         match map.get(key) {
-            Some(&Json::String(ref s)) => Some(s.as_slice()),
+            Some(&Json::String(ref s)) => Some(s),
             Some(&Json::Null) => None,
             None => None,
             _ => panic!("Unexpected JSON"),
         }
     }
+}
+
+
+#[test]
+fn expect_no_error_token() {
+    assert!(Parser::new("foo 4px ( / { !bar }").expect_no_error_token().is_ok());
+    assert!(Parser::new(")").expect_no_error_token().is_err());
+    assert!(Parser::new("}").expect_no_error_token().is_err());
+    assert!(Parser::new("(a){]").expect_no_error_token().is_err());
+    assert!(Parser::new("'\n'").expect_no_error_token().is_err());
+    assert!(Parser::new("url('\n'").expect_no_error_token().is_err());
+    assert!(Parser::new("url(a b)").expect_no_error_token().is_err());
+    assert!(Parser::new("url(\u{7F})").expect_no_error_token().is_err());
+}
+
+
+/// https://github.com/servo/rust-cssparser/issues/71
+#[test]
+fn outer_block_end_consumed() {
+    let mut input = Parser::new("(calc(true))");
+    assert!(input.expect_parenthesis_block().is_ok());
+    assert!(input.parse_nested_block(|input| input.expect_function_matching("calc")).is_ok());
+    println!("{:?}", input.position());
+    assert_eq!(input.next(), Err(()));
 }
 
 
@@ -302,30 +314,6 @@ fn color3_keywords() {
 }
 
 
-#[bench]
-fn bench_color_lookup_red(b: &mut test::Bencher) {
-    b.iter(|| {
-        test::black_box(parse_color_keyword("red"))
-    });
-}
-
-
-#[bench]
-fn bench_color_lookup_lightgoldenrodyellow(b: &mut test::Bencher) {
-    b.iter(|| {
-        test::black_box(parse_color_keyword("lightgoldenrodyellow"))
-    });
-}
-
-
-#[bench]
-fn bench_color_lookup_fail(b: &mut test::Bencher) {
-    b.iter(|| {
-        test::black_box(parse_color_keyword("lightgoldenrodyellowbazinga"))
-    });
-}
-
-
 #[test]
 fn nth() {
     run_json_tests(include_str!("css-parsing-tests/An+B.json"), |input| {
@@ -357,7 +345,7 @@ fn serializer() {
         }
         let mut serialized = String::new();
         write_to(input, &mut serialized);
-        let parser = &mut Parser::new(serialized.as_slice());
+        let parser = &mut Parser::new(&serialized);
         Json::Array(component_values_to_json(parser))
     });
 }
@@ -600,15 +588,15 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::Delim('\\') => "\\".to_json(),
         Token::Delim(value) => value.to_string().to_json(),
 
-        Token::Number(value) => Json::Array(vec!["number".to_json()] + numeric(value).as_slice()),
+        Token::Number(value) => Json::Array(vec!["number".to_json()] + &*numeric(value)),
         Token::Percentage(PercentageValue { unit_value, int_value, has_sign }) => Json::Array(
-            vec!["percentage".to_json()] + numeric(NumericValue {
+            vec!["percentage".to_json()] + &*numeric(NumericValue {
                 value: unit_value * 100.,
                 int_value: int_value,
                 has_sign: has_sign,
-            }).as_slice()),
+            })),
         Token::Dimension(value, unit) => Json::Array(
-            vec!["dimension".to_json()] + numeric(value).as_slice() + [unit.to_json()].as_slice()),
+            vec!["dimension".to_json()] + &*numeric(value) + &[unit.to_json()][..]),
 
         Token::UnicodeRange(start, end) => JArray!["unicode-range", start, end],
 
@@ -627,10 +615,10 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::CDC => "-->".to_json(),
 
         Token::Function(name) => Json::Array(vec!["function".to_json(), name.to_json()] +
-                                             nested(input).as_slice()),
-        Token::ParenthesisBlock => Json::Array(vec!["()".to_json()] + nested(input).as_slice()),
-        Token::SquareBracketBlock => Json::Array(vec!["[]".to_json()] + nested(input).as_slice()),
-        Token::CurlyBracketBlock => Json::Array(vec!["{}".to_json()] + nested(input).as_slice()),
+                                             &*nested(input)),
+        Token::ParenthesisBlock => Json::Array(vec!["()".to_json()] + &*nested(input)),
+        Token::SquareBracketBlock => Json::Array(vec!["[]".to_json()] + &*nested(input)),
+        Token::CurlyBracketBlock => Json::Array(vec!["{}".to_json()] + &nested(input)),
         Token::BadUrl => JArray!["error", "bad-url"],
         Token::BadString => JArray!["error", "bad-string"],
         Token::CloseParenthesis => JArray!["error", ")"],

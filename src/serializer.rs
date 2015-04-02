@@ -4,7 +4,6 @@
 
 use std::fmt;
 use std::cmp;
-use std::num::{Float, Int};
 
 use text_writer::{self, TextWriter};
 
@@ -49,11 +48,11 @@ pub trait ToCss {
 fn write_numeric<W>(value: NumericValue, dest: &mut W) -> text_writer::Result
 where W: TextWriter {
     // `value.value >= 0` is true for negative 0.
-    if value.has_sign && value.value.is_positive() {
+    if value.has_sign && value.value.is_sign_positive() {
         try!(dest.write_str("+"));
     }
 
-    if value.value == 0.0 && value.value.is_negative() {
+    if value.value == 0.0 && value.value.is_sign_negative() {
         // Negative zero. Work around #20596.
         try!(dest.write_str("-0"))
     } else {
@@ -120,11 +119,13 @@ impl<'a> ToCss for Token<'a> {
             Token::UnicodeRange(start, end) => {
                 try!(dest.write_str("U+"));
                 let bits = cmp::min(start.trailing_zeros(), (!end).trailing_zeros());
-                if bits >= 4 && start >> bits == end >> bits {
-                    let question_marks = bits / 4;
-                    let common = start >> question_marks * 4;
-                    if common != 0 {
-                        try!(write!(dest, "{:X}", common));
+                let question_marks = bits / 4;
+                let bits = question_marks * 4;
+                let truncated_start = start >> bits;
+                let truncated_end = end >> bits;
+                if truncated_start == truncated_end {
+                    if truncated_start != 0 {
+                        try!(write!(dest, "{:X}", truncated_start));
                     }
                     for _ in (0..question_marks) {
                         try!(dest.write_str("?"));

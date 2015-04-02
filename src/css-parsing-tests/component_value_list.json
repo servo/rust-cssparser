@@ -380,22 +380,23 @@
     ["unicode-range", 1048576, 2097151], "?"
 ],
 
-"u+1-2 U+100000-2 U+1000000-2 U+10-200000", [
-    ["unicode-range", 1, 2], " ",
+"u+20-3F U+100000-2 U+1000000-2 U+10-200000", [
+    ["unicode-range", 32, 63], " ",
     ["unicode-range", 1048576, 2], " ",
     ["unicode-range", 1048576, 1048576], ["number", "0", 0, "integer"],
         ["number", "-2", -2, "integer"], " ",
     ["unicode-range", 16, 2097152]
 ],
 
-"ù+12 Ü+12 u +12 U+ 12 U+12 - 20 U+1?2 U+1?-50", [
+"ù+12 Ü+12 u +12 U+ 12 U+12 - 20 U+1?2 U+1?-50 U+1- 2", [
     ["ident", "ù"], ["number", "+12", 12, "integer"], " ",
     ["ident", "Ü"], ["number", "+12", 12, "integer"], " ",
     ["ident", "u"], " ", ["number", "+12", 12, "integer"], " ",
     ["ident", "U"], "+", " ", ["number", "12", 12, "integer"], " ",
     ["unicode-range", 18, 18], " ", "-", " ", ["number", "20", 20, "integer"], " ",
     ["unicode-range", 16, 31], ["number", "2", 2, "integer"], " ",
-    ["unicode-range", 16, 31], ["number", "-50", -50, "integer"]
+    ["unicode-range", 16, 31], ["number", "-50", -50, "integer"], " ",
+    ["unicode-range", 1, 1], "-", " ", ["number", "2", 2, "integer"]
 ],
 
 "~=|=^=$=*=||<!------> |/**/| ~/**/=", [
