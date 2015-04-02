@@ -545,11 +545,11 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::Delim(value) => value.to_string().to_json(),
 
         Token::Number(value) => Json::Array(vec!["number".to_json()] + numeric(value).as_slice()),
-        Token::Percentage(PercentageValue { unit_value, int_value, signed }) => Json::Array(
+        Token::Percentage(PercentageValue { unit_value, int_value, has_sign }) => Json::Array(
             vec!["percentage".to_json()] + numeric(NumericValue {
                 value: unit_value * 100.,
                 int_value: int_value,
-                signed: signed,
+                has_sign: has_sign,
             }).as_slice()),
         Token::Dimension(value, unit) => Json::Array(
             vec!["dimension".to_json()] + numeric(value).as_slice() + [unit.to_json()].as_slice()),

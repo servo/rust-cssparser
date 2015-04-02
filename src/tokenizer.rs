@@ -170,7 +170,7 @@ pub struct NumericValue {
     /// Whether the number had a `+` or `-` sign.
     ///
     /// This is used is some cases like the <An+B> micro syntax. (See the `parse_nth` function.)
-    pub signed: bool,
+    pub has_sign: bool,
 }
 
 
@@ -184,7 +184,7 @@ pub struct PercentageValue {
     pub int_value: Option<i32>,
 
     /// Whether the number had a `+` or `-` sign.
-    pub signed: bool,
+    pub has_sign: bool,
 }
 
 
@@ -653,8 +653,8 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     // But this is always called so that there is at least one digit in \d*(\.\d+)?
     let start_pos = tokenizer.position();
     let mut is_integer = true;
-    let signed = matches!(tokenizer.next_char(), '-' | '+');
-    if signed {
+    let has_sign = matches!(tokenizer.next_char(), '-' | '+');
+    if has_sign {
         tokenizer.advance(1);
     }
     consume_digits(tokenizer);
@@ -696,13 +696,13 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         return Percentage(PercentageValue {
             unit_value: value / 100.,
             int_value: int_value,
-            signed: signed,
+            has_sign: has_sign,
         })
     }
     let value = NumericValue {
         value: value,
         int_value: int_value,
-        signed: signed,
+        has_sign: has_sign,
     };
     if is_ident_start(tokenizer) { Dimension(value, consume_name(tokenizer)) }
     else { Number(value) }
