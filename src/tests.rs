@@ -410,6 +410,62 @@ fn line_numbers() {
 }
 
 #[test]
+fn overflow() {
+    use std::iter::repeat;
+    use std::f32;
+
+    let css = r"
+         2147483646
+         2147483647
+         2147483648
+         10000000000000
+         1000000000000000000000000000000000000000
+         1{309 zeros}
+
+         -2147483647
+         -2147483648
+         -2147483649
+         -10000000000000
+         -1000000000000000000000000000000000000000
+         -1{309 zeros}
+
+         3.30282347e+38
+         3.40282347e+38
+         3.402824e+38
+
+         -3.30282347e+38
+         -3.40282347e+38
+         -3.402824e+38
+
+    ".replace("{309 zeros}", &repeat('0').take(309).collect::<String>());
+    let mut input = Parser::new(&css);
+
+    assert_eq!(input.expect_integer(), Ok(2147483646));
+    assert_eq!(input.expect_integer(), Ok(2147483647));
+    assert_eq!(input.expect_integer(), Ok(2147483647)); // Clamp on overflow
+    assert_eq!(input.expect_integer(), Ok(2147483647));
+    assert_eq!(input.expect_integer(), Ok(2147483647));
+    assert_eq!(input.expect_integer(), Ok(2147483647));
+
+    assert_eq!(input.expect_integer(), Ok(-2147483647));
+    assert_eq!(input.expect_integer(), Ok(-2147483648));
+    assert_eq!(input.expect_integer(), Ok(-2147483648)); // Clamp on overflow
+    assert_eq!(input.expect_integer(), Ok(-2147483648));
+    assert_eq!(input.expect_integer(), Ok(-2147483648));
+    assert_eq!(input.expect_integer(), Ok(-2147483648));
+
+    assert_eq!(input.expect_number(), Ok(3.30282347e+38));
+    assert_eq!(input.expect_number(), Ok(f32::MAX));
+    assert_eq!(input.expect_number(), Ok(f32::INFINITY));
+    assert!(f32::MAX != f32::INFINITY);
+
+    assert_eq!(input.expect_number(), Ok(-3.30282347e+38));
+    assert_eq!(input.expect_number(), Ok(f32::MIN));
+    assert_eq!(input.expect_number(), Ok(f32::NEG_INFINITY));
+    assert!(f32::MIN != f32::NEG_INFINITY);
+}
+
+#[test]
 fn line_delimited() {
     let mut input = Parser::new(" { foo ; bar } baz;,");
     assert_eq!(input.next(), Ok(Token::CurlyBracketBlock));
