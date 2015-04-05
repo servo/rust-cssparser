@@ -10,6 +10,7 @@ script:
   - cargo doc --verbose
 
 after_success: |
+  [ $TRAVIS_RUST_VERSION = nightly ] &&
   [ $TRAVIS_BRANCH = master ] &&
   [ $TRAVIS_PULL_REQUEST = false ] &&
   echo '<meta http-equiv=refresh content=0;url=cssparser/index.html>' > target/doc/index.html &&
