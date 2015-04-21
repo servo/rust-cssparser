@@ -64,7 +64,6 @@ fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
 */
 
 extern crate encoding;
-extern crate text_writer;
 #[macro_use] extern crate matches;
 #[cfg(test)] extern crate tempdir;
 #[cfg(test)] extern crate rustc_serialize;

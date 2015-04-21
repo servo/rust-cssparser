@@ -2,10 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::fmt;
+use std::ascii::AsciiExt;
 use std::cmp;
-
-use text_writer::{self, TextWriter};
+use std::fmt::{self, Write};
 
 use super::{Token, NumericValue, PercentageValue};
 
@@ -13,7 +12,7 @@ use super::{Token, NumericValue, PercentageValue};
 /// Trait for things the can serialize themselves in CSS syntax.
 pub trait ToCss {
     /// Serialize `self` in CSS syntax, writing to `dest`.
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter;
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write;
 
     /// Serialize `self` in CSS syntax and return a string.
     ///
@@ -38,15 +37,14 @@ pub trait ToCss {
     ///
     /// (This is a convenience wrapper for `to_css` and probably should not be overridden.)
     #[inline]
-    fn fmt_to_css<W>(&self, dest: &mut W) -> fmt::Result where W: TextWriter {
+    fn fmt_to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
         self.to_css(dest).map_err(|_| fmt::Error)
     }
 }
 
 
 #[inline]
-fn write_numeric<W>(value: NumericValue, dest: &mut W) -> text_writer::Result
-where W: TextWriter {
+fn write_numeric<W>(value: NumericValue, dest: &mut W) -> fmt::Result where W: fmt::Write {
     // `value.value >= 0` is true for negative 0.
     if value.has_sign && value.value.is_sign_positive() {
         try!(dest.write_str("+"));
@@ -67,30 +65,28 @@ where W: TextWriter {
 
 
 impl<'a> ToCss for Token<'a> {
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
         match *self {
             Token::Ident(ref value) => try!(serialize_identifier(&**value, dest)),
             Token::AtKeyword(ref value) => {
-                try!(dest.write_char('@'));
+                try!(dest.write_str("@"));
                 try!(serialize_identifier(&**value, dest));
             },
             Token::Hash(ref value) => {
-                try!(dest.write_char('#'));
-                for c in value.chars() {
-                    try!(serialize_char(c, dest, /* is_identifier_start = */ false));
-                }
+                try!(dest.write_str("#"));
+                try!(serialize_name(value, dest));
             },
             Token::IDHash(ref value) => {
-                try!(dest.write_char('#'));
+                try!(dest.write_str("#"));
                 try!(serialize_identifier(&**value, dest));
             }
             Token::QuotedString(ref value) => try!(serialize_string(&**value, dest)),
             Token::Url(ref value) => {
                 try!(dest.write_str("url("));
                 try!(serialize_string(&**value, dest));
-                try!(dest.write_char(')'));
+                try!(dest.write_str(")"));
             },
-            Token::Delim(value) => try!(dest.write_char(value)),
+            Token::Delim(value) => try!(write!(dest, "{}", value)),
 
             Token::Number(value) => try!(write_numeric(value, dest)),
             Token::Percentage(PercentageValue { unit_value, int_value, has_sign }) => {
@@ -100,7 +96,7 @@ impl<'a> ToCss for Token<'a> {
                     has_sign: has_sign,
                 };
                 try!(write_numeric(value, dest));
-                try!(dest.write_char('%'));
+                try!(dest.write_str("%"));
             },
             Token::Dimension(value, ref unit) => {
                 try!(write_numeric(value, dest));
@@ -108,9 +104,7 @@ impl<'a> ToCss for Token<'a> {
                 let unit = &**unit;
                 if unit == "e" || unit == "E" || unit.starts_with("e-") || unit.starts_with("E-") {
                     try!(dest.write_str("\\65 "));
-                    for c in unit[1..].chars() {
-                        try!(serialize_char(c, dest, /* is_identifier_start = */ false));
-                    }
+                    try!(serialize_name(&unit[1..], dest));
                 } else {
                     try!(serialize_identifier(unit, dest));
                 }
@@ -140,9 +134,9 @@ impl<'a> ToCss for Token<'a> {
 
             Token::WhiteSpace(content) => try!(dest.write_str(content)),
             Token::Comment(content) => try!(write!(dest, "/*{}*/", content)),
-            Token::Colon => try!(dest.write_char(':')),
-            Token::Semicolon => try!(dest.write_char(';')),
-            Token::Comma => try!(dest.write_char(',')),
+            Token::Colon => try!(dest.write_str(":")),
+            Token::Semicolon => try!(dest.write_str(";")),
+            Token::Comma => try!(dest.write_str(",")),
             Token::IncludeMatch => try!(dest.write_str("~=")),
             Token::DashMatch => try!(dest.write_str("|=")),
             Token::PrefixMatch => try!(dest.write_str("^=")),
@@ -154,17 +148,17 @@ impl<'a> ToCss for Token<'a> {
 
             Token::Function(ref name) => {
                 try!(serialize_identifier(&**name, dest));
-                try!(dest.write_char('('));
+                try!(dest.write_str("("));
             },
-            Token::ParenthesisBlock => try!(dest.write_char('(')),
-            Token::SquareBracketBlock => try!(dest.write_char('[')),
-            Token::CurlyBracketBlock => try!(dest.write_char('{')),
+            Token::ParenthesisBlock => try!(dest.write_str("(")),
+            Token::SquareBracketBlock => try!(dest.write_str("[")),
+            Token::CurlyBracketBlock => try!(dest.write_str("{")),
 
             Token::BadUrl => try!(dest.write_str("url(<bad url>)")),
             Token::BadString => try!(dest.write_str("\"<bad string>\n")),
-            Token::CloseParenthesis => try!(dest.write_char(')')),
-            Token::CloseSquareBracket => try!(dest.write_char(']')),
-            Token::CloseCurlyBracket => try!(dest.write_char('}')),
+            Token::CloseParenthesis => try!(dest.write_str(")")),
+            Token::CloseSquareBracket => try!(dest.write_str("]")),
+            Token::CloseCurlyBracket => try!(dest.write_str("}")),
         }
         Ok(())
     }
@@ -172,65 +166,75 @@ impl<'a> ToCss for Token<'a> {
 
 
 /// Write a CSS identifier, escaping characters as necessary.
-pub fn serialize_identifier<W>(value: &str, dest: &mut W) -> text_writer::Result
-where W:TextWriter {
-    // TODO: avoid decoding/re-encoding UTF-8?
-    let mut iter = value.chars();
-    let mut c = iter.next().unwrap();
-    if c == '-' {
-        c = match iter.next() {
-            None => return dest.write_str("\\-"),
-            Some(c) => { try!(dest.write_char('-')); c },
-        }
-    };
-    try!(serialize_char(c, dest, /* is_identifier_start = */ true));
-    for c in iter {
-        try!(serialize_char(c, dest, /* is_identifier_start = */ false));
+pub fn serialize_identifier<W>(mut value: &str, dest: &mut W) -> fmt::Result where W:fmt::Write {
+    if value.is_empty() {
+        return Ok(())
     }
-    Ok(())
+
+    if value.starts_with("--") {
+        try!(dest.write_str("--"));
+        serialize_name(&value[2..], dest)
+    } else if value == "-" {
+        dest.write_str("\\-")
+    } else {
+        if value.as_bytes()[0] == b'-' {
+            try!(dest.write_str("-"));
+            value = &value[1..];
+        }
+        if let digit @ b'0'...b'9' = value.as_bytes()[0] {
+            try!(write!(dest, "\\3{} ", digit as char));
+            value = &value[1..];
+        }
+        serialize_name(value, dest)
+    }
 }
 
 
-#[inline]
-fn serialize_char<W>(c: char, dest: &mut W, is_identifier_start: bool) -> text_writer::Result
-where W: TextWriter {
-    match c {
-        '0'...'9' if is_identifier_start => try!(write!(dest, "\\3{} ", c)),
-        '-' if is_identifier_start => try!(dest.write_str("\\-")),
-        '0'...'9' | 'A'...'Z' | 'a'...'z' | '_' | '-' => try!(dest.write_char(c)),
-        _ if c > '\x7F' => try!(dest.write_char(c)),
-        '\n' => try!(dest.write_str("\\A ")),
-        '\r' => try!(dest.write_str("\\D ")),
-        '\x0C' => try!(dest.write_str("\\C ")),
-        _ => { try!(dest.write_char('\\')); try!(dest.write_char(c)) },
-    };
-    Ok(())
+fn serialize_name<W>(value: &str, dest: &mut W) -> fmt::Result where W:fmt::Write {
+    let mut chunk_start = 0;
+    for (i, b) in value.bytes().enumerate() {
+        let escaped = match b {
+            b'0'...b'9' | b'A'...b'Z' | b'a'...b'z' | b'_' | b'-' => continue,
+            _ if !b.is_ascii() => continue,
+            b'\n' => Some("\\A "),
+            b'\r' => Some("\\D "),
+            b'\x0C' => Some("\\C "),
+            _ => None,
+        };
+        try!(dest.write_str(&value[chunk_start..i]));
+        if let Some(escaped) = escaped {
+            try!(dest.write_str(escaped));
+        } else {
+            try!(write!(dest, "\\{}", b as char));
+        }
+        chunk_start = i + 1;
+    }
+    dest.write_str(&value[chunk_start..])
 }
 
 
 /// Write a double-quoted CSS string token, escaping content as necessary.
-pub fn serialize_string<W>(value: &str, dest: &mut W) -> text_writer::Result
-where W: TextWriter {
-    try!(dest.write_char('"'));
+pub fn serialize_string<W>(value: &str, dest: &mut W) -> fmt::Result where W: fmt::Write {
+    try!(dest.write_str("\""));
     try!(CssStringWriter::new(dest).write_str(value));
-    try!(dest.write_char('"'));
+    try!(dest.write_str("\""));
     Ok(())
 }
 
 
-/// A `TextWriter` adaptor that escapes text for writing as a double-quoted CSS string.
+/// A `fmt::Write` adapter that escapes text for writing as a double-quoted CSS string.
 /// Quotes are not included.
 ///
 /// Typical usage:
 ///
 /// ```{rust,ignore}
-/// fn write_foo<W>(foo: &Foo, dest: &mut W) -> text_writer::Result where W: TextWriter {
-///     try!(dest.write_char('"'));
+/// fn write_foo<W>(foo: &Foo, dest: &mut W) -> fmt::Result where W: fmt::Write {
+///     try!(dest.write_str("\""));
 ///     {
 ///         let mut string_dest = CssStringWriter::new(dest);
 ///         // Write into string_dest...
 ///     }
-///     try!(dest.write_char('"'));
+///     try!(dest.write_str("\""));
 ///     Ok(())
 /// }
 /// ```
@@ -238,31 +242,30 @@ pub struct CssStringWriter<'a, W: 'a> {
     inner: &'a mut W,
 }
 
-impl<'a, W> CssStringWriter<'a, W> where W: TextWriter {
+impl<'a, W> CssStringWriter<'a, W> where W: fmt::Write {
     /// Wrap a text writer to create a `CssStringWriter`.
     pub fn new(inner: &'a mut W) -> CssStringWriter<'a, W> {
         CssStringWriter { inner: inner }
     }
 }
 
-impl<'a, W> TextWriter for CssStringWriter<'a, W> where W: TextWriter {
-    fn write_str(&mut self, s: &str) -> text_writer::Result {
-        // TODO: avoid decoding/re-encoding UTF-8?
-        for c in s.chars() {
-            try!(self.write_char(c))
+impl<'a, W> fmt::Write for CssStringWriter<'a, W> where W: fmt::Write {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let mut chunk_start = 0;
+        for (i, b) in s.bytes().enumerate() {
+            let escaped = match b {
+                b'"' => "\\\"",
+                b'\\' => "\\\\",
+                b'\n' => "\\A ",
+                b'\r' => "\\D ",
+                b'\x0C' => "\\C ",
+                _ => continue,
+            };
+            try!(self.inner.write_str(&s[chunk_start..i]));
+            try!(self.inner.write_str(escaped));
+            chunk_start = i + 1;
         }
-        Ok(())
-    }
-
-    fn write_char(&mut self, c: char) -> text_writer::Result {
-        match c {
-            '"' => self.inner.write_str("\\\""),
-            '\\' => self.inner.write_str("\\\\"),
-            '\n' => self.inner.write_str("\\A "),
-            '\r' => self.inner.write_str("\\D "),
-            '\x0C' => self.inner.write_str("\\C "),
-            _ => self.inner.write_char(c),
-        }
+        self.inner.write_str(&s[chunk_start..])
     }
 }
 
@@ -270,7 +273,7 @@ impl<'a, W> TextWriter for CssStringWriter<'a, W> where W: TextWriter {
 macro_rules! impl_tocss_for_number {
     ($T: ty) => {
         impl<'a> ToCss for $T {
-            fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+            fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
                 write!(dest, "{}", *self)
             }
         }

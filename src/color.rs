@@ -5,13 +5,11 @@
 use std::ascii::AsciiExt;
 use std::fmt;
 
-use text_writer::{self, TextWriter};
-
 use super::{Token, Parser, ToCss};
 
 
 /// A color with red, green, blue, and alpha components.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct RGBA {
     /// The red channel. Nominally in 0.0 ... 1.0.
     pub red: f32,
@@ -24,7 +22,7 @@ pub struct RGBA {
 }
 
 impl ToCss for RGBA {
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
         if self.alpha == 1f32 {
             write!(dest, "rgb({}, {}, {})",
                    (self.red * 255.).round(),
@@ -41,7 +39,7 @@ impl ToCss for RGBA {
 }
 
 /// A <color> value.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Color {
     /// The 'currentColor' keyword
     CurrentColor,
@@ -50,20 +48,12 @@ pub enum Color {
 }
 
 impl ToCss for Color {
-    fn to_css<W>(&self, dest: &mut W) -> text_writer::Result where W: TextWriter {
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
         match self {
             &Color::CurrentColor => dest.write_str("currentColor"),
             &Color::RGBA(rgba) => rgba.to_css(dest),
         }
     }
-}
-
-impl fmt::Debug for RGBA {
-    #[inline] fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_to_css(f) }
-}
-
-impl fmt::Debug for Color {
-    #[inline] fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_to_css(f) }
 }
 
 impl Color {
