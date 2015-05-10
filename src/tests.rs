@@ -588,15 +588,26 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::Delim('\\') => "\\".to_json(),
         Token::Delim(value) => value.to_string().to_json(),
 
-        Token::Number(value) => Json::Array(vec!["number".to_json()] + &*numeric(value)),
-        Token::Percentage(PercentageValue { unit_value, int_value, has_sign }) => Json::Array(
-            vec!["percentage".to_json()] + &*numeric(NumericValue {
+        Token::Number(value) => Json::Array({
+            let mut v = vec!["number".to_json()];
+            v.extend(numeric(value));
+            v
+        }),
+        Token::Percentage(PercentageValue { unit_value, int_value, has_sign }) => Json::Array({
+            let mut v = vec!["percentage".to_json()];
+            v.extend(numeric(NumericValue {
                 value: unit_value * 100.,
                 int_value: int_value,
                 has_sign: has_sign,
-            })),
-        Token::Dimension(value, unit) => Json::Array(
-            vec!["dimension".to_json()] + &*numeric(value) + &[unit.to_json()][..]),
+            }));
+            v
+        }),
+        Token::Dimension(value, unit) => Json::Array({
+            let mut v = vec!["dimension".to_json()];
+            v.extend(numeric(value));
+            v.push(unit.to_json());
+            v
+        }),
 
         Token::UnicodeRange(start, end) => JArray!["unicode-range", start, end],
 
@@ -614,11 +625,26 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::CDO => "<!--".to_json(),
         Token::CDC => "-->".to_json(),
 
-        Token::Function(name) => Json::Array(vec!["function".to_json(), name.to_json()] +
-                                             &*nested(input)),
-        Token::ParenthesisBlock => Json::Array(vec!["()".to_json()] + &*nested(input)),
-        Token::SquareBracketBlock => Json::Array(vec!["[]".to_json()] + &*nested(input)),
-        Token::CurlyBracketBlock => Json::Array(vec!["{}".to_json()] + &nested(input)),
+        Token::Function(name) => Json::Array({
+            let mut v = vec!["function".to_json(), name.to_json()];
+            v.extend(nested(input));
+            v
+        }),
+        Token::ParenthesisBlock => Json::Array({
+            let mut v = vec!["()".to_json()];
+            v.extend(nested(input));
+            v
+        }),
+        Token::SquareBracketBlock => Json::Array({
+            let mut v = vec!["[]".to_json()];
+            v.extend(nested(input));
+            v
+        }),
+        Token::CurlyBracketBlock => Json::Array({
+            let mut v = vec!["{}".to_json()];
+            v.extend(nested(input));
+            v
+        }),
         Token::BadUrl => JArray!["error", "bad-url"],
         Token::BadString => JArray!["error", "bad-string"],
         Token::CloseParenthesis => JArray!["error", ")"],
