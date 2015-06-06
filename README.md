@@ -3,7 +3,7 @@ rust-cssparser
 
 [![Build Status](https://travis-ci.org/servo/rust-cssparser.svg?branch=travis)](https://travis-ci.org/servo/rust-cssparser)
 
-[Documentation](http://doc.servo.org/cssparser/)
+[Documentation](https://servo.github.io/rust-cssparser/cssparser/index.html)
 
 Rust implementation of
 [CSS Syntax Module Level 3](http://www.w3.org/TR/css-syntax-3/)
