@@ -83,10 +83,10 @@ pub trait DeclarationParser {
 /// for using `DeclarationListParser` to parse a declartions list with only qualified rules.
 pub trait AtRuleParser {
     /// The intermediate representation of an at-rule prelude.
-    type Prelude = ();
+    type Prelude;
 
     /// The finished representation of an at-rule.
-    type AtRule = ();
+    type AtRule;
 
     /// Parse the prelude of an at-rule with the given `name`.
     ///
@@ -151,10 +151,10 @@ pub trait AtRuleParser {
 /// (such as inside `@font-feature-values`).
 pub trait QualifiedRuleParser {
     /// The intermediate representation of a qualified rule prelude.
-    type Prelude = ();
+    type Prelude;
 
     /// The finished representation of a qualified rule.
-    type QualifiedRule = ();
+    type QualifiedRule;
 
     /// Parse the prelude of a qualified rule. For style rules, this is as Selector list.
     ///
