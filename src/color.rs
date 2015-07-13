@@ -10,6 +10,7 @@ use super::{Token, Parser, ToCss};
 
 /// A color with red, green, blue, and alpha components.
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct RGBA {
     /// The red channel. Nominally in 0.0 ... 1.0.
     pub red: f32,
