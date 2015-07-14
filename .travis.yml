@@ -21,3 +21,6 @@ after_success: |
 
 env:
   - secure: N66sY4jTqznkJRTNshbib1o7GpgPN8Rw66KFGkRxDfuDOZGkpmTWRPP4tLwmbFfdMOSFKd8Q1OTUOGqvRgny4TErcCF+E56/tUSdGfOFqKeGqowUGhRBLx4eso8FP1ECCTEEZE4hEs1Yb10BrPvZU6YmdBcc5e8YeDZBTAhqMUE=
+
+notifications:
+  webhooks: http://build.servo.org:54856/travis
