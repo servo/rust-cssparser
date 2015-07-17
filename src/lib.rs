@@ -12,7 +12,7 @@
 
 /*!
 
-Implementation of [CSS Syntax Module Level 3](http://dev.w3.org/csswg/css-syntax-3/) for Rust.
+Implementation of [CSS Syntax Module Level 3](https://drafts.csswg.org/css-syntax/) for Rust.
 
 # Input
 

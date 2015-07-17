@@ -24,7 +24,7 @@ use encoding::{EncodingRef, DecoderTrap, decode};
 pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>,
                                environment_encoding: Option<EncodingRef>)
                             -> (String, EncodingRef) {
-    // http://dev.w3.org/csswg/css-syntax/#the-input-byte-stream
+    // https://drafts.csswg.org/css-syntax/#the-input-byte-stream
     match protocol_encoding_label {
         None => (),
         Some(label) => match encoding_from_whatwg_label(label) {

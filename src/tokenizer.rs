@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// http://dev.w3.org/csswg/css3-syntax/#tokenization
+// https://drafts.csswg.org/css-syntax/#tokenization
 
 use std::ops::Range;
 use std::cell::Cell;
@@ -22,30 +22,30 @@ use self::Token::*;
 #[derive(PartialEq, Debug, Clone)]
 pub enum Token<'a> {
 
-    /// A [`<ident-token>`](http://dev.w3.org/csswg/css-syntax/#ident-token-diagram)
+    /// A [`<ident-token>`](https://drafts.csswg.org/css-syntax/#ident-token-diagram)
     Ident(Cow<'a, str>),
 
-    /// A [`<at-keyword-token>`](http://dev.w3.org/csswg/css-syntax/#at-keyword-token-diagram)
+    /// A [`<at-keyword-token>`](https://drafts.csswg.org/css-syntax/#at-keyword-token-diagram)
     ///
     /// The value does not include the `@` marker.
     AtKeyword(Cow<'a, str>),
 
-    /// A [`<hash-token>`](http://dev.w3.org/csswg/css-syntax/#hash-token-diagram) with the type flag set to "unrestricted"
+    /// A [`<hash-token>`](https://drafts.csswg.org/css-syntax/#hash-token-diagram) with the type flag set to "unrestricted"
     ///
     /// The value does not include the `#` marker.
     Hash(Cow<'a, str>),
 
-    /// A [`<hash-token>`](http://dev.w3.org/csswg/css-syntax/#hash-token-diagram) with the type flag set to "id"
+    /// A [`<hash-token>`](https://drafts.csswg.org/css-syntax/#hash-token-diagram) with the type flag set to "id"
     ///
     /// The value does not include the `#` marker.
     IDHash(Cow<'a, str>),  // Hash that is a valid ID selector.
 
-    /// A [`<string-token>`](http://dev.w3.org/csswg/css-syntax/#string-token-diagram)
+    /// A [`<string-token>`](https://drafts.csswg.org/css-syntax/#string-token-diagram)
     ///
     /// The value does not include the quotes.
     QuotedString(Cow<'a, str>),
 
-    /// A [`<url-token>`](http://dev.w3.org/csswg/css-syntax/#url-token-diagram) or `url( <string-token> )` function
+    /// A [`<url-token>`](https://drafts.csswg.org/css-syntax/#url-token-diagram) or `url( <string-token> )` function
     ///
     /// The value does not include the `url(` `)` markers or the quotes.
     Url(Cow<'a, str>),
@@ -53,16 +53,16 @@ pub enum Token<'a> {
     /// A `<delim-token>`
     Delim(char),
 
-    /// A [`<number-token>`](http://dev.w3.org/csswg/css-syntax/#number-token-diagram)
+    /// A [`<number-token>`](https://drafts.csswg.org/css-syntax/#number-token-diagram)
     Number(NumericValue),
 
-    /// A [`<percentage-token>`](http://dev.w3.org/csswg/css-syntax/#percentage-token-diagram)
+    /// A [`<percentage-token>`](https://drafts.csswg.org/css-syntax/#percentage-token-diagram)
     Percentage(PercentageValue),
 
-    /// A [`<dimension-token>`](http://dev.w3.org/csswg/css-syntax/#dimension-token-diagram)
+    /// A [`<dimension-token>`](https://drafts.csswg.org/css-syntax/#dimension-token-diagram)
     Dimension(NumericValue, Cow<'a, str>),
 
-    /// A [`<unicode-range-token>`](http://dev.w3.org/csswg/css-syntax/#unicode-range-token-diagram)
+    /// A [`<unicode-range-token>`](https://drafts.csswg.org/css-syntax/#unicode-range-token-diagram)
     ///
     /// Components are the start and end code points, respectively.
     ///
@@ -70,7 +70,7 @@ pub enum Token<'a> {
     /// but does not check that code points are within the range of Unicode (up to U+10_FFFF).
     UnicodeRange(u32, u32),
 
-    /// A [`<whitespace-token>`](http://dev.w3.org/csswg/css-syntax/#whitespace-token-diagram)
+    /// A [`<whitespace-token>`](https://drafts.csswg.org/css-syntax/#whitespace-token-diagram)
     WhiteSpace(&'a str),
 
     /// A comment.
@@ -90,31 +90,31 @@ pub enum Token<'a> {
     /// A `,` `<comma-token>`
     Comma,  // ,
 
-    /// A `~=` [`<include-match-token>`](http://dev.w3.org/csswg/css-syntax/#include-match-token-diagram)
+    /// A `~=` [`<include-match-token>`](https://drafts.csswg.org/css-syntax/#include-match-token-diagram)
     IncludeMatch,
 
-    /// A `|=` [`<dash-match-token>`](http://dev.w3.org/csswg/css-syntax/#dash-match-token-diagram)
+    /// A `|=` [`<dash-match-token>`](https://drafts.csswg.org/css-syntax/#dash-match-token-diagram)
     DashMatch,
 
-    /// A `^=` [`<prefix-match-token>`](http://dev.w3.org/csswg/css-syntax/#prefix-match-token-diagram)
+    /// A `^=` [`<prefix-match-token>`](https://drafts.csswg.org/css-syntax/#prefix-match-token-diagram)
     PrefixMatch,
 
-    /// A `$=` [`<suffix-match-token>`](http://dev.w3.org/csswg/css-syntax/#suffix-match-token-diagram)
+    /// A `$=` [`<suffix-match-token>`](https://drafts.csswg.org/css-syntax/#suffix-match-token-diagram)
     SuffixMatch,
 
-    /// A `*=` [`<substring-match-token>`](http://dev.w3.org/csswg/css-syntax/#substring-match-token-diagram)
+    /// A `*=` [`<substring-match-token>`](https://drafts.csswg.org/css-syntax/#substring-match-token-diagram)
     SubstringMatch,
 
-    /// A `||` [`<column-token>`](http://dev.w3.org/csswg/css-syntax/#column-token-diagram)
+    /// A `||` [`<column-token>`](https://drafts.csswg.org/css-syntax/#column-token-diagram)
     Column,
 
-    /// A `<!--` [`<CDO-token>`](http://dev.w3.org/csswg/css-syntax/#CDO-token-diagram)
+    /// A `<!--` [`<CDO-token>`](https://drafts.csswg.org/css-syntax/#CDO-token-diagram)
     CDO,
 
-    /// A `-->` [`<CDC-token>`](http://dev.w3.org/csswg/css-syntax/#CDC-token-diagram)
+    /// A `-->` [`<CDC-token>`](https://drafts.csswg.org/css-syntax/#CDC-token-diagram)
     CDC,
 
-    /// A [`<function-token>`](http://dev.w3.org/csswg/css-syntax/#function-token-diagram)
+    /// A [`<function-token>`](https://drafts.csswg.org/css-syntax/#function-token-diagram)
     ///
     /// The value (name) does not include the `(` marker.
     Function(Cow<'a, str>),
