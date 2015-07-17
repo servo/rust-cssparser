@@ -322,7 +322,7 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
         try!(arguments.expect_comma());
         let lightness = (try!(arguments.expect_percentage())).max(0.).min(1.);
 
-        // http://www.w3.org/TR/css3-color/#hsl-color
+        // https://drafts.csswg.org/css-color/#hsl-color
         fn hue_to_rgb(m1: f32, m2: f32, mut h: f32) -> f32 {
             if h < 0. { h += 1. }
             if h > 1. { h -= 1. }

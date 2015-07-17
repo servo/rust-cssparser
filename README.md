@@ -6,7 +6,7 @@ rust-cssparser
 [Documentation](https://servo.github.io/rust-cssparser/cssparser/index.html)
 
 Rust implementation of
-[CSS Syntax Module Level 3](http://www.w3.org/TR/css-syntax-3/)
+[CSS Syntax Module Level 3](https://drafts.csswg.org/css-syntax/)
 
 
 Overview
@@ -43,7 +43,7 @@ Parsing CSS involves a series of steps:
 
 * The last step of a full CSS parser is
   parsing the remaining component values
-  into [Selectors](http://www.w3.org/TR/selectors/),
+  into [Selectors](https://drafts.csswg.org/selectors/),
   specific CSS properties, etc.
 
   By design, rust-cssparser does not do this last step

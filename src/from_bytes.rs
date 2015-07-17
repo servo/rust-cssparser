@@ -18,7 +18,7 @@ use encoding::{EncodingRef, DecoderTrap, decode};
 /// * `protocol_encoding`: The encoding label, if any, defined by HTTP or equivalent protocol.
 ///     (e.g. via the `charset` parameter of the `Content-Type` header.)
 /// * `environment_encoding`: An optional `Encoding` object for the [environment encoding]
-///     (http://www.w3.org/TR/css-syntax/#environment-encoding), if any.
+///     (https://drafts.csswg.org/css-syntax/#environment-encoding), if any.
 ///
 /// Returns a 2-tuple of a decoded Unicode string and the `Encoding` object that was used.
 pub fn decode_stylesheet_bytes(css: &[u8], protocol_encoding_label: Option<&str>,
