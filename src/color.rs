@@ -86,6 +86,16 @@ fn rgb(red: f32, green: f32, blue: f32) -> Result<Color, ()> {
     }))
 }
 
+#[inline]
+fn rgba(red: f32, green: f32, blue: f32, alpha: f32) -> Result<Color, ()> {
+    Ok(Color::RGBA(RGBA {
+        red: red / 255.,
+        green: green / 255.,
+        blue: blue / 255.,
+        alpha: alpha / 255.,
+    }))
+}
+
 
 /// Return the named color with the given name.
 ///
@@ -267,10 +277,22 @@ fn from_hex(c: u8) -> Result<u8, ()> {
 fn parse_color_hash(value: &str) -> Result<Color, ()> {
     let value = value.as_bytes();
     match value.len() {
+        8 => rgba(
+            (try!(from_hex(value[0])) * 16 + try!(from_hex(value[1]))) as f32,
+            (try!(from_hex(value[2])) * 16 + try!(from_hex(value[3]))) as f32,
+            (try!(from_hex(value[4])) * 16 + try!(from_hex(value[5]))) as f32,
+            (try!(from_hex(value[6])) * 16 + try!(from_hex(value[7]))) as f32,
+        ),
         6 => rgb(
             (try!(from_hex(value[0])) * 16 + try!(from_hex(value[1]))) as f32,
             (try!(from_hex(value[2])) * 16 + try!(from_hex(value[3]))) as f32,
             (try!(from_hex(value[4])) * 16 + try!(from_hex(value[5]))) as f32,
+        ),
+        4 => rgba(
+            (try!(from_hex(value[0])) * 17) as f32,
+            (try!(from_hex(value[1])) * 17) as f32,
+            (try!(from_hex(value[2])) * 17) as f32,
+            (try!(from_hex(value[3])) * 17) as f32,
         ),
         3 => rgb(
             (try!(from_hex(value[0])) * 17) as f32,
