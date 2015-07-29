@@ -686,10 +686,10 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
             && matches!(tokenizer.char_at(1), '0'...'9') {
         is_integer = false;
         tokenizer.advance(1);  // Consume '.'
-        let mut divisor = 10.;
+        let mut factor = 0.1;
         while let Some(digit) = tokenizer.next_char().to_digit(10) {
-            fractional_part += digit as f64 / divisor;
-            divisor *= 10.;
+            fractional_part += digit as f64 * factor;
+            factor *= 0.1;
             tokenizer.advance(1);
             if tokenizer.is_eof() {
                 break
