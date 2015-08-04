@@ -314,9 +314,13 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
         _ => return Err(())
     };
 
-    let red: f32;
-    let green: f32;
-    let blue: f32;
+    fn clamp(val: f32) -> f32 {
+        val.max(0.).min(1.)
+    }
+
+    let mut red: f32;
+    let mut green: f32;
+    let mut blue: f32;
     if is_rgb {
         // Either integers or percentages, but all the same type.
         match try!(arguments.next()) {
@@ -336,13 +340,23 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
             }
             _ => return Err(())
         };
+        // The spec says to clamp to the device gamut which may be wider than 0% ... 100%,
+        // but moz2d doesn’t seem to have any support for this, so let’s not bother.
+        // https://drafts.csswg.org/css-color/#rgb-functions
+        // https://github.com/servo/rust-cssparser/issues/76
+        red = clamp(red);
+        green = clamp(green);
+        blue = clamp(blue);
     } else {
         let hue = try!(arguments.expect_number()) / 360.;
         let hue = hue - hue.floor();
+        // Saturation and lightness are clamped to 0% ... 100%
+        // regardless of device gamut:
+        // https://drafts.csswg.org/css-color/#the-hsl-notation
         try!(arguments.expect_comma());
-        let saturation = (try!(arguments.expect_percentage())).max(0.).min(1.);
+        let saturation = clamp(try!(arguments.expect_percentage()));
         try!(arguments.expect_comma());
-        let lightness = (try!(arguments.expect_percentage())).max(0.).min(1.);
+        let lightness = clamp(try!(arguments.expect_percentage()));
 
         // https://drafts.csswg.org/css-color/#hsl-color
         fn hue_to_rgb(m1: f32, m2: f32, mut h: f32) -> f32 {
@@ -364,7 +378,7 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
 
     let alpha = if has_alpha {
         try!(arguments.expect_comma());
-        (try!(arguments.expect_number())).max(0.).min(1.)
+        clamp(try!(arguments.expect_number()))
     } else {
         1.
     };
