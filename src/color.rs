@@ -314,6 +314,10 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
         _ => return Err(())
     };
 
+    fn clamp(val: f32) -> f32 {
+        val.max(0.).min(1.)
+    }
+
     let red: f32;
     let green: f32;
     let blue: f32;
@@ -321,18 +325,19 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
         // Either integers or percentages, but all the same type.
         match try!(arguments.next()) {
             Token::Number(ref v) if v.int_value.is_some() => {
-                red = v.value / 255.;
+
+                red = clamp(v.value / 255.);
                 try!(arguments.expect_comma());
-                green = try!(arguments.expect_integer()) as f32 / 255.;
+                green = clamp(try!(arguments.expect_integer()) as f32 / 255.);
                 try!(arguments.expect_comma());
-                blue = try!(arguments.expect_integer()) as f32 / 255.;
+                blue = clamp(try!(arguments.expect_integer()) as f32 / 255.);
             }
             Token::Percentage(ref v) => {
-                red = v.unit_value;
+                red = clamp(v.unit_value);
                 try!(arguments.expect_comma());
-                green = try!(arguments.expect_percentage());
+                green = clamp(try!(arguments.expect_percentage()));
                 try!(arguments.expect_comma());
-                blue = try!(arguments.expect_percentage());
+                blue = clamp(try!(arguments.expect_percentage()));
             }
             _ => return Err(())
         };
@@ -340,9 +345,9 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
         let hue = try!(arguments.expect_number()) / 360.;
         let hue = hue - hue.floor();
         try!(arguments.expect_comma());
-        let saturation = (try!(arguments.expect_percentage())).max(0.).min(1.);
+        let saturation = clamp(try!(arguments.expect_percentage()));
         try!(arguments.expect_comma());
-        let lightness = (try!(arguments.expect_percentage())).max(0.).min(1.);
+        let lightness = clamp(try!(arguments.expect_percentage()));
 
         // https://drafts.csswg.org/css-color/#hsl-color
         fn hue_to_rgb(m1: f32, m2: f32, mut h: f32) -> f32 {
@@ -364,7 +369,7 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
 
     let alpha = if has_alpha {
         try!(arguments.expect_comma());
-        (try!(arguments.expect_number())).max(0.).min(1.)
+        clamp(try!(arguments.expect_number()))
     } else {
         1.
     };
