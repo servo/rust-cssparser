@@ -22,10 +22,14 @@ optional = true
 [dependencies.serde_macros]
 optional = true
 
+[dependencies.heapsize]
+git = "https://github.com/servo/heapsize.git"
+optional = true
+
 [dependencies]
 encoding = "0.2"
 matches = "0.1"
 
 [features]
 serde-serialization = [ "serde", "serde_macros" ]
-
+heap_size = [ "heapsize" ]

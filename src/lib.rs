@@ -71,6 +71,7 @@ extern crate encoding;
 #[cfg(test)] extern crate tempdir;
 #[cfg(test)] extern crate rustc_serialize;
 #[cfg(feature = "serde-serialization")] extern crate serde;
+#[cfg(feature = "heap_size")] #[macro_use] extern crate heapsize;
 
 pub use tokenizer::{Token, NumericValue, PercentageValue, SourceLocation};
 pub use rules_and_declarations::{parse_important};
@@ -82,6 +83,8 @@ pub use color::{RGBA, Color, parse_color_keyword};
 pub use nth::parse_nth;
 pub use serializer::{ToCss, CssStringWriter, serialize_identifier, serialize_string};
 pub use parser::{Parser, Delimiter, Delimiters, SourcePosition};
+
+#[cfg(feature = "heap_size")] known_heap_size!(0, Color, RGBA);
 
 
 /**
