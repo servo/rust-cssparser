@@ -9,6 +9,7 @@ script:
   - cargo build --verbose
   - cargo test --verbose
   - cargo doc --verbose
+  - ([ $TRAVIS_RUST_VERSION != nightly ] || cargo test --features heap_size)
 
 after_success: |
   [ $TRAVIS_RUST_VERSION = nightly ] &&
