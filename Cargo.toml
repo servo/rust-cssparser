@@ -23,7 +23,7 @@ optional = true
 optional = true
 
 [dependencies.heapsize]
-git = "https://github.com/servo/heapsize.git"
+version = "0.1.1"
 optional = true
 
 [dependencies]
