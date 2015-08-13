@@ -22,10 +22,18 @@ optional = true
 [dependencies.serde_macros]
 optional = true
 
+[dependencies.heapsize]
+version = "0.1.1"
+optional = true
+
+[dependencies.heapsize_plugin]
+version = "0.0.1"
+optional = true
+
 [dependencies]
 encoding = "0.2"
 matches = "0.1"
 
 [features]
 serde-serialization = [ "serde", "serde_macros" ]
-
+heap_size = [ "heapsize", "heapsize_plugin" ]
