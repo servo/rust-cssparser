@@ -211,6 +211,14 @@ pub struct Tokenizer<'a> {
     position: usize,
     /// Cache for `source_location()`
     last_known_line_break: Cell<(usize, usize)>,
+    var_functions: VarFunctions,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum VarFunctions {
+    DontCare,
+    LookingForThem,
+    SeenAtLeastOne,
 }
 
 
@@ -221,7 +229,20 @@ impl<'a> Tokenizer<'a> {
             input: input,
             position: 0,
             last_known_line_break: Cell::new((1, 0)),
+            var_functions: VarFunctions::DontCare,
         }
+    }
+
+    #[inline]
+    pub fn look_for_var_functions(&mut self) {
+        self.var_functions = VarFunctions::LookingForThem;
+    }
+
+    #[inline]
+    pub fn seen_var_functions(&mut self) -> bool {
+        let seen = self.var_functions == VarFunctions::SeenAtLeastOne;
+        self.var_functions = VarFunctions::DontCare;
+        seen
     }
 
     #[inline]
@@ -606,8 +627,15 @@ fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     let value = consume_name(tokenizer);
     if !tokenizer.is_eof() && tokenizer.next_char() == '(' {
         tokenizer.advance(1);
-        if value.eq_ignore_ascii_case("url") { consume_url(tokenizer) }
-        else { Function(value) }
+        if value.eq_ignore_ascii_case("url") {
+            consume_url(tokenizer)
+        } else {
+            if tokenizer.var_functions == VarFunctions::LookingForThem &&
+                value.eq_ignore_ascii_case("var") {
+                tokenizer.var_functions = VarFunctions::SeenAtLeastOne;
+            }
+            Function(value)
+        }
     } else {
         Ident(value)
     }
