@@ -220,6 +220,19 @@ impl<'i, 't> Parser<'i, 't> {
         self.at_start_of = new_position.at_start_of;
     }
 
+    /// Start looking for `var()` functions. (See the `.seen_var_functions()` method.)
+    #[inline]
+    pub fn look_for_var_functions(&mut self) {
+        self.tokenizer.look_for_var_functions()
+    }
+
+    /// Return whether a `var()` function has been seen by the tokenizer since
+    /// either `look_for_var_functions` was called, and stop looking.
+    #[inline]
+    pub fn seen_var_functions(&mut self) -> bool {
+        self.tokenizer.seen_var_functions()
+    }
+
     /// Execute the given closure, passing it the parser.
     /// If the result (returned unchanged) is `Err`,
     /// the internal state of the parser  (including position within the input)
