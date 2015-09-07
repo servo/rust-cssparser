@@ -155,6 +155,7 @@ impl Delimiters {
     fn from_byte(byte: Option<u8>) -> Delimiters {
         match byte {
             Some(b';') => Delimiter::Semicolon,
+            Some(b'!') => Delimiter::Bang,
             Some(b',') => Delimiter::Comma,
             Some(b'{') => Delimiter::CurlyBracketBlock,
             Some(b'}') => ClosingDelimiter::CloseCurlyBracket,
