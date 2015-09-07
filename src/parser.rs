@@ -124,6 +124,8 @@ pub mod Delimiter {
     pub const CurlyBracketBlock: Delimiters = Delimiters { bits: 1 << 1 };
     /// The delimiter set with only the `;` semicolon
     pub const Semicolon: Delimiters = Delimiters { bits: 1 << 2 };
+    /// The delimiter set with only the `!` exclamation point
+    pub const Bang: Delimiters = Delimiters { bits: 1 << 3 };
     /// The delimiter set with only the `,` comma
     pub const Comma: Delimiters = Delimiters { bits: 1 << 4 };
 }
