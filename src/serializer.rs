@@ -290,3 +290,127 @@ impl_tocss_for_number!(i32);
 impl_tocss_for_number!(u32);
 impl_tocss_for_number!(i64);
 impl_tocss_for_number!(u64);
+
+
+/// A category of token. See the `needs_separator_when_before` method.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "heap_size", derive(HeapSizeOf))]
+pub struct TokenSerializationType(TokenSerializationTypeVariants);
+
+impl TokenSerializationType {
+    /// Return a value that represents the absence of a token, e.g. before the start of the input.
+    pub fn nothing() -> TokenSerializationType {
+        TokenSerializationType(TokenSerializationTypeVariants::Nothing)
+    }
+
+    /// If this value is `TokenSerializationType::nothing()`, set it to the given value instead.
+    pub fn set_if_nothing(&mut self, new_value: TokenSerializationType) {
+        if self.0 == TokenSerializationTypeVariants::Nothing {
+            self.0 = new_value.0
+        }
+    }
+
+    /// Return true if, when a token of category `self` is serialized just before
+    /// a token of category `other` with no whitespace in between,
+    /// an empty comment `/**/` needs to be inserted between them
+    /// so that they are not re-parsed as a single token.
+    ///
+    /// See https://drafts.csswg.org/css-syntax/#serialization
+    pub fn needs_separator_when_before(self, other: TokenSerializationType) -> bool {
+        use self::TokenSerializationTypeVariants::*;
+        match self.0 {
+            Ident => matches!(other.0,
+                Ident | Function | UrlOrBadUrl | DelimMinus | Number | Percentage | Dimension |
+                UnicodeRange | CDC | OpenParen),
+            AtKeywordOrHash | Dimension => matches!(other.0,
+                Ident | Function | UrlOrBadUrl | DelimMinus | Number | Percentage | Dimension |
+                UnicodeRange | CDC),
+            DelimHash | DelimMinus | Number => matches!(other.0,
+                Ident | Function | UrlOrBadUrl | DelimMinus | Number | Percentage | Dimension |
+                UnicodeRange),
+            DelimAt => matches!(other.0,
+                Ident | Function | UrlOrBadUrl | DelimMinus | UnicodeRange),
+            UnicodeRange => matches!(other.0,
+                Ident | Function | Number | Percentage | Dimension | DelimQuestion),
+            DelimDotOrPlus => matches!(other.0, Number | Percentage | Dimension),
+            DelimAssorted | DelimAsterisk => matches!(other.0, DelimEquals),
+            DelimBar => matches!(other.0, DelimEquals | DelimBar | DashMatch),
+            DelimSlash => matches!(other.0, DelimAsterisk | SubstringMatch),
+            Nothing | WhiteSpace | Percentage | UrlOrBadUrl | Function | CDC | OpenParen |
+            DashMatch | SubstringMatch | DelimQuestion | DelimEquals | Other => false,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "heap_size", derive(HeapSizeOf))]
+enum TokenSerializationTypeVariants {
+    Nothing,
+    WhiteSpace,
+    AtKeywordOrHash,
+    Number,
+    Dimension,
+    Percentage,
+    UnicodeRange,
+    UrlOrBadUrl,
+    Function,
+    Ident,
+    CDC,
+    DashMatch,
+    SubstringMatch,
+    OpenParen,         // '('
+    DelimHash,         // '#'
+    DelimAt,           // '@'
+    DelimDotOrPlus,    // '.', '+'
+    DelimMinus,        // '-'
+    DelimQuestion,     // '?'
+    DelimAssorted,     // '$', '^', '~'
+    DelimEquals,       // '='
+    DelimBar,          // '|'
+    DelimSlash,        // '/'
+    DelimAsterisk,     // '*'
+    Other,             // anything else
+}
+
+impl<'a> Token<'a> {
+    /// Categorize a token into a type that determines when `/**/` needs to be inserted
+    /// between two tokens when serialized next to each other without whitespace in between.
+    ///
+    /// See the `TokenSerializationType::needs_separator_when_before` method.
+    pub fn serialization_type(&self) -> TokenSerializationType {
+        use self::TokenSerializationTypeVariants::*;
+        TokenSerializationType(match *self {
+            Token::Ident(_) => Ident,
+            Token::AtKeyword(_) | Token::Hash(_) | Token::IDHash(_) => AtKeywordOrHash,
+            Token::Url(_) | Token::BadUrl => UrlOrBadUrl,
+            Token::Delim('#') => DelimHash,
+            Token::Delim('@') => DelimAt,
+            Token::Delim('.') | Token::Delim('+') => DelimDotOrPlus,
+            Token::Delim('-') => DelimMinus,
+            Token::Delim('?') => DelimQuestion,
+            Token::Delim('$') | Token::Delim('^') | Token::Delim('~') => DelimAssorted,
+            Token::Delim('=') => DelimEquals,
+            Token::Delim('|') => DelimBar,
+            Token::Delim('/') => DelimSlash,
+            Token::Delim('*') => DelimAsterisk,
+            Token::Number(_) => Number,
+            Token::Percentage(_) => Percentage,
+            Token::Dimension(..) => Dimension,
+            Token::UnicodeRange(..) => UnicodeRange,
+            Token::WhiteSpace(_) => WhiteSpace,
+            Token::Comment(_) => DelimSlash,
+            Token::DashMatch => DashMatch,
+            Token::SubstringMatch => SubstringMatch,
+            Token::Column => DelimBar,
+            Token::CDC => CDC,
+            Token::Function(_) => Function,
+            Token::ParenthesisBlock => OpenParen,
+            Token::SquareBracketBlock | Token::CurlyBracketBlock |
+            Token::CloseParenthesis | Token::CloseSquareBracket | Token::CloseCurlyBracket |
+            Token::QuotedString(_) | Token::BadString |
+            Token::Delim(_) | Token::Colon | Token::Semicolon | Token::Comma | Token::CDO |
+            Token::IncludeMatch | Token::PrefixMatch | Token::SuffixMatch
+            => Other,
+        })
+    }
+}
