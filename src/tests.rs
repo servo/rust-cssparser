@@ -18,6 +18,7 @@ use super::{Parser, Delimiter, Token, NumericValue, PercentageValue, SourceLocat
             AtRuleType, AtRuleParser, QualifiedRuleParser,
             parse_one_declaration, parse_one_rule, parse_important,
             decode_stylesheet_bytes,
+            TokenSerializationType,
             Color, RGBA, parse_nth, ToCss};
 
 
@@ -323,10 +324,31 @@ fn nth() {
 
 
 #[test]
-fn serializer() {
+fn serializer_not_preserving_comments() {
+    serializer(false)
+}
+
+#[test]
+fn serializer_preserving_comments() {
+    serializer(true)
+}
+
+fn serializer(preserve_comments: bool) {
     run_json_tests(include_str!("css-parsing-tests/component_value_list.json"), |input| {
-        fn write_to(input: &mut Parser, string: &mut String) {
-            while let Ok(token) = input.next_including_whitespace_and_comments() {
+        fn write_to(mut previous_token: TokenSerializationType,
+                    input: &mut Parser,
+                    string: &mut String,
+                    preserve_comments: bool) {
+            while let Ok(token) = if preserve_comments {
+                input.next_including_whitespace_and_comments()
+            } else {
+                input.next_including_whitespace()
+            } {
+                let token_type = token.serialization_type();
+                if !preserve_comments && previous_token.needs_separator_when_before(token_type) {
+                    string.push_str("/**/")
+                }
+                previous_token = token_type;
                 token.to_css(string).unwrap();
                 let closing_token = match token {
                     Token::Function(_) | Token::ParenthesisBlock => Some(Token::CloseParenthesis),
@@ -336,7 +358,7 @@ fn serializer() {
                 };
                 if let Some(closing_token) = closing_token {
                     input.parse_nested_block(|input| {
-                        write_to(input, string);
+                        write_to(previous_token, input, string, preserve_comments);
                         Ok(())
                     }).unwrap();
                     closing_token.to_css(string).unwrap();
@@ -344,7 +366,7 @@ fn serializer() {
             }
         }
         let mut serialized = String::new();
-        write_to(input, &mut serialized);
+        write_to(TokenSerializationType::nothing(), input, &mut serialized, preserve_comments);
         let parser = &mut Parser::new(&serialized);
         Json::Array(component_values_to_json(parser))
     });
