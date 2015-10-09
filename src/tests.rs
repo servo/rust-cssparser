@@ -2,12 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::borrow::Cow::Borrowed;
+use std::borrow::Cow::{self, Borrowed};
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::Command;
-use std::mem;
 use rustc_serialize::json::{self, Json, ToJson};
 use tempdir::TempDir;
 
@@ -74,14 +73,8 @@ fn almost_equals(a: &Json, b: &Json) -> bool {
 fn normalize(json: &mut Json) {
     match *json {
         Json::Array(ref mut list) => {
-            match find_url(list) {
-                Some(Ok(url)) => *list = vec!["url".to_json(), Json::String(url)],
-                Some(Err(())) => *list = vec!["error".to_json(), "bad-url".to_json()],
-                None => {
-                    for item in list.iter_mut() {
-                        normalize(item)
-                    }
-                }
+            for item in list.iter_mut() {
+                normalize(item)
             }
         }
         Json::String(ref mut s) => {
@@ -92,26 +85,6 @@ fn normalize(json: &mut Json) {
         _ => {}
     }
 }
-
-fn find_url(list: &mut [Json]) -> Option<Result<String, ()>> {
-    if list.len() < 2 ||
-        list[0].as_string() != Some("function") ||
-        list[1].as_string() != Some("url") {
-        return None
-    }
-
-    let mut args = list[2..].iter_mut().filter(|a| a.as_string() != Some(" "));
-    if let (Some(&mut Json::Array(ref mut arg)), None) = (args.next(), args.next()) {
-        if arg.len() == 2 && arg[0].as_string() == Some("string") {
-            if let &mut Json::String(ref mut value) = &mut arg[1] {
-                return Some(Ok(mem::replace(value, String::new())))
-            }
-        }
-    }
-
-    Some(Err(()))
-}
-
 
 fn assert_json_eq(results: json::Json, mut expected: json::Json, message: String) {
     normalize(&mut expected);
@@ -279,6 +252,42 @@ fn outer_block_end_consumed() {
     assert!(input.parse_nested_block(|input| input.expect_function_matching("calc")).is_ok());
     println!("{:?}", input.position());
     assert_eq!(input.next(), Err(()));
+}
+
+#[test]
+fn unquoted_url_escaping() {
+    let token = Token::UnquotedUrl("\
+        \x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\
+        \x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f \
+        !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]\
+        ^_`abcdefghijklmnopqrstuvwxyz{|}~\x7fé\
+    ".into());
+    let serialized = token.to_css_string();
+    assert_eq!(serialized, "\
+        url(\
+            \\1 \\2 \\3 \\4 \\5 \\6 \\7 \\8 \\9 \\A \\B \\C \\D \\E \\F \\10 \
+            \\11 \\12 \\13 \\14 \\15 \\16 \\17 \\18 \\19 \\1A \\1B \\1C \\1D \\1E \\1F \\20 \
+            !\\\"#$%&\\'\\(\\)*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]\
+            ^_`abcdefghijklmnopqrstuvwxyz{|}~\\7F é\
+        )\
+    ");
+    assert_eq!(Parser::new(&serialized).next(), Ok(token))
+}
+
+#[test]
+fn test_expect_url() {
+    fn parse(s: &str) -> Result<Cow<str>, ()> {
+        Parser::new(s).expect_url()
+    }
+    assert_eq!(parse("url()").unwrap(), "");
+    assert_eq!(parse("url( ").unwrap(), "");
+    assert_eq!(parse("url( abc").unwrap(), "abc");
+    assert_eq!(parse("url( abc \t)").unwrap(), "abc");
+    assert_eq!(parse("url( 'abc' \t)").unwrap(), "abc");
+    assert_eq!(parse("url(abc more stuff)"), Err(()));
+    // The grammar at https://drafts.csswg.org/css-values/#urls plans for `<url-modifier>*`
+    // at the position of "more stuff", but no such modifier is defined yet.
+    assert_eq!(parse("url('abc' more stuff)"), Err(()));
 }
 
 
@@ -606,7 +615,7 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::Hash(value) => JArray!["hash", value, "unrestricted"],
         Token::IDHash(value) => JArray!["hash", value, "id"],
         Token::QuotedString(value) => JArray!["string", value],
-        Token::Url(value) => JArray!["url", value],
+        Token::UnquotedUrl(value) => JArray!["url", value],
         Token::Delim('\\') => "\\".to_json(),
         Token::Delim(value) => value.to_string().to_json(),
 

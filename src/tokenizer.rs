@@ -48,7 +48,7 @@ pub enum Token<'a> {
     /// A [`<url-token>`](https://drafts.csswg.org/css-syntax/#url-token-diagram) or `url( <string-token> )` function
     ///
     /// The value does not include the `url(` `)` markers or the quotes.
-    Url(Cow<'a, str>),
+    UnquotedUrl(Cow<'a, str>),
 
     /// A `<delim-token>`
     Delim(char),
@@ -628,7 +628,7 @@ fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     if !tokenizer.is_eof() && tokenizer.next_char() == '(' {
         tokenizer.advance(1);
         if value.eq_ignore_ascii_case("url") {
-            consume_url(tokenizer)
+            consume_unquoted_url(tokenizer).unwrap_or(Function(value))
         } else {
             if tokenizer.var_functions == VarFunctions::LookingForThem &&
                 value.eq_ignore_ascii_case("var") {
@@ -791,31 +791,30 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 }
 
 
-fn consume_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
-    while !tokenizer.is_eof() {
-        match tokenizer.next_char() {
-            ' ' | '\t' | '\n' | '\r' | '\x0C' => tokenizer.advance(1),
-            '"' => return consume_quoted_url(tokenizer, false),
-            '\'' => return consume_quoted_url(tokenizer, true),
-            ')' => { tokenizer.advance(1); break },
-            _ => return consume_unquoted_url(tokenizer),
+fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
+    for (offset, c) in tokenizer.input[tokenizer.position..].char_indices() {
+        match c {
+            ' ' | '\t' | '\n' | '\r' | '\x0C' => {},
+            '"' | '\'' => return Err(()),  // Do not advance
+            ')' => {
+                tokenizer.advance(offset + 1);
+                return Ok(UnquotedUrl(Borrowed("")));
+            }
+            _ => {
+                tokenizer.advance(offset);
+                return Ok(consume_unquoted_url(tokenizer))
+            }
         }
     }
-    return Url(Borrowed(""));
-
-    fn consume_quoted_url<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool) -> Token<'a> {
-        match consume_quoted_string(tokenizer, single_quote) {
-            Ok(value) => consume_url_end(tokenizer, value),
-            Err(()) => consume_bad_url(tokenizer),
-        }
-    }
+    tokenizer.position = tokenizer.input.len();
+    return Ok(UnquotedUrl(Borrowed("")));
 
     fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         let start_pos = tokenizer.position();
         let mut string;
         loop {
             if tokenizer.is_eof() {
-                return Url(Borrowed(tokenizer.slice_from(start_pos)))
+                return UnquotedUrl(Borrowed(tokenizer.slice_from(start_pos)))
             }
             match tokenizer.next_char() {
                 ' ' | '\t' | '\n' | '\r' | '\x0C' => {
@@ -826,7 +825,7 @@ fn consume_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
                 ')' => {
                     let value = tokenizer.slice_from(start_pos);
                     tokenizer.advance(1);
-                    return Url(Borrowed(value))
+                    return UnquotedUrl(Borrowed(value))
                 }
                 '\x01'...'\x08' | '\x0B' | '\x0E'...'\x1F' | '\x7F'  // non-printable
                     | '"' | '\'' | '(' => {
@@ -861,7 +860,7 @@ fn consume_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
             };
             string.push(next_char)
         }
-        Url(Owned(string))
+        UnquotedUrl(Owned(string))
     }
 
     fn consume_url_end<'a>(tokenizer: &mut Tokenizer<'a>, string: Cow<'a, str>) -> Token<'a> {
@@ -872,7 +871,7 @@ fn consume_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
                 _ => return consume_bad_url(tokenizer)
             }
         }
-        Url(string)
+        UnquotedUrl(string)
     }
 
     fn consume_bad_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {

@@ -81,9 +81,9 @@ impl<'a> ToCss for Token<'a> {
                 try!(serialize_identifier(&**value, dest));
             }
             Token::QuotedString(ref value) => try!(serialize_string(&**value, dest)),
-            Token::Url(ref value) => {
+            Token::UnquotedUrl(ref value) => {
                 try!(dest.write_str("url("));
-                try!(serialize_string(&**value, dest));
+                try!(serialize_unquoted_url(&**value, dest));
                 try!(dest.write_str(")"));
             },
             Token::Delim(value) => try!(write!(dest, "{}", value)),
@@ -204,6 +204,26 @@ fn serialize_name<W>(value: &str, dest: &mut W) -> fmt::Result where W:fmt::Writ
         try!(dest.write_str(&value[chunk_start..i]));
         if let Some(escaped) = escaped {
             try!(dest.write_str(escaped));
+        } else {
+            try!(write!(dest, "\\{}", b as char));
+        }
+        chunk_start = i + 1;
+    }
+    dest.write_str(&value[chunk_start..])
+}
+
+
+fn serialize_unquoted_url<W>(value: &str, dest: &mut W) -> fmt::Result where W:fmt::Write {
+    let mut chunk_start = 0;
+    for (i, b) in value.bytes().enumerate() {
+        let hex = match b {
+            b'\0' ... b' ' | b'\x7F' => true,
+            b'(' | b')' | b'"' | b'\'' | b'\\' => false,
+            _ => continue
+        };
+        try!(dest.write_str(&value[chunk_start..i]));
+        if hex {
+            try!(write!(dest, "\\{:X} ", b));
         } else {
             try!(write!(dest, "\\{}", b as char));
         }
@@ -382,7 +402,7 @@ impl<'a> Token<'a> {
         TokenSerializationType(match *self {
             Token::Ident(_) => Ident,
             Token::AtKeyword(_) | Token::Hash(_) | Token::IDHash(_) => AtKeywordOrHash,
-            Token::Url(_) | Token::BadUrl => UrlOrBadUrl,
+            Token::UnquotedUrl(_) | Token::BadUrl => UrlOrBadUrl,
             Token::Delim('#') => DelimHash,
             Token::Delim('@') => DelimAt,
             Token::Delim('.') | Token::Delim('+') => DelimDotOrPlus,
