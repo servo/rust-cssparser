@@ -121,7 +121,7 @@ impl<'a> ToCss for Token<'a> {
                     if truncated_start != 0 {
                         try!(write!(dest, "{:X}", truncated_start));
                     }
-                    for _ in (0..question_marks) {
+                    for _ in 0..question_marks {
                         try!(dest.write_str("?"));
                     }
                 } else {
