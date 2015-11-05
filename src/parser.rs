@@ -331,7 +331,7 @@ impl<'i, 't> Parser<'i, 't> {
     /// This can help tell e.g. `color: green;` from `color: green 4px;`
     #[inline]
     pub fn parse_entirely<F, T>(&mut self, parse: F) -> Result<T, ()>
-    where F: FnOnce(&mut Parser) -> Result<T, ()> {
+    where F: FnOnce(&mut Parser<'i, 't>) -> Result<T, ()> {
         let result = parse(self);
         try!(self.expect_exhausted());
         result
@@ -374,7 +374,7 @@ impl<'i, 't> Parser<'i, 't> {
     /// The result is overridden to `Err(())` if the closure leaves some input before that point.
     #[inline]
     pub fn parse_nested_block<F, T>(&mut self, parse: F) -> Result <T, ()>
-    where F: FnOnce(&mut Parser) -> Result<T, ()> {
+    where F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ()> {
         let block_type = self.at_start_of.take().expect("\
             A nested parser can only be created when a Function, \
             ParenthesisBlock, SquareBracketBlock, or CurlyBracketBlock \
@@ -412,7 +412,7 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn parse_until_before<F, T>(&mut self, delimiters: Delimiters, parse: F)
                                     -> Result <T, ()>
-    where F: FnOnce(&mut Parser) -> Result<T, ()> {
+    where F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ()> {
         let delimiters = self.stop_before | delimiters;
         let result;
         // Introduce a new scope to limit duration of nested_parser’s borrow
@@ -451,7 +451,7 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn parse_until_after<F, T>(&mut self, delimiters: Delimiters, parse: F)
                                    -> Result <T, ()>
-    where F: FnOnce(&mut Parser) -> Result<T, ()> {
+    where F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ()> {
         let result = self.parse_until_before(delimiters, parse);
         let next_byte = self.tokenizer.next_byte();
         if next_byte.is_some() && !self.stop_before.contains(Delimiters::from_byte(next_byte)) {
@@ -481,7 +481,7 @@ impl<'i, 't> Parser<'i, 't> {
 
     /// Parse a <ident-token> whose unescaped value is an ASCII-insensitive match for the given value.
     #[inline]
-    pub fn expect_ident_matching<'a>(&mut self, expected_value: &str) -> Result<(), ()> {
+    pub fn expect_ident_matching(&mut self, expected_value: &str) -> Result<(), ()> {
         match try!(self.next()) {
             Token::Ident(ref value) if value.eq_ignore_ascii_case(expected_value) => Ok(()),
             _ => Err(())
@@ -511,7 +511,10 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn expect_url(&mut self) -> Result<Cow<'i, str>, ()> {
         match try!(self.next()) {
-            Token::Url(value) => Ok(value),
+            Token::UnquotedUrl(value) => Ok(value),
+            Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {
+                self.parse_nested_block(|input| input.expect_string())
+            },
             _ => Err(())
         }
     }
@@ -520,8 +523,11 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn expect_url_or_string(&mut self) -> Result<Cow<'i, str>, ()> {
         match try!(self.next()) {
-            Token::Url(value) => Ok(value),
+            Token::UnquotedUrl(value) => Ok(value),
             Token::QuotedString(value) => Ok(value),
+            Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {
+                self.parse_nested_block(|input| input.expect_string())
+            },
             _ => Err(())
         }
     }
