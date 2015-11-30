@@ -10,6 +10,7 @@ script:
   - cargo test --verbose
   - cargo doc --verbose
   - ([ $TRAVIS_RUST_VERSION != nightly ] || cargo test --features heap_size)
+  - ([ $TRAVIS_RUST_VERSION != nightly ] || cargo test --features serde-serialization)
 
 after_success: |
   [ $TRAVIS_RUST_VERSION = nightly ] &&
