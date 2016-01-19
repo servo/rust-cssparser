@@ -18,7 +18,7 @@ pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
             let a = try!(value.int_value.ok_or(())) as i32;
             match_ignore_ascii_case! { unit,
                 "n" => parse_b(input, a),
-                "n-" => parse_signless_b(input, a, -1)
+                "n-" => parse_signless_b(input, a, -1),
                 _ => Ok((a, try!(parse_n_dash_digits(&*unit))))
             }
         }
@@ -29,7 +29,7 @@ pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
                 "n" => parse_b(input, 1),
                 "-n" => parse_b(input, -1),
                 "n-" => parse_signless_b(input, 1, -1),
-                "-n-" => parse_signless_b(input, -1, -1)
+                "-n-" => parse_signless_b(input, -1, -1),
                 _ => if value.starts_with("-") {
                     Ok((-1, try!(parse_n_dash_digits(&value[1..]))))
                 } else {
@@ -41,7 +41,7 @@ pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
             Token::Ident(value) => {
                 match_ignore_ascii_case! { value,
                     "n" => parse_b(input, 1),
-                    "n-" => parse_signless_b(input, 1, -1)
+                    "n-" => parse_signless_b(input, 1, -1),
                     _ => Ok((1, try!(parse_n_dash_digits(&*value))))
                 }
             }

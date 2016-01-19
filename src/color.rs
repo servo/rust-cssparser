@@ -258,7 +258,7 @@ pub fn parse_color_keyword(ident: &str) -> Result<Color, ()> {
         "yellowgreen" => rgb(154., 205., 50.),
 
         "transparent" => Ok(Color::RGBA(RGBA { red: 0., green: 0., blue: 0., alpha: 0. })),
-        "currentcolor" => Ok(Color::CurrentColor)
+        "currentcolor" => Ok(Color::CurrentColor),
         _ => Err(())
     }
 }
@@ -312,7 +312,7 @@ fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()>
         "rgba" => (true, true),
         "rgb" => (true, false),
         "hsl" => (false, false),
-        "hsla" => (false, true)
+        "hsla" => (false, true),
         _ => return Err(())
     };
 
