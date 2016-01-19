@@ -69,6 +69,8 @@ fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
 
 */
 
+#![recursion_limit="200"]  // For color::parse_color_keyword
+
 extern crate encoding;
 #[macro_use] extern crate matches;
 #[cfg(test)] extern crate tempdir;
@@ -99,7 +101,7 @@ Usage example:
 match_ignore_ascii_case! { string,
     "foo" => Some(Foo),
     "bar" => Some(Bar),
-    "baz" => Some(Baz)
+    "baz" => Some(Baz),
     _ => None
 }
 ```
@@ -107,13 +109,21 @@ match_ignore_ascii_case! { string,
 The macro also takes a slice of the value,
 so that a `String` or `CowString` could be passed directly instead of a `&str`.
 
-Note that because of `macro_rules` ambiguity resolutions quirks,
-each arm except the fallback and the one before it must end with a comma.
-
 */
 #[macro_export]
 macro_rules! match_ignore_ascii_case {
-    ( $value: expr, $( $string: expr => $result: expr ),+ _ => $fallback: expr ) => {
+    // parse the last case plus the fallback
+    (@inner $value:expr, ($string:expr => $result:expr, _ => $fallback:expr) -> ($($parsed:tt)*) ) => {
+        match_ignore_ascii_case!(@inner $value, () -> ($($parsed)* ($string => $result)) $fallback)
+    };
+
+    // parse a case (not the last one)
+    (@inner $value:expr, ($string:expr => $result:expr, $($rest:tt)*) -> ($($parsed:tt)*) ) => {
+        match_ignore_ascii_case!(@inner $value, ($($rest)*) -> ($($parsed)* ($string => $result)))
+    };
+
+    // finished parsing
+    (@inner $value:expr, () -> ($(($string:expr => $result:expr))*) $fallback:expr ) => {
         {
             use std::ascii::AsciiExt;
             match &$value[..] {
@@ -124,8 +134,12 @@ macro_rules! match_ignore_ascii_case {
             }
         }
     };
-}
 
+    // entry point, start parsing
+    ( $value:expr, $($rest:tt)* ) => {
+        match_ignore_ascii_case!(@inner $value, ($($rest)*) -> ())
+    };
+}
 
 mod rules_and_declarations;
 mod tokenizer;
