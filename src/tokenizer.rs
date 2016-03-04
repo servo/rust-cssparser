@@ -212,10 +212,18 @@ pub struct Tokenizer<'a> {
     /// Cache for `source_location()`
     last_known_line_break: Cell<(usize, usize)>,
     var_functions: VarFunctions,
+    viewport_percentages: ViewportPercentages,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum VarFunctions {
+    DontCare,
+    LookingForThem,
+    SeenAtLeastOne,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum ViewportPercentages {
     DontCare,
     LookingForThem,
     SeenAtLeastOne,
@@ -230,6 +238,7 @@ impl<'a> Tokenizer<'a> {
             position: 0,
             last_known_line_break: Cell::new((1, 0)),
             var_functions: VarFunctions::DontCare,
+            viewport_percentages: ViewportPercentages::DontCare,
         }
     }
 
@@ -242,6 +251,18 @@ impl<'a> Tokenizer<'a> {
     pub fn seen_var_functions(&mut self) -> bool {
         let seen = self.var_functions == VarFunctions::SeenAtLeastOne;
         self.var_functions = VarFunctions::DontCare;
+        seen
+    }
+
+    #[inline]
+    pub fn look_for_viewport_percentages(&mut self) {
+        self.viewport_percentages = ViewportPercentages::LookingForThem;
+    }
+
+    #[inline]
+    pub fn seen_viewport_percentages(&mut self) -> bool {
+        let seen = self.viewport_percentages == ViewportPercentages::SeenAtLeastOne;
+        self.viewport_percentages = ViewportPercentages::DontCare;
         seen
     }
 
@@ -784,7 +805,16 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         has_sign: has_sign,
     };
     if is_ident_start(tokenizer) {
-        Dimension(value, consume_name(tokenizer))
+        let name = consume_name(tokenizer);
+        if tokenizer.viewport_percentages == ViewportPercentages::LookingForThem {
+            match &*name {
+                "vh" | "vw" | "vmin" | "vmax" => {
+                    tokenizer.viewport_percentages = ViewportPercentages::SeenAtLeastOne;
+                }
+                _ => {}
+            }
+        }
+        Dimension(value, name)
     } else {
         Number(value)
     }
