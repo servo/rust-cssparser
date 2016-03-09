@@ -210,7 +210,7 @@ pub struct Tokenizer<'a> {
     /// Counted in bytes, not code points. From 0.
     position: usize,
     /// Cache for `source_location()`
-    last_known_line_break: Cell<(usize, usize)>,
+    last_known_source_location: Cell<(SourcePosition, SourceLocation)>,
     var_functions: VarFunctions,
 }
 
@@ -228,7 +228,8 @@ impl<'a> Tokenizer<'a> {
         Tokenizer {
             input: input,
             position: 0,
-            last_known_line_break: Cell::new((1, 0)),
+            last_known_source_location: Cell::new((SourcePosition(0),
+                                                   SourceLocation { line: 1, column: 1 })),
             var_functions: VarFunctions::DontCare,
         }
     }
@@ -278,37 +279,33 @@ impl<'a> Tokenizer<'a> {
 
     pub fn source_location(&self, position: SourcePosition) -> SourceLocation {
         let target = position.0;
-        let mut line_number;
+        let mut location;
         let mut position;
-        let (last_known_line_number, position_after_last_known_newline) =
-            self.last_known_line_break.get();
-        if target >= position_after_last_known_newline {
-            position = position_after_last_known_newline;
-            line_number = last_known_line_number;
+        let (SourcePosition(last_known_position), last_known_location) =
+            self.last_known_source_location.get();
+        if target >= last_known_position {
+            position = last_known_position;
+            location = last_known_location;
         } else {
+            // For now we’re only traversing the source *forwards* to count newlines.
+            // So if the requested position is before the last known one,
+            // start over from the beginning.
             position = 0;
-            line_number = 1;
+            location = SourceLocation { line: 1, column: 1 };
         }
         let mut source = &self.input[position..target];
-        while let Some(newline_position) = source.find(&['\n', '\r', '\x0C'][..]) {
+        while let Some(newline_position) = source.find(|c| matches!(c, '\n' | '\r' | '\x0C')) {
             let offset = newline_position +
-            if source[newline_position..].starts_with("\r\n") {
-                2
-            } else {
-                1
-            };
+                if source[newline_position..].starts_with("\r\n") { 2 } else { 1 };
             source = &source[offset..];
             position += offset;
-            line_number += 1;
+            location.line += 1;
+            location.column = 1;
         }
         debug_assert!(position <= target);
-        self.last_known_line_break.set((line_number, position));
-        SourceLocation {
-            line: line_number,
-            // `target == position` when `target` is at the beginning of the line,
-            // so add 1 so that the column numbers start at 1.
-            column: target - position + 1,
-        }
+        location.column += target - position;
+        self.last_known_source_location.set((SourcePosition(target), location));
+        location
     }
 
     #[inline]
@@ -371,7 +368,7 @@ pub struct SourceLocation {
     /// The line number, starting at 1 for the first line.
     pub line: usize,
 
-    /// The column number within a line, starting at 1 for the character of the line.
+    /// The column number within a line, starting at 1 for first the character of the line.
     pub column: usize,
 }
 
