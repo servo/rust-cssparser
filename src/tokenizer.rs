@@ -211,11 +211,12 @@ pub struct Tokenizer<'a> {
     position: usize,
     /// Cache for `source_location()`
     last_known_line_break: Cell<(usize, usize)>,
-    var_functions: VarFunctions,
+    var_functions: SeenStatus,
+    viewport_percentages: SeenStatus,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-enum VarFunctions {
+enum SeenStatus {
     DontCare,
     LookingForThem,
     SeenAtLeastOne,
@@ -229,19 +230,32 @@ impl<'a> Tokenizer<'a> {
             input: input,
             position: 0,
             last_known_line_break: Cell::new((1, 0)),
-            var_functions: VarFunctions::DontCare,
+            var_functions: SeenStatus::DontCare,
+            viewport_percentages: SeenStatus::DontCare,
         }
     }
 
     #[inline]
     pub fn look_for_var_functions(&mut self) {
-        self.var_functions = VarFunctions::LookingForThem;
+        self.var_functions = SeenStatus::LookingForThem;
     }
 
     #[inline]
     pub fn seen_var_functions(&mut self) -> bool {
-        let seen = self.var_functions == VarFunctions::SeenAtLeastOne;
-        self.var_functions = VarFunctions::DontCare;
+        let seen = self.var_functions == SeenStatus::SeenAtLeastOne;
+        self.var_functions = SeenStatus::DontCare;
+        seen
+    }
+
+    #[inline]
+    pub fn look_for_viewport_percentages(&mut self) {
+        self.viewport_percentages = SeenStatus::LookingForThem;
+    }
+
+    #[inline]
+    pub fn seen_viewport_percentages(&mut self) -> bool {
+        let seen = self.viewport_percentages == SeenStatus::SeenAtLeastOne;
+        self.viewport_percentages = SeenStatus::DontCare;
         seen
     }
 
@@ -630,9 +644,9 @@ fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         if value.eq_ignore_ascii_case("url") {
             consume_unquoted_url(tokenizer).unwrap_or(Function(value))
         } else {
-            if tokenizer.var_functions == VarFunctions::LookingForThem &&
+            if tokenizer.var_functions == SeenStatus::LookingForThem &&
                 value.eq_ignore_ascii_case("var") {
-                tokenizer.var_functions = VarFunctions::SeenAtLeastOne;
+                tokenizer.var_functions = SeenStatus::SeenAtLeastOne;
             }
             Function(value)
         }
@@ -784,7 +798,16 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         has_sign: has_sign,
     };
     if is_ident_start(tokenizer) {
-        Dimension(value, consume_name(tokenizer))
+        let name = consume_name(tokenizer);
+        if tokenizer.viewport_percentages == SeenStatus::LookingForThem {
+            if name.eq_ignore_ascii_case("vh") ||
+               name.eq_ignore_ascii_case("vw") ||
+               name.eq_ignore_ascii_case("vmin") ||
+               name.eq_ignore_ascii_case("vmax") {
+                   tokenizer.viewport_percentages = SeenStatus::SeenAtLeastOne;
+           }
+        }
+        Dimension(value, name)
     } else {
         Number(value)
     }
