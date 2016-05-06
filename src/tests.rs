@@ -493,6 +493,78 @@ fn line_delimited() {
     assert_eq!(input.next(), Err(()));
 }
 
+#[test]
+fn identifier_serialization() {
+    // Null bytes
+    assert_eq!(Token::Ident("\0".into()).to_css_string(), "\u{FFFD}");
+    assert_eq!(Token::Ident("a\0".into()).to_css_string(), "a\u{FFFD}");
+    assert_eq!(Token::Ident("\0b".into()).to_css_string(), "\u{FFFD}b");
+    assert_eq!(Token::Ident("a\0b".into()).to_css_string(), "a\u{FFFD}b");
+
+    // Replacement character
+    assert_eq!(Token::Ident("\u{FFFD}".into()).to_css_string(), "\u{FFFD}");
+    assert_eq!(Token::Ident("a\u{FFFD}".into()).to_css_string(), "a\u{FFFD}");
+    assert_eq!(Token::Ident("\u{FFFD}b".into()).to_css_string(), "\u{FFFD}b");
+    assert_eq!(Token::Ident("a\u{FFFD}b".into()).to_css_string(), "a\u{FFFD}b");
+
+    // Number prefix
+    assert_eq!(Token::Ident("0a".into()).to_css_string(), "\\30 a");
+    assert_eq!(Token::Ident("1a".into()).to_css_string(), "\\31 a");
+    assert_eq!(Token::Ident("2a".into()).to_css_string(), "\\32 a");
+    assert_eq!(Token::Ident("3a".into()).to_css_string(), "\\33 a");
+    assert_eq!(Token::Ident("4a".into()).to_css_string(), "\\34 a");
+    assert_eq!(Token::Ident("5a".into()).to_css_string(), "\\35 a");
+    assert_eq!(Token::Ident("6a".into()).to_css_string(), "\\36 a");
+    assert_eq!(Token::Ident("7a".into()).to_css_string(), "\\37 a");
+    assert_eq!(Token::Ident("8a".into()).to_css_string(), "\\38 a");
+    assert_eq!(Token::Ident("9a".into()).to_css_string(), "\\39 a");
+
+    // Letter number prefix
+    assert_eq!(Token::Ident("a0b".into()).to_css_string(), "a0b");
+    assert_eq!(Token::Ident("a1b".into()).to_css_string(), "a1b");
+    assert_eq!(Token::Ident("a2b".into()).to_css_string(), "a2b");
+    assert_eq!(Token::Ident("a3b".into()).to_css_string(), "a3b");
+    assert_eq!(Token::Ident("a4b".into()).to_css_string(), "a4b");
+    assert_eq!(Token::Ident("a5b".into()).to_css_string(), "a5b");
+    assert_eq!(Token::Ident("a6b".into()).to_css_string(), "a6b");
+    assert_eq!(Token::Ident("a7b".into()).to_css_string(), "a7b");
+    assert_eq!(Token::Ident("a8b".into()).to_css_string(), "a8b");
+    assert_eq!(Token::Ident("a9b".into()).to_css_string(), "a9b");
+
+    // Dash number prefix
+    assert_eq!(Token::Ident("-0a".into()).to_css_string(), "-\\30 a");
+    assert_eq!(Token::Ident("-1a".into()).to_css_string(), "-\\31 a");
+    assert_eq!(Token::Ident("-2a".into()).to_css_string(), "-\\32 a");
+    assert_eq!(Token::Ident("-3a".into()).to_css_string(), "-\\33 a");
+    assert_eq!(Token::Ident("-4a".into()).to_css_string(), "-\\34 a");
+    assert_eq!(Token::Ident("-5a".into()).to_css_string(), "-\\35 a");
+    assert_eq!(Token::Ident("-6a".into()).to_css_string(), "-\\36 a");
+    assert_eq!(Token::Ident("-7a".into()).to_css_string(), "-\\37 a");
+    assert_eq!(Token::Ident("-8a".into()).to_css_string(), "-\\38 a");
+    assert_eq!(Token::Ident("-9a".into()).to_css_string(), "-\\39 a");
+
+    // Double dash prefix
+    assert_eq!(Token::Ident("--a".into()).to_css_string(), "--a");
+
+    // Various tests
+    assert_eq!(Token::Ident("\x01\x02\x1E\x1F".into()).to_css_string(), "\\1 \\2 \\1e \\1f ");
+    assert_eq!(Token::Ident("\u{0080}\x2D\x5F\u{00A9}".into()).to_css_string(), "\u{0080}\x2D\x5F\u{00A9}");
+    assert_eq!(Token::Ident("\x7F\u{0080}\u{0081}\u{0082}\u{0083}\u{0084}\u{0085}\u{0086}\u{0087}\u{0088}\u{0089}\
+        \u{008A}\u{008B}\u{008C}\u{008D}\u{008E}\u{008F}\u{0090}\u{0091}\u{0092}\u{0093}\u{0094}\u{0095}\u{0096}\
+        \u{0097}\u{0098}\u{0099}\u{009A}\u{009B}\u{009C}\u{009D}\u{009E}\u{009F}".into()).to_css_string(),
+        "\\7f \u{0080}\u{0081}\u{0082}\u{0083}\u{0084}\u{0085}\u{0086}\u{0087}\u{0088}\u{0089}\u{008A}\u{008B}\u{008C}\
+        \u{008D}\u{008E}\u{008F}\u{0090}\u{0091}\u{0092}\u{0093}\u{0094}\u{0095}\u{0096}\u{0097}\u{0098}\u{0099}\
+        \u{009A}\u{009B}\u{009C}\u{009D}\u{009E}\u{009F}");
+    assert_eq!(Token::Ident("\u{00A0}\u{00A1}\u{00A2}".into()).to_css_string(), "\u{00A0}\u{00A1}\u{00A2}");
+    assert_eq!(Token::Ident("a0123456789b".into()).to_css_string(), "a0123456789b");
+    assert_eq!(Token::Ident("abcdefghijklmnopqrstuvwxyz".into()).to_css_string(), "abcdefghijklmnopqrstuvwxyz");
+    assert_eq!(Token::Ident("ABCDEFGHIJKLMNOPQRSTUVWXYZ".into()).to_css_string(), "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    assert_eq!(Token::Ident("\x20\x21\x78\x79".into()).to_css_string(), "\\ \\!xy");
+
+    // astral symbol (U+1D306 TETRAGRAM FOR CENTRE)
+    assert_eq!(Token::Ident("\u{1D306}".into()).to_css_string(), "\u{1D306}");
+}
+
 impl ToJson for Color {
     fn to_json(&self) -> json::Json {
         match *self {
