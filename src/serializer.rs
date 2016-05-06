@@ -196,14 +196,14 @@ fn serialize_name<W>(value: &str, dest: &mut W) -> fmt::Result where W:fmt::Writ
         let escaped = match b {
             b'0'...b'9' | b'A'...b'Z' | b'a'...b'z' | b'_' | b'-' => continue,
             _ if !b.is_ascii() => continue,
-            b'\n' => Some("\\A "),
-            b'\r' => Some("\\D "),
-            b'\x0C' => Some("\\C "),
+            b'\0' => Some("\u{FFFD}"),
             _ => None,
         };
         try!(dest.write_str(&value[chunk_start..i]));
         if let Some(escaped) = escaped {
             try!(dest.write_str(escaped));
+        } else if (b >= b'\x01' && b <= b'\x1F') || b == b'\x7F' {
+            try!(write!(dest, "\\{:x} ", b));
         } else {
             try!(write!(dest, "\\{}", b as char));
         }
