@@ -6,9 +6,6 @@
 #![crate_type = "rlib"]
 
 #![deny(missing_docs)]
-#![cfg_attr(feature = "serde-serialization", feature(custom_derive))]
-#![cfg_attr(feature = "serde-serialization", feature(plugin))]
-#![cfg_attr(feature = "serde-serialization", plugin(serde_macros))]
 
 /*!
 
@@ -72,7 +69,7 @@ extern crate encoding;
 #[macro_use] extern crate matches;
 #[cfg(test)] extern crate tempdir;
 #[cfg(test)] extern crate rustc_serialize;
-#[cfg(feature = "serde-serialization")] extern crate serde;
+#[cfg(feature = "serde")] extern crate serde;
 #[cfg(feature = "heapsize")] #[macro_use] extern crate heapsize;
 
 pub use tokenizer::{Token, NumericValue, PercentageValue, SourceLocation};

@@ -6,10 +6,11 @@ use std::fmt;
 
 use super::{Token, Parser, ToCss};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// A color with red, green, blue, and alpha components.
 #[derive(Clone, Copy, PartialEq, Debug)]
-#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct RGBA {
     /// The red channel. Nominally in 0.0 ... 1.0.
     pub red: f32,
@@ -19,6 +20,31 @@ pub struct RGBA {
     pub blue: f32,
     /// The alpha (opacity) channel. Clamped to 0.0 ... 1.0.
     pub alpha: f32,
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for RGBA {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        (self.red, self.green, self.blue, self.alpha).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Deserialize for RGBA {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let (red, green, blue, alpha) =
+            try!(Deserialize::deserialize(deserializer));
+        Ok(RGBA {
+            red: red,
+            green: green,
+            blue: blue,
+            alpha: alpha,
+        })
+    }
 }
 
 #[cfg(feature = "heapsize")]
