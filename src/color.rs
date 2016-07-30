@@ -10,7 +10,6 @@ use super::{Token, Parser, ToCss};
 /// A color with red, green, blue, and alpha components.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
-#[cfg_attr(feature = "heap_size", derive(HeapSizeOf))]
 pub struct RGBA {
     /// The red channel. Nominally in 0.0 ... 1.0.
     pub red: f32,
@@ -21,6 +20,9 @@ pub struct RGBA {
     /// The alpha (opacity) channel. Clamped to 0.0 ... 1.0.
     pub alpha: f32,
 }
+
+#[cfg(feature = "heapsize")]
+known_heap_size!(0, RGBA);
 
 impl ToCss for RGBA {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
@@ -41,13 +43,15 @@ impl ToCss for RGBA {
 
 /// A <color> value.
 #[derive(Clone, Copy, PartialEq, Debug)]
-#[cfg_attr(feature = "heap_size", derive(HeapSizeOf))]
 pub enum Color {
     /// The 'currentColor' keyword
     CurrentColor,
     /// Everything else gets converted to RGBA during parsing
     RGBA(RGBA),
 }
+
+#[cfg(feature = "heapsize")]
+known_heap_size!(0, Color);
 
 impl ToCss for Color {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {

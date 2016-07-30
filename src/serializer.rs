@@ -314,8 +314,10 @@ impl_tocss_for_number!(u64);
 
 /// A category of token. See the `needs_separator_when_before` method.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-#[cfg_attr(feature = "heap_size", derive(HeapSizeOf))]
 pub struct TokenSerializationType(TokenSerializationTypeVariants);
+
+#[cfg(feature = "heapsize")]
+known_heap_size!(0, TokenSerializationType);
 
 impl TokenSerializationType {
     /// Return a value that represents the absence of a token, e.g. before the start of the input.
@@ -363,7 +365,6 @@ impl TokenSerializationType {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-#[cfg_attr(feature = "heap_size", derive(HeapSizeOf))]
 enum TokenSerializationTypeVariants {
     Nothing,
     WhiteSpace,
