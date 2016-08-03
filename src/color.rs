@@ -2,16 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::ascii::AsciiExt;
 use std::fmt;
 
 use super::{Token, Parser, ToCss};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// A color with red, green, blue, and alpha components.
 #[derive(Clone, Copy, PartialEq, Debug)]
-#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
-#[cfg_attr(feature = "heap_size", derive(HeapSizeOf))]
 pub struct RGBA {
     /// The red channel. Nominally in 0.0 ... 1.0.
     pub red: f32,
@@ -22,6 +21,34 @@ pub struct RGBA {
     /// The alpha (opacity) channel. Clamped to 0.0 ... 1.0.
     pub alpha: f32,
 }
+
+#[cfg(feature = "serde")]
+impl Serialize for RGBA {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        (self.red, self.green, self.blue, self.alpha).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Deserialize for RGBA {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let (red, green, blue, alpha) =
+            try!(Deserialize::deserialize(deserializer));
+        Ok(RGBA {
+            red: red,
+            green: green,
+            blue: blue,
+            alpha: alpha,
+        })
+    }
+}
+
+#[cfg(feature = "heapsize")]
+known_heap_size!(0, RGBA);
 
 impl ToCss for RGBA {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
@@ -42,13 +69,15 @@ impl ToCss for RGBA {
 
 /// A <color> value.
 #[derive(Clone, Copy, PartialEq, Debug)]
-#[cfg_attr(feature = "heap_size", derive(HeapSizeOf))]
 pub enum Color {
     /// The 'currentColor' keyword
     CurrentColor,
     /// Everything else gets converted to RGBA during parsing
     RGBA(RGBA),
 }
+
+#[cfg(feature = "heapsize")]
+known_heap_size!(0, Color);
 
 impl ToCss for Color {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
