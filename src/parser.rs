@@ -471,6 +471,9 @@ impl<'i, 't> Parser<'i, 't> {
         if next_byte.is_some() && !self.stop_before.contains(Delimiters::from_byte(next_byte)) {
             debug_assert!(delimiters.contains(Delimiters::from_byte(next_byte)));
             self.tokenizer.advance(1);
+            if next_byte == Some(b'{') {
+                consume_until_end_of_block(BlockType::CurlyBracket, &mut *self.tokenizer);
+            }
         }
         result
     }

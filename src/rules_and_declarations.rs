@@ -4,6 +4,7 @@
 
 // https://drafts.csswg.org/css-syntax/#parsing
 
+use std::ascii::AsciiExt;
 use std::ops::Range;
 use std::borrow::Cow;
 use super::{Token, Parser, Delimiter, SourcePosition};
@@ -264,6 +265,7 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
     pub parser: P,
 
     is_stylesheet: bool,
+    any_rule_so_far: bool,
 }
 
 
@@ -285,6 +287,7 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
             input: input,
             parser: parser,
             is_stylesheet: true,
+            any_rule_so_far: false,
         }
     }
 
@@ -300,6 +303,7 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
             input: input,
             parser: parser,
             is_stylesheet: false,
+            any_rule_so_far: false,
         }
     }
 }
@@ -318,9 +322,17 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
                 Ok(Token::WhiteSpace(_)) | Ok(Token::Comment(_)) => {}
                 Ok(Token::CDO) | Ok(Token::CDC) if self.is_stylesheet => {}
                 Ok(Token::AtKeyword(name)) => {
-                    return Some(parse_at_rule(start_position, name, self.input, &mut self.parser))
+                    let first_stylesheet_rule = self.is_stylesheet && !self.any_rule_so_far;
+                    self.any_rule_so_far = true;
+                    if first_stylesheet_rule && name.eq_ignore_ascii_case("charset") {
+                        let delimiters = Delimiter::Semicolon | Delimiter::CurlyBracketBlock;
+                        let _ = self.input.parse_until_after(delimiters, |_input| Ok(()));
+                    } else {
+                        return Some(parse_at_rule(start_position, name, self.input, &mut self.parser))
+                    }
                 }
                 Ok(_) => {
+                    self.any_rule_so_far = true;
                     self.input.reset(start_position);
                     return Some(parse_qualified_rule(self.input, &mut self.parser)
                                 .map_err(|()| start_position..self.input.position()))
