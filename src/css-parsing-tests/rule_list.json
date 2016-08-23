@@ -6,6 +6,11 @@
 
 "@foo", [["at-rule", "foo", [], null]],
 
+"@charset; @foo", [
+    ["at-rule", "charset", [], null],
+    ["at-rule", "foo", [], null]
+],
+
 "@foo bar; \t/* comment */", [["at-rule", "foo", [" ", ["ident", "bar"]], null]],
 
 " /**/ @foo bar{[(4", [["at-rule", "foo",
