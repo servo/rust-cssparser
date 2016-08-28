@@ -186,8 +186,7 @@ pub trait QualifiedRuleParser {
 
 
 /// Provides an iterator for declaration list parsing.
-pub struct DeclarationListParser<'i: 't, 't: 'a, 'a, I, P>
-where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
+pub struct DeclarationListParser<'i: 't, 't: 'a, 'a, P> {
     /// The input given to `DeclarationListParser::new`
     pub input: &'a mut Parser<'i, 't>,
 
@@ -196,7 +195,7 @@ where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
 }
 
 
-impl<'i, 't, 'a, I, P> DeclarationListParser<'i, 't, 'a, I, P>
+impl<'i, 't, 'a, I, P> DeclarationListParser<'i, 't, 'a, P>
 where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
     /// Create a new `DeclarationListParser` for the given `input` and `parser`.
     ///
@@ -212,8 +211,7 @@ where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
     /// The return type for finished declarations and at-rules also needs to be the same,
     /// since `<DeclarationListParser as Iterator>::next` can return either.
     /// It could be a custom enum.
-    pub fn new(input: &'a mut Parser<'i, 't>, parser: P)
-               -> DeclarationListParser<'i, 't, 'a, I, P> {
+    pub fn new(input: &'a mut Parser<'i, 't>, parser: P) -> Self {
         DeclarationListParser {
             input: input,
             parser: parser,
@@ -223,7 +221,7 @@ where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
 
 /// `DeclarationListParser` is an iterator that yields `Ok(_)` for a valid declaration or at-rule
 /// or `Err(())` for an invalid one.
-impl<'i, 't, 'a, I, P> Iterator for DeclarationListParser<'i, 't, 'a, I, P>
+impl<'i, 't, 'a, I, P> Iterator for DeclarationListParser<'i, 't, 'a, P>
 where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
     type Item = Result<I, Range<SourcePosition>>;
 
@@ -256,8 +254,7 @@ where P: DeclarationParser<Declaration = I> + AtRuleParser<AtRule = I> {
 
 
 /// Provides an iterator for rule list parsing.
-pub struct RuleListParser<'i: 't, 't: 'a, 'a, R, P>
-where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
+pub struct RuleListParser<'i: 't, 't: 'a, 'a, P> {
     /// The input given to `RuleListParser::new`
     pub input: &'a mut Parser<'i, 't>,
 
@@ -269,7 +266,7 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
 }
 
 
-impl<'i: 't, 't: 'a, 'a, R, P> RuleListParser<'i, 't, 'a, R, P>
+impl<'i: 't, 't: 'a, 'a, R, P> RuleListParser<'i, 't, 'a, P>
 where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
     /// Create a new `RuleListParser` for the given `input` at the top-level of a stylesheet
     /// and the given `parser`.
@@ -281,8 +278,7 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
     /// The return type for finished qualified rules and at-rules also needs to be the same,
     /// since `<RuleListParser as Iterator>::next` can return either.
     /// It could be a custom enum.
-    pub fn new_for_stylesheet(input: &'a mut Parser<'i, 't>, parser: P)
-                              -> RuleListParser<'i, 't, 'a, R, P> {
+    pub fn new_for_stylesheet(input: &'a mut Parser<'i, 't>, parser: P) -> Self {
         RuleListParser {
             input: input,
             parser: parser,
@@ -297,8 +293,7 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
     /// This differs in that `<!--` and `-->` tokens
     /// should only be ignored at the stylesheet top-level.
     /// (This is to deal with legacy work arounds for `<style>` HTML element parsing.)
-    pub fn new_for_nested_rule(input: &'a mut Parser<'i, 't>, parser: P)
-                               -> RuleListParser<'i, 't, 'a, R, P> {
+    pub fn new_for_nested_rule(input: &'a mut Parser<'i, 't>, parser: P) -> Self {
         RuleListParser {
             input: input,
             parser: parser,
@@ -311,7 +306,7 @@ where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
 
 
 /// `RuleListParser` is an iterator that yields `Ok(_)` for a rule or `Err(())` for an invalid one.
-impl<'i, 't, 'a, R, P> Iterator for RuleListParser<'i, 't, 'a, R, P>
+impl<'i, 't, 'a, R, P> Iterator for RuleListParser<'i, 't, 'a, P>
 where P: QualifiedRuleParser<QualifiedRule = R> + AtRuleParser<AtRule = R> {
     type Item = Result<R, Range<SourcePosition>>;
 
