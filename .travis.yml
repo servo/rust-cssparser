@@ -10,17 +10,5 @@ script:
   - cargo doc --verbose
   - cargo test --features heapsize
 
-after_success: |
-  [ $TRAVIS_RUST_VERSION = nightly ] &&
-  [ $TRAVIS_BRANCH = master ] &&
-  [ $TRAVIS_PULL_REQUEST = false ] &&
-  echo '<meta http-equiv=refresh content=0;url=cssparser/index.html>' > target/doc/index.html &&
-  pip install --user ghp-import &&
-  ~/.local/bin/ghp-import -n target/doc &&
-  git push -qf https://${TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git gh-pages
-
-env:
-  - secure: N66sY4jTqznkJRTNshbib1o7GpgPN8Rw66KFGkRxDfuDOZGkpmTWRPP4tLwmbFfdMOSFKd8Q1OTUOGqvRgny4TErcCF+E56/tUSdGfOFqKeGqowUGhRBLx4eso8FP1ECCTEEZE4hEs1Yb10BrPvZU6YmdBcc5e8YeDZBTAhqMUE=
-
 notifications:
   webhooks: http://build.servo.org:54856/travis
