@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#[cfg(feature = "bench")]
 extern crate test;
 
 use std::borrow::Cow::{self, Borrowed};
@@ -11,6 +12,8 @@ use std::path::Path;
 use std::process::Command;
 use rustc_serialize::json::{self, Json, ToJson};
 use tempdir::TempDir;
+
+#[cfg(feature = "bench")]
 use self::test::Bencher;
 
 use encoding::label::encoding_from_whatwg_label;
@@ -579,8 +582,10 @@ impl ToJson for Color {
     }
 }
 
+#[cfg(feature = "bench")]
 const BACKGROUND_IMAGE: &'static str = include_str!("big-data-url.css");
 
+#[cfg(feature = "bench")]
 #[bench]
 fn unquoted_url(b: &mut Bencher) {
     b.iter(|| {

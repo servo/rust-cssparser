@@ -25,3 +25,4 @@ serde = {version = ">=0.6.6, <0.9", optional = true}
 [features]
 serde-serialization = [ "serde" ]
 heap_size = [ "heapsize" ]
+bench = []
