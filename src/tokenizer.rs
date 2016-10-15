@@ -345,6 +345,20 @@ impl<'a> Tokenizer<'a> {
 
     // Assumes non-EOF
     #[inline]
+    fn next_byte_unchecked(&self) -> u8 { self.byte_at(0) }
+
+    #[inline]
+    fn byte_at(&self, offset: usize) -> u8 {
+        self.input.as_bytes()[self.position + offset]
+    }
+
+    #[inline]
+    fn consume_byte(&mut self) -> u8 {
+        self.position += 1;
+        self.input.as_bytes()[self.position - 1]
+    }
+
+    #[inline]
     fn next_char(&self) -> char { self.char_at(0) }
 
     #[inline]
@@ -812,11 +826,11 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 
 
 fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
-    for (offset, c) in tokenizer.input[tokenizer.position..].char_indices() {
+    for (offset, c) in tokenizer.input[tokenizer.position..].as_bytes().iter().cloned().enumerate() {
         match c {
-            ' ' | '\t' | '\n' | '\r' | '\x0C' => {},
-            '"' | '\'' => return Err(()),  // Do not advance
-            ')' => {
+            b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' => {},
+            b'"' | b'\'' => return Err(()),  // Do not advance
+            b')' => {
                 tokenizer.advance(offset + 1);
                 return Ok(UnquotedUrl(Borrowed("")));
             }
@@ -836,28 +850,28 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
             if tokenizer.is_eof() {
                 return UnquotedUrl(Borrowed(tokenizer.slice_from(start_pos)))
             }
-            match tokenizer.next_char() {
-                ' ' | '\t' | '\n' | '\r' | '\x0C' => {
+            match tokenizer.next_byte_unchecked() {
+                b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' => {
                     let value = tokenizer.slice_from(start_pos);
                     tokenizer.advance(1);
                     return consume_url_end(tokenizer, Borrowed(value))
                 }
-                ')' => {
+                b')' => {
                     let value = tokenizer.slice_from(start_pos);
                     tokenizer.advance(1);
                     return UnquotedUrl(Borrowed(value))
                 }
-                '\x01'...'\x08' | '\x0B' | '\x0E'...'\x1F' | '\x7F'  // non-printable
-                    | '"' | '\'' | '(' => {
+                b'\x01'...b'\x08' | b'\x0B' | b'\x0E'...b'\x1F' | b'\x7F'  // non-printable
+                    | b'"' | b'\'' | b'(' => {
                     tokenizer.advance(1);
                     return consume_bad_url(tokenizer)
                 },
-                '\\' | '\0' => {
+                b'\\' | b'\0' => {
                     string = tokenizer.slice_from(start_pos).to_owned();
                     break
                 }
                 _ => {
-                    tokenizer.consume_char();
+                    tokenizer.consume_byte();
                 }
             }
         }
