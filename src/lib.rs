@@ -5,6 +5,7 @@
 #![crate_name = "cssparser"]
 #![crate_type = "rlib"]
 
+#![feature(test)]
 #![deny(missing_docs)]
 
 /*!
