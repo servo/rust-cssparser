@@ -580,30 +580,30 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
         if tokenizer.is_eof() {
             return Ok(Borrowed(tokenizer.slice_from(start_pos)))
         }
-        match tokenizer.next_char() {
-            '"' if !single_quote => {
+        match tokenizer.next_byte_unchecked() {
+            b'"' if !single_quote => {
                 let value = tokenizer.slice_from(start_pos);
                 tokenizer.advance(1);
                 return Ok(Borrowed(value))
             }
-            '\'' if single_quote => {
+            b'\'' if single_quote => {
                 let value = tokenizer.slice_from(start_pos);
                 tokenizer.advance(1);
                 return Ok(Borrowed(value))
             }
-            '\\' | '\0' => {
+            b'\\' | b'\0' => {
                 string = tokenizer.slice_from(start_pos).to_owned();
                 break
             }
-            '\n' | '\r' | '\x0C' => return Err(()),
+            b'\n' | b'\r' | b'\x0C' => return Err(()),
             _ => {
-                tokenizer.consume_char();
+                tokenizer.consume_byte();
             }
         }
     }
 
     while !tokenizer.is_eof() {
-        if matches!(tokenizer.next_char(), '\n' | '\r' | '\x0C') {
+        if matches!(tokenizer.next_byte_unchecked(), b'\n' | b'\r' | b'\x0C') {
             return Err(());
         }
         match tokenizer.consume_char() {
@@ -611,12 +611,12 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
             '\'' if single_quote => break,
             '\\' => {
                 if !tokenizer.is_eof() {
-                    match tokenizer.next_char() {
+                    match tokenizer.next_byte_unchecked() {
                         // Escaped newline
-                        '\n' | '\x0C' => tokenizer.advance(1),
-                        '\r' => {
+                        b'\n' | b'\x0C' => tokenizer.advance(1),
+                        b'\r' => {
                             tokenizer.advance(1);
-                            if !tokenizer.is_eof() && tokenizer.next_char() == '\n' {
+                            if tokenizer.next_byte() == Some(b'\n') {
                                 tokenizer.advance(1);
                             }
                         }
