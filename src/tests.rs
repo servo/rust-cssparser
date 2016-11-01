@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#[cfg(feature = "bench")]
+extern crate test;
+
 use std::borrow::Cow::{self, Borrowed};
 use std::fs::File;
 use std::io::{self, Write};
@@ -9,6 +12,9 @@ use std::path::Path;
 use std::process::Command;
 use rustc_serialize::json::{self, Json, ToJson};
 use tempdir::TempDir;
+
+#[cfg(feature = "bench")]
+use self::test::Bencher;
 
 use encoding::label::encoding_from_whatwg_label;
 
@@ -576,6 +582,24 @@ impl ToJson for Color {
     }
 }
 
+#[cfg(feature = "bench")]
+const BACKGROUND_IMAGE: &'static str = include_str!("big-data-url.css");
+
+#[cfg(feature = "bench")]
+#[bench]
+fn unquoted_url(b: &mut Bencher) {
+    b.iter(|| {
+        let mut input = Parser::new(BACKGROUND_IMAGE);
+        input.look_for_var_functions();
+
+        let result = input.try(|input| input.expect_url());
+
+        assert!(result.is_ok());
+
+        input.seen_var_functions();
+        (result.is_ok(), input.seen_var_functions())
+    })
+}
 
 struct JsonParser;
 
@@ -666,7 +690,6 @@ fn component_values_to_json(input: &mut Parser) -> Vec<Json> {
     }
     values
 }
-
 
 fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
     fn numeric(value: NumericValue) -> Vec<json::Json> {

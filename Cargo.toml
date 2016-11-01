@@ -1,7 +1,7 @@
 [package]
 
 name = "cssparser"
-version = "0.7.0"
+version = "0.7.1"
 authors = [ "Simon Sapin <simon.sapin@exyr.org>" ]
 
 description = "Rust implementation of CSS Syntax Level 3"
@@ -25,3 +25,4 @@ serde = {version = ">=0.6.6, <0.9", optional = true}
 [features]
 serde-serialization = [ "serde" ]
 heap_size = [ "heapsize" ]
+bench = []
