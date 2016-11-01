@@ -853,7 +853,7 @@ fn to_utf8(string_bytes: Vec<u8>) -> String {
 
 fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
 
-    for (offset, c) in tokenizer.input[tokenizer.position..].as_bytes().iter().cloned().enumerate() {
+    for (offset, c) in tokenizer.input[tokenizer.position..].bytes().enumerate() {
         match c {
             b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' => {},
             b'"' | b'\'' => return Err(()),  // Do not advance
