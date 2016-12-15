@@ -603,6 +603,16 @@ fn unquoted_url(b: &mut Bencher) {
 
 struct JsonParser;
 
+#[test]
+fn no_stack_overflow_multiple_nested_blocks() {
+    let mut input: String = "{{".into();
+    for _ in 0..20 {
+        let dup = input.clone();
+        input.push_str(&dup);
+    }
+    let mut input = Parser::new(&input);
+    while let Ok(..) = input.next() { }
+}
 
 impl DeclarationParser for JsonParser {
     type Declaration = Json;

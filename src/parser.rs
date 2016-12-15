@@ -691,15 +691,22 @@ impl<'i, 't> Parser<'i, 't> {
 }
 
 
-/// Return value indicates whether the end of the input was reached.
 fn consume_until_end_of_block(block_type: BlockType, tokenizer: &mut Tokenizer) {
+    let mut stack = vec![block_type];
+
     // FIXME: have a special-purpose tokenizer method for this that does less work.
     while let Ok(ref token) = tokenizer.next() {
-        if BlockType::closing(token) == Some(block_type) {
-            return
+        if let Some(b) = BlockType::closing(token) {
+            if *stack.last().unwrap() == b {
+                stack.pop();
+                if stack.is_empty() {
+                    return;
+                }
+            }
         }
+
         if let Some(block_type) = BlockType::opening(token) {
-            consume_until_end_of_block(block_type, tokenizer);
+            stack.push(block_type);
         }
     }
 }
