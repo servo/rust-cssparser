@@ -137,7 +137,9 @@ macro_rules! match_ignore_ascii_case {
 }
 
 mod rules_and_declarations;
-mod tokenizer;
+mod tokenizer {
+    include!(concat!(env!("OUT_DIR"), "/tokenizer.rs"));
+}
 mod parser;
 mod from_bytes;
 mod color;
