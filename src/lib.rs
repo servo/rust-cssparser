@@ -137,7 +137,25 @@ macro_rules! match_ignore_ascii_case {
 }
 
 mod rules_and_declarations;
+
+#[cfg(feature = "dummy_match_byte")]
+macro_rules! match_byte {
+    ($value:expr, $($rest:tt)* ) => {
+        match $value {
+            $(
+                $rest
+            )+
+        }
+    };
+}
+
+#[cfg(feature = "dummy_match_byte")]
 mod tokenizer;
+
+#[cfg(not(feature = "dummy_match_byte"))]
+mod tokenizer {
+    include!(concat!(env!("OUT_DIR"), "/tokenizer.rs"));
+}
 mod parser;
 mod from_bytes;
 mod color;
