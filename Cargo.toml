@@ -31,3 +31,4 @@ quote = "0.3"
 serde-serialization = [ "serde" ]
 heap_size = [ "heapsize" ]
 bench = []
+dummy_match_byte = []
