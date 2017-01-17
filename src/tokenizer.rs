@@ -380,8 +380,8 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    fn starts_with(&self, needle: &str) -> bool {
-        self.input[self.position..].starts_with(needle)
+    fn starts_with(&self, needle: &[u8]) -> bool {
+        self.input.as_bytes()[self.position..].starts_with(needle)
     }
 }
 
@@ -405,88 +405,88 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
     if tokenizer.is_eof() {
         return None
     }
-    let c = tokenizer.next_char();
+    let c = tokenizer.next_byte_unchecked();
     let token = match c {
-        '\t' | '\n' | ' ' | '\r' | '\x0C' => {
+        b'\t' | b'\n' | b' ' | b'\r' | b'\x0C' => {
             let start_position = tokenizer.position();
             tokenizer.advance(1);
             while !tokenizer.is_eof() {
-                match tokenizer.next_char() {
-                    ' ' | '\t' | '\n' | '\r' | '\x0C' => tokenizer.advance(1),
+                match tokenizer.next_byte_unchecked() {
+                    b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' => tokenizer.advance(1),
                     _ => break,
                 }
             }
             WhiteSpace(tokenizer.slice_from(start_position))
         },
-        '"' => consume_string(tokenizer, false),
-        '#' => {
+        b'"' => consume_string(tokenizer, false),
+        b'#' => {
             tokenizer.advance(1);
             if is_ident_start(tokenizer) { IDHash(consume_name(tokenizer)) }
-            else if !tokenizer.is_eof() && match tokenizer.next_char() {
-                'a'...'z' | 'A'...'Z' | '0'...'9' | '-' | '_' => true,
-                '\\' => !tokenizer.has_newline_at(1),
-                _ => c > '\x7F',  // Non-ASCII
+            else if !tokenizer.is_eof() && match tokenizer.next_byte_unchecked() {
+                b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'-' | b'_' => true,
+                b'\\' => !tokenizer.has_newline_at(1),
+                _ => !c.is_ascii(),
             } { Hash(consume_name(tokenizer)) }
-            else { Delim(c) }
+            else { Delim('#') }
         },
-        '$' => {
-            if tokenizer.starts_with("$=") { tokenizer.advance(2); SuffixMatch }
-            else { tokenizer.advance(1); Delim(c) }
+        b'$' => {
+            if tokenizer.starts_with(b"$=") { tokenizer.advance(2); SuffixMatch }
+            else { tokenizer.advance(1); Delim('$') }
         },
-        '\'' => consume_string(tokenizer, true),
-        '(' => { tokenizer.advance(1); ParenthesisBlock },
-        ')' => { tokenizer.advance(1); CloseParenthesis },
-        '*' => {
-            if tokenizer.starts_with("*=") { tokenizer.advance(2); SubstringMatch }
-            else { tokenizer.advance(1); Delim(c) }
+        b'\'' => consume_string(tokenizer, true),
+        b'(' => { tokenizer.advance(1); ParenthesisBlock },
+        b')' => { tokenizer.advance(1); CloseParenthesis },
+        b'*' => {
+            if tokenizer.starts_with(b"*=") { tokenizer.advance(2); SubstringMatch }
+            else { tokenizer.advance(1); Delim('*') }
         },
-        '+' => {
+        b'+' => {
             if (
                 tokenizer.has_at_least(1)
-                && matches!(tokenizer.char_at(1), '0'...'9')
+                && matches!(tokenizer.byte_at(1), b'0'...b'9')
             ) || (
                 tokenizer.has_at_least(2)
-                && tokenizer.char_at(1) == '.'
-                && matches!(tokenizer.char_at(2), '0'...'9')
+                && tokenizer.byte_at(1) == b'.'
+                && matches!(tokenizer.byte_at(2), b'0'...b'9')
             ) {
                 consume_numeric(tokenizer)
             } else {
                 tokenizer.advance(1);
-                Delim(c)
+                Delim('+')
             }
         },
-        ',' => { tokenizer.advance(1); Comma },
-        '-' => {
+        b',' => { tokenizer.advance(1); Comma },
+        b'-' => {
             if (
                 tokenizer.has_at_least(1)
-                && matches!(tokenizer.char_at(1), '0'...'9')
+                && matches!(tokenizer.byte_at(1), b'0'...b'9')
             ) || (
                 tokenizer.has_at_least(2)
-                && tokenizer.char_at(1) == '.'
-                && matches!(tokenizer.char_at(2), '0'...'9')
+                && tokenizer.byte_at(1) == b'.'
+                && matches!(tokenizer.byte_at(2), b'0'...b'9')
             ) {
                 consume_numeric(tokenizer)
-            } else if tokenizer.starts_with("-->") {
+            } else if tokenizer.starts_with(b"-->") {
                 tokenizer.advance(3);
                 CDC
             } else if is_ident_start(tokenizer) {
                 consume_ident_like(tokenizer)
             } else {
                 tokenizer.advance(1);
-                Delim(c)
+                Delim('-')
             }
         },
-        '.' => {
+        b'.' => {
             if tokenizer.has_at_least(1)
-                && matches!(tokenizer.char_at(1), '0'...'9'
+                && matches!(tokenizer.byte_at(1), b'0'...b'9'
             ) {
                 consume_numeric(tokenizer)
             } else {
                 tokenizer.advance(1);
-                Delim(c)
+                Delim('.')
             }
         }
-        '/' if tokenizer.starts_with("/*") => {
+        b'/' if tokenizer.starts_with(b"/*") => {
             tokenizer.advance(2);  // consume "/*"
             let start_position = tokenizer.position();
             let content;
@@ -503,58 +503,59 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
             }
             Comment(content)
         }
-        '0'...'9' => consume_numeric(tokenizer),
-        ':' => { tokenizer.advance(1); Colon },
-        ';' => { tokenizer.advance(1); Semicolon },
-        '<' => {
-            if tokenizer.starts_with("<!--") {
+        b'0'...b'9' => consume_numeric(tokenizer),
+        b':' => { tokenizer.advance(1); Colon },
+        b';' => { tokenizer.advance(1); Semicolon },
+        b'<' => {
+            if tokenizer.starts_with(b"<!--") {
                 tokenizer.advance(4);
                 CDO
             } else {
                 tokenizer.advance(1);
-                Delim(c)
+                Delim('<')
             }
         },
-        '@' => {
+        b'@' => {
             tokenizer.advance(1);
             if is_ident_start(tokenizer) { AtKeyword(consume_name(tokenizer)) }
-            else { Delim(c) }
+            else { Delim('@') }
         },
-        'u' | 'U' => {
+        b'u' | b'U' => {
             if tokenizer.has_at_least(2)
-               && tokenizer.char_at(1) == '+'
-               && matches!(tokenizer.char_at(2), '0'...'9' | 'a'...'f' | 'A'...'F' | '?')
+               && tokenizer.byte_at(1) == b'+'
+               && matches!(tokenizer.byte_at(2), b'0'...b'9' | b'a'...b'f' | b'A'...b'F' | b'?')
             { consume_unicode_range(tokenizer) }
             else { consume_ident_like(tokenizer) }
         },
-        'a'...'z' | 'A'...'Z' | '_' | '\0' => consume_ident_like(tokenizer),
-        '[' => { tokenizer.advance(1); SquareBracketBlock },
-        '\\' => {
+        b'a'...b'z' | b'A'...b'Z' | b'_' | b'\0' => consume_ident_like(tokenizer),
+        b'[' => { tokenizer.advance(1); SquareBracketBlock },
+        b'\\' => {
             if !tokenizer.has_newline_at(1) { consume_ident_like(tokenizer) }
-            else { tokenizer.advance(1); Delim(c) }
+            else { tokenizer.advance(1); Delim('\\') }
         },
-        ']' => { tokenizer.advance(1); CloseSquareBracket },
-        '^' => {
-            if tokenizer.starts_with("^=") { tokenizer.advance(2); PrefixMatch }
-            else { tokenizer.advance(1); Delim(c) }
+        b']' => { tokenizer.advance(1); CloseSquareBracket },
+        b'^' => {
+            if tokenizer.starts_with(b"^=") { tokenizer.advance(2); PrefixMatch }
+            else { tokenizer.advance(1); Delim('^') }
         },
-        '{' => { tokenizer.advance(1); CurlyBracketBlock },
-        '|' => {
-            if tokenizer.starts_with("|=") { tokenizer.advance(2); DashMatch }
-            else if tokenizer.starts_with("||") { tokenizer.advance(2); Column }
-            else { tokenizer.advance(1); Delim(c) }
+        b'{' => { tokenizer.advance(1); CurlyBracketBlock },
+        b'|' => {
+            if tokenizer.starts_with(b"|=") { tokenizer.advance(2); DashMatch }
+            else if tokenizer.starts_with(b"||") { tokenizer.advance(2); Column }
+            else { tokenizer.advance(1); Delim('|') }
         },
-        '}' => { tokenizer.advance(1); CloseCurlyBracket },
-        '~' => {
-            if tokenizer.starts_with("~=") { tokenizer.advance(2); IncludeMatch }
-            else { tokenizer.advance(1); Delim(c) }
+        b'}' => { tokenizer.advance(1); CloseCurlyBracket },
+        b'~' => {
+            if tokenizer.starts_with(b"~=") { tokenizer.advance(2); IncludeMatch }
+            else { tokenizer.advance(1); Delim('~') }
         },
         _ => {
-            if c > '\x7F' {  // Non-ASCII
+            if !c.is_ascii() {  // Non-ASCII
                 consume_ident_like(tokenizer)
             } else {
+                let ret = Delim(tokenizer.next_char());
                 tokenizer.advance(1);
-                Delim(c)
+                ret
             }
         },
     };
@@ -641,15 +642,15 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
 
 #[inline]
 fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
-    !tokenizer.is_eof() && match tokenizer.next_char() {
-        'a'...'z' | 'A'...'Z' | '_' | '\0' => true,
-        '-' => tokenizer.has_at_least(1) && match tokenizer.char_at(1) {
-            'a'...'z' | 'A'...'Z' | '-' | '_' | '\0' => true,
-            '\\' => !tokenizer.has_newline_at(1),
-            c => c > '\x7F',  // Non-ASCII
+    !tokenizer.is_eof() && match tokenizer.next_byte_unchecked() {
+        b'a'...b'z' | b'A'...b'Z' | b'_' | b'\0' => true,
+        b'-' => tokenizer.has_at_least(1) && match tokenizer.byte_at(1) {
+            b'a'...b'z' | b'A'...b'Z' | b'-' | b'_' | b'\0' => true,
+            b'\\' => !tokenizer.has_newline_at(1),
+            c => !c.is_ascii(),
         },
-        '\\' => !tokenizer.has_newline_at(1),
-        c => c > '\x7F',  // Non-ASCII
+        b'\\' => !tokenizer.has_newline_at(1),
+        c => !c.is_ascii(),
     }
 }
 
