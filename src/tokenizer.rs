@@ -359,17 +359,14 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    fn next_char(&self) -> char { self.char_at(0) }
-
-    #[inline]
-    fn char_at(&self, offset: usize) -> char {
-        self.input[self.position + offset..].chars().next().unwrap()
+    fn next_char(&self) -> char {
+        self.input[self.position..].chars().next().unwrap()
     }
 
     #[inline]
     fn has_newline_at(&self, offset: usize) -> bool {
         self.position + offset < self.input.len() &&
-        matches!(self.char_at(offset), '\n' | '\r' | '\x0C')
+        matches!(self.byte_at(offset), b'\n' | b'\r' | b'\x0C')
     }
 
     #[inline]
@@ -405,8 +402,8 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
     if tokenizer.is_eof() {
         return Err(())
     }
-    let c = tokenizer.next_byte_unchecked();
-    let token = match_byte! { c,
+    let b = tokenizer.next_byte_unchecked();
+    let token = match_byte! { b,
         b'\t' | b'\n' | b' ' | b'\r' | b'\x0C' => {
             let start_position = tokenizer.position();
             tokenizer.advance(1);
@@ -425,7 +422,7 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
             else if !tokenizer.is_eof() && match tokenizer.next_byte_unchecked() {
                 b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'-' | b'_' => true,
                 b'\\' => !tokenizer.has_newline_at(1),
-                _ => !c.is_ascii(),
+                _ => !b.is_ascii(),
             } { Hash(consume_name(tokenizer)) }
             else { Delim('#') }
         },
@@ -555,12 +552,11 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
             else { tokenizer.advance(1); Delim('~') }
         },
         _ => {
-            if !c.is_ascii() {
+            if !b.is_ascii() {
                 consume_ident_like(tokenizer)
             } else {
-                let ret = Delim(tokenizer.next_char());
                 tokenizer.advance(1);
-                ret
+                Delim(b as char)
             }
         },
     };
@@ -671,11 +667,11 @@ fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
                     true
                 }
                 b'\\' => { !tokenizer.has_newline_at(1) }
-                c => { !c.is_ascii() },
+                b => { !b.is_ascii() },
             }
         },
         b'\\' => { !tokenizer.has_newline_at(1) },
-        c => { !c.is_ascii() },
+        b => { !b.is_ascii() },
     }
 }
 
@@ -759,9 +755,9 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     // Do all the math in f64 so that large numbers overflow to +/-inf
     // and i32::{MIN, MAX} are within range.
 
-    let (has_sign, sign) = match tokenizer.next_char() {
-        '-' => (true, -1.),
-        '+' => (true, 1.),
+    let (has_sign, sign) = match tokenizer.next_byte_unchecked() {
+        b'-' => (true, -1.),
+        b'+' => (true, 1.),
         _ => (false, 1.),
     };
     if has_sign {
@@ -780,8 +776,8 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     let mut is_integer = true;
 
     let mut fractional_part: f64 = 0.;
-    if tokenizer.has_at_least(1) && tokenizer.next_char() == '.'
-            && matches!(tokenizer.char_at(1), '0'...'9') {
+    if tokenizer.has_at_least(1) && tokenizer.next_byte_unchecked() == b'.'
+            && matches!(tokenizer.byte_at(1), b'0'...b'9') {
         is_integer = false;
         tokenizer.advance(1);  // Consume '.'
         let mut factor = 0.1;
