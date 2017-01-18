@@ -359,17 +359,14 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    fn next_char(&self) -> char { self.char_at(0) }
-
-    #[inline]
-    fn char_at(&self, offset: usize) -> char {
-        self.input[self.position + offset..].chars().next().unwrap()
+    fn next_char(&self) -> char {
+        self.input[self.position..].chars().next().unwrap()
     }
 
     #[inline]
     fn has_newline_at(&self, offset: usize) -> bool {
         self.position + offset < self.input.len() &&
-        matches!(self.char_at(offset), '\n' | '\r' | '\x0C')
+        matches!(self.byte_at(offset), b'\n' | b'\r' | b'\x0C')
     }
 
     #[inline]
@@ -759,9 +756,9 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     // Do all the math in f64 so that large numbers overflow to +/-inf
     // and i32::{MIN, MAX} are within range.
 
-    let (has_sign, sign) = match tokenizer.next_char() {
-        '-' => (true, -1.),
-        '+' => (true, 1.),
+    let (has_sign, sign) = match tokenizer.next_byte_unchecked() {
+        b'-' => (true, -1.),
+        b'+' => (true, 1.),
         _ => (false, 1.),
     };
     if has_sign {
@@ -780,8 +777,8 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     let mut is_integer = true;
 
     let mut fractional_part: f64 = 0.;
-    if tokenizer.has_at_least(1) && tokenizer.next_char() == '.'
-            && matches!(tokenizer.char_at(1), '0'...'9') {
+    if tokenizer.has_at_least(1) && tokenizer.next_byte_unchecked() == b'.'
+            && matches!(tokenizer.byte_at(1), b'0'...b'9') {
         is_integer = false;
         tokenizer.advance(1);  // Consume '.'
         let mut factor = 0.1;
