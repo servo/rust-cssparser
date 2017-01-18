@@ -262,7 +262,7 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     pub fn next(&mut self) -> Result<Token<'a>, ()> {
-        next_token(self).ok_or(())
+        next_token(self)
     }
 
     #[inline]
@@ -401,9 +401,9 @@ pub struct SourceLocation {
 }
 
 
-fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
+fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
     if tokenizer.is_eof() {
-        return None
+        return Err(())
     }
     let c = tokenizer.next_byte_unchecked();
     let token = match_byte! { c,
@@ -564,7 +564,7 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Option<Token<'a>> {
             }
         },
     };
-    Some(token)
+    Ok(token)
 }
 
 
