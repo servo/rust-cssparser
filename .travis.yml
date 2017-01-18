@@ -9,6 +9,9 @@ script:
   - cargo test --verbose
   - cargo doc --verbose
   - cargo test --features heapsize
+  - cargo test --features dummy_match_byte
+  - cargo bench --features bench
+  - cargo bench --features "bench dummy_match_byte"
 
 notifications:
   webhooks: http://build.servo.org:54856/travis
