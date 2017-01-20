@@ -53,6 +53,32 @@ impl Visitor for ExpanderVisitor {
     }
 }
 
+/// Parses a token tree corresponding to the `match_byte` macro.
+///
+/// ## Example
+///
+/// ```rust
+/// match_byte! { tokenizer.next_byte_unchecked(),
+///     b'a'..b'z' => { ... }
+///     b'0'..b'9' => { ... }
+///     b'\n' | b'\\' => { ... }
+///     foo => { ... }
+/// }
+///
+/// Returns:
+///  * The token tree that contains the expression to be matched (in this case
+///    `tokenizer.next_byte_unchecked()`.
+///
+///  * The table with the different cases per byte, each entry in the table
+///    contains a non-zero integer representing a different arm of the
+///    match expression.
+///
+///  * The list of cases containing the expansion of the arms of the match
+///    expression.
+///
+///  * An optional identifier to which the wildcard pattern is matched (`foo` in
+///    this case).
+///
 fn parse_match_bytes_macro(tts: Vec<syn::TokenTree>) -> (Vec<syn::TokenTree>, [u8; 256], Vec<Case>, Option<syn::Ident>) {
     use syn::TokenTree::Delimited;
     use syn::DelimToken::Brace;
