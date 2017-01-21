@@ -10,6 +10,7 @@ repository = "https://github.com/servo/rust-cssparser"
 readme = "README.md"
 keywords = ["css", "syntax", "parser"]
 license = "MPL-2.0"
+build = "build.rs"
 
 
 [dev-dependencies]
@@ -22,7 +23,12 @@ heapsize = {version = ">=0.1.1, <0.4.0", optional = true}
 matches = "0.1"
 serde = {version = ">=0.6.6, <0.9", optional = true}
 
+[build-dependencies]
+syn = { version = "0.10.6", features = ["full", "visit"]}
+quote = "0.3"
+
 [features]
 serde-serialization = [ "serde" ]
 heap_size = [ "heapsize" ]
 bench = []
+dummy_match_byte = []
