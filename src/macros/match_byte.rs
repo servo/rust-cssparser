@@ -3,10 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use quote::{ToTokens, Tokens};
-use super::visit::{Visitor, RecursiveVisitor};
 use std::fs::File;
 use std::io::{Read, Write};
-use std::mem;
 use std::path::Path;
 use std::vec;
 use std::iter;
@@ -15,42 +13,69 @@ use syn;
 pub fn expand(from: &Path, to: &Path) {
     let mut source = String::new();
     File::open(from).unwrap().read_to_string(&mut source).unwrap();
-    let mut crate_ = syn::parse_crate(&source).expect("Parsing rules.rs module");
-    let mut visitor = ExpanderVisitor;
-
-    RecursiveVisitor { node_visitor: &mut visitor }.visit_crate(&mut crate_);
-
+    let tts = syn::parse_token_trees(&source).expect("Parsing rules.rs module");
     let mut tokens = Tokens::new();
-    crate_.to_tokens(&mut tokens);
+    tokens.append_all(expand_tts(tts));
+
     let code = tokens.to_string().replace("{ ", "{\n").replace(" }", "\n}");
     File::create(to).unwrap().write_all(code.as_bytes()).unwrap();
 }
 
-struct ExpanderVisitor;
+fn expand_tts(tts: Vec<syn::TokenTree>) -> Vec<syn::TokenTree> {
+    use syn::*;
+    let mut expanded = Vec::new();
+    let mut tts = tts.into_iter();
+    while let Some(tt) = tts.next() {
+        match tt {
+            TokenTree::Token(Token::Ident(ident)) => {
+                if ident != "match_byte" {
+                    expanded.push(TokenTree::Token(Token::Ident(ident)));
+                    continue;
+                }
 
-impl Visitor for ExpanderVisitor {
-    fn visit_expression(&mut self, expr: &mut syn::Expr) {
-        let tokens = match expr.node {
-            syn::ExprKind::Mac(ref mut macro_) if macro_.path == syn::Path::from("match_byte") => {
-                mem::replace(&mut macro_.tts, vec![])
-            }
-            _ => return,
-        };
-        let (to_be_matched, table, cases, wildcard_binding) = parse_match_bytes_macro(tokens);
-        *expr = expand_match_bytes_macro(to_be_matched, &table, cases, wildcard_binding);
-    }
+                match tts.next() {
+                    Some(TokenTree::Token(Token::Not)) => {},
+                    other => {
+                        expanded.push(TokenTree::Token(Token::Ident(ident)));
+                        if let Some(other) = other {
+                            expanded.push(other);
+                        }
+                        continue;
+                    }
+                }
 
-    fn visit_statement(&mut self, stmt: &mut syn::Stmt) {
-        let tokens = match *stmt {
-            syn::Stmt::Mac(ref mut macro_) if macro_.0.path == syn::Path::from("match_byte") => {
-                mem::replace(&mut macro_.0.tts, vec![])
+                let tts = match tts.next() {
+                    Some(TokenTree::Delimited(Delimited { tts, .. })) => tts,
+                    other => {
+                        expanded.push(TokenTree::Token(Token::Ident(ident)));
+                        expanded.push(TokenTree::Token(Token::Not));
+                        if let Some(other) = other {
+                            expanded.push(other);
+                        }
+                        continue;
+                    }
+                };
+
+                let (to_be_matched, table, cases, wildcard_binding) = parse_match_bytes_macro(tts);
+                let expr = expand_match_bytes_macro(to_be_matched,
+                                                    &table,
+                                                    cases,
+                                                    wildcard_binding);
+
+                let tts = syn::parse_token_trees(&expr)
+                    .expect("parsing macro expansion as token trees");
+                expanded.extend(expand_tts(tts));
             }
-            _ => return,
-        };
-        let (to_be_matched, table, cases, wildcard_binding) = parse_match_bytes_macro(tokens);
-        let expr = expand_match_bytes_macro(to_be_matched, &table, cases, wildcard_binding);
-        *stmt = syn::Stmt::Expr(Box::new(expr));
+            TokenTree::Delimited(Delimited { delim, tts }) => {
+                expanded.push(TokenTree::Delimited(Delimited {
+                    delim: delim,
+                    tts: expand_tts(tts),
+                }))
+            }
+            other => expanded.push(other),
+        }
     }
+    expanded
 }
 
 /// Parses a token tree corresponding to the `match_byte` macro.
@@ -80,18 +105,7 @@ impl Visitor for ExpanderVisitor {
 ///    this case).
 ///
 fn parse_match_bytes_macro(tts: Vec<syn::TokenTree>) -> (Vec<syn::TokenTree>, [u8; 256], Vec<Case>, Option<syn::Ident>) {
-    use syn::TokenTree::Delimited;
-    use syn::DelimToken::Brace;
-
     let mut tts = tts.into_iter();
-    let inner_tts = match tts.next() {
-        Some(Delimited(syn::Delimited { delim: Brace, tts })) => tts,
-        other => panic!("expected one top-level {{}} block, got: {:?}", other),
-    };
-
-    assert_eq!(tts.next(), None);
-
-    let mut tts = inner_tts.into_iter();
 
     // Grab the thing we're matching, until we find a comma.
     let mut left_hand_side = vec![];
@@ -204,7 +218,7 @@ fn expand_match_bytes_macro(to_be_matched: Vec<syn::TokenTree>,
                             table: &[u8; 256],
                             cases: Vec<Case>,
                             binding: Option<syn::Ident>)
-                            -> syn::Expr {
+                            -> String {
     use std::fmt::Write;
 
     assert!(!to_be_matched.is_empty());
@@ -253,5 +267,5 @@ fn expand_match_bytes_macro(to_be_matched: Vec<syn::TokenTree>,
 
     expr.push_str("}\n"); // top
 
-    syn::parse_expr(&expr).expect("couldn't parse expression?")
+    expr
 }
