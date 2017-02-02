@@ -136,6 +136,27 @@ macro_rules! match_ignore_ascii_case {
     };
 }
 
+macro_rules! match_ignore_ascii_case_with_table {
+    ( $input: expr => $ty: ty, $($keyword: expr => $value: expr,)* ) => {
+        {
+            use std::ascii::AsciiExt;
+            static MATCH_IGNORE_ASCII_CASE_TABLE: &'static [(&'static str, $ty)] = &[
+                $(
+                    ($keyword, $value),
+                )*
+            ];
+            let mut result = Err(());
+            let input = $input;
+            for &(keyword, value) in MATCH_IGNORE_ASCII_CASE_TABLE {
+                if keyword.eq_ignore_ascii_case(&input) {
+                    result = Ok(value)
+                }
+            }
+            result
+        }
+    };
+}
+
 mod rules_and_declarations;
 
 #[cfg(feature = "dummy_match_byte")]
