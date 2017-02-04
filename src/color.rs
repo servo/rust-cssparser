@@ -135,7 +135,8 @@ fn rgba(red: f32, green: f32, blue: f32, alpha: f32) -> Result<Color, ()> {
 /// (For example, the value of an `Ident` token is fine.)
 #[inline]
 pub fn parse_color_keyword(ident: &str) -> Result<Color, ()> {
-    match_ignore_ascii_case! { ident,
+    use std::ascii::AsciiExt;
+    match &*ident.to_ascii_lowercase() {
         "black" => rgb(0., 0., 0.),
         "silver" => rgb(192., 192., 192.),
         "gray" => rgb(128., 128., 128.),
