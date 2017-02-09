@@ -761,8 +761,6 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
             v
         }),
 
-        Token::UnicodeRange(start, end) => JArray!["unicode-range", start, end],
-
         Token::WhiteSpace(_) => " ".to_json(),
         Token::Comment(_) => "/**/".to_json(),
         Token::Colon => ":".to_json(),
