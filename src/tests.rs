@@ -23,7 +23,7 @@ use super::{Parser, Delimiter, Token, NumericValue, PercentageValue, SourceLocat
             parse_one_declaration, parse_one_rule, parse_important,
             stylesheet_encoding, EncodingSupport,
             TokenSerializationType,
-            Color, RGBA, parse_nth, ToCss};
+            Color, RGBA, parse_nth, UnicodeRange, ToCss};
 
 macro_rules! JArray {
     ($($e: expr,)*) => { JArray![ $( $e ),* ] };
@@ -347,6 +347,21 @@ fn color3_keywords() {
 fn nth() {
     run_json_tests(include_str!("css-parsing-tests/An+B.json"), |input| {
         input.parse_entirely(parse_nth).ok().to_json()
+    });
+}
+
+#[test]
+fn unicode_range() {
+    run_json_tests(include_str!("css-parsing-tests/urange.json"), |input| {
+        input.parse_comma_separated(|input| {
+            let result = UnicodeRange::parse(input).ok().map(|r| (r.start, r.end));
+            if input.is_exhausted() {
+                Ok(result)
+            } else {
+                while let Ok(_) = input.next() {}
+                Ok(None)
+            }
+        }).unwrap().to_json()
     });
 }
 
