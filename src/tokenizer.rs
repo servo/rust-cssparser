@@ -62,14 +62,6 @@ pub enum Token<'a> {
     /// A [`<dimension-token>`](https://drafts.csswg.org/css-syntax/#dimension-token-diagram)
     Dimension(NumericValue, Cow<'a, str>),
 
-    /// A [`<unicode-range-token>`](https://drafts.csswg.org/css-syntax/#unicode-range-token-diagram)
-    ///
-    /// Components are the start and end code points, respectively.
-    ///
-    /// The tokenizer only reads up to 6 hex digit (up to 0xFF_FFFF),
-    /// but does not check that code points are within the range of Unicode (up to U+10_FFFF).
-    UnicodeRange(u32, u32),
-
     /// A [`<whitespace-token>`](https://drafts.csswg.org/css-syntax/#whitespace-token-diagram)
     WhiteSpace(&'a str),
 
@@ -521,13 +513,6 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
             tokenizer.advance(1);
             if is_ident_start(tokenizer) { AtKeyword(consume_name(tokenizer)) }
             else { Delim('@') }
-        },
-        b'u' | b'U' => {
-            if tokenizer.has_at_least(2)
-               && tokenizer.byte_at(1) == b'+'
-               && matches!(tokenizer.byte_at(2), b'0'...b'9' | b'a'...b'f' | b'A'...b'F' | b'?')
-            { consume_unicode_range(tokenizer) }
-            else { consume_ident_like(tokenizer) }
         },
         b'a'...b'z' | b'A'...b'Z' | b'_' | b'\0' => { consume_ident_like(tokenizer) },
         b'[' => { tokenizer.advance(1); SquareBracketBlock },
@@ -1016,39 +1001,6 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
         BadUrl
     }
 }
-
-
-
-fn consume_unicode_range<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
-    tokenizer.advance(2);  // Skip U+
-    let (hex_value, hex_digits) = consume_hex_digits(tokenizer);
-    let max_question_marks = 6 - hex_digits;
-    let mut question_marks = 0;
-    while question_marks < max_question_marks && !tokenizer.is_eof()
-            && tokenizer.next_byte_unchecked() == b'?' {
-        question_marks += 1;
-        tokenizer.advance(1)
-    }
-    let start;
-    let end;
-    if question_marks > 0 {
-        start = hex_value << (question_marks * 4);
-        end = ((hex_value + 1) << (question_marks * 4)) - 1;
-    } else {
-        start = hex_value;
-        if tokenizer.has_at_least(1) &&
-           tokenizer.next_byte_unchecked() == b'-' &&
-           matches!(tokenizer.byte_at(1), b'0'...b'9' | b'A'...b'F' | b'a'...b'f') {
-            tokenizer.advance(1);
-            let (hex_value, _) = consume_hex_digits(tokenizer);
-            end = hex_value;
-        } else {
-            end = start;
-        }
-    }
-    UnicodeRange(start, end)
-}
-
 
 // (value, number of digits up to 6)
 fn consume_hex_digits<'a>(tokenizer: &mut Tokenizer<'a>) -> (u32, u32) {
