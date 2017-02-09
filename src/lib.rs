@@ -85,6 +85,7 @@ pub use color::{RGBA, Color, parse_color_keyword};
 pub use nth::parse_nth;
 pub use serializer::{ToCss, CssStringWriter, serialize_identifier, serialize_string, TokenSerializationType};
 pub use parser::{Parser, Delimiter, Delimiters, SourcePosition};
+pub use unicode_range::UnicodeRange;
 
 
 /**
@@ -163,6 +164,7 @@ mod from_bytes;
 mod color;
 mod nth;
 mod serializer;
+mod unicode_range;
 
 #[cfg(test)]
 mod tests;
