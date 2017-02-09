@@ -142,6 +142,13 @@ associated with the expected result.
     the output as null for invalid syntax,
     or an array of two integers ``[A, B]``.
 
+``urange.json``
+    Tests the `urange <https://drafts.csswg.org/css-syntax-3/#urange>`_
+    syntax defined in CSS Syntax Level 3.
+    The Unicode input is represented by a JSON string,
+    the output as null for invalid syntax,
+    or an array of two integers ``[start, end]``.
+
 
 Result representation
 =====================
