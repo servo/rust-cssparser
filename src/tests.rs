@@ -62,7 +62,7 @@ fn almost_equals(a: &Json, b: &Json) -> bool {
         (_, &Json::I64(b)) => almost_equals(a, &Json::F64(b as f64)),
         (_, &Json::U64(b)) => almost_equals(a, &Json::F64(b as f64)),
 
-        (&Json::F64(a), &Json::F64(b)) => (a - b).abs() < 1e-6,
+        (&Json::F64(a), &Json::F64(b)) => (a - b).abs() < 1. / 255.,
 
         (&Json::Boolean(a), &Json::Boolean(b)) => a == b,
         (&Json::String(ref a), &Json::String(ref b)) => a == b,
