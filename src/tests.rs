@@ -321,8 +321,8 @@ fn color3_hsl() {
 fn color3_keywords() {
     run_color_tests(include_str!("css-parsing-tests/color3_keywords.json"), |c| {
         match c {
-            Ok(Color::RGBA(RGBA { red: r, green: g, blue: b, alpha: a }))
-            => [r * 255., g * 255., b * 255., a].to_json(),
+            Ok(Color::RGBA(ref rgba))
+            => [rgba.red() * 255., rgba.green() * 255., rgba.blue() * 255., rgba.alpha()].to_json(),
             Ok(Color::CurrentColor) => "currentColor".to_json(),
             Err(()) => Json::Null,
         }
@@ -397,15 +397,15 @@ fn serialize_current_color() {
 
 #[test]
 fn serialize_rgb_full_alpha() {
-    let c = Color::RGBA(RGBA { red: 1.0, green: 0.9, blue: 0.8, alpha: 1.0 });
-    assert!(c.to_css_string() == "rgb(255, 230, 204)");
+    let c = Color::RGBA(RGBA::from_floats(1.0, 0.9, 0.8, 1.0));
+    assert_eq!(c.to_css_string(), "rgb(255, 230, 204)");
 }
 
 
 #[test]
 fn serialize_rgba() {
-    let c = Color::RGBA(RGBA { red: 0.1, green: 0.2, blue: 0.3, alpha: 0.5 });
-    assert!(c.to_css_string() == "rgba(26, 51, 77, 0.5)");
+    let c = Color::RGBA(RGBA::from_floats(0.1, 0.2, 0.3, 0.6));
+    assert_eq!(c.to_css_string(), "rgba(26, 51, 77, 0.6)");
 }
 
 #[test]
@@ -574,8 +574,8 @@ fn identifier_serialization() {
 impl ToJson for Color {
     fn to_json(&self) -> json::Json {
         match *self {
-            Color::RGBA(RGBA { red, green, blue, alpha }) => {
-                [red, green, blue, alpha].to_json()
+            Color::RGBA(ref rgba) => {
+                [rgba.red(), rgba.green(), rgba.blue(), rgba.alpha()].to_json()
             },
             Color::CurrentColor => "currentColor".to_json(),
         }
