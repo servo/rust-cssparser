@@ -96,11 +96,17 @@ impl ToCss for RGBA {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result
         where W: fmt::Write,
     {
+        // Try first with two decimal places, then with three.
+        let mut rounded_alpha = (self.alpha_f32() * 100.).round() / 100.;
+        if clamp_f32(rounded_alpha) != self.alpha {
+            rounded_alpha = (self.alpha_f32() * 1000.).round() / 1000.;
+        }
+
         if self.alpha == 255 {
             write!(dest, "rgb({}, {}, {})", self.red, self.green, self.blue)
         } else {
-            write!(dest, "rgba({}, {}, {}, {:.3})",
-                   self.red, self.green, self.blue, self.alpha_f32())
+            write!(dest, "rgba({}, {}, {}, {})",
+                   self.red, self.green, self.blue, rounded_alpha)
         }
     }
 }

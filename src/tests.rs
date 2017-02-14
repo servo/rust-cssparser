@@ -100,7 +100,6 @@ fn assert_json_eq(results: json::Json, mut expected: json::Json, message: String
     }
 }
 
-
 fn run_raw_json_tests<F: Fn(Json, Json) -> ()>(json_data: &str, run: F) {
     let items = match Json::from_str(json_data) {
         Ok(Json::Array(items)) => items,
@@ -380,13 +379,11 @@ fn serializer(preserve_comments: bool) {
     });
 }
 
-
 #[test]
 fn serialize_current_color() {
     let c = Color::CurrentColor;
     assert!(c.to_css_string() == "currentColor");
 }
-
 
 #[test]
 fn serialize_rgb_full_alpha() {
@@ -394,11 +391,16 @@ fn serialize_rgb_full_alpha() {
     assert_eq!(c.to_css_string(), "rgb(255, 230, 204)");
 }
 
-
 #[test]
 fn serialize_rgba() {
     let c = Color::RGBA(RGBA::new(26, 51, 77, 32));
     assert_eq!(c.to_css_string(), "rgba(26, 51, 77, 0.125)");
+}
+
+#[test]
+fn serialize_rgba_two_digit_float_if_roundtrips() {
+    let c = Color::RGBA(RGBA::from_floats(0., 0., 0., 0.5));
+    assert_eq!(c.to_css_string(), "rgba(0, 0, 0, 0.5)");
 }
 
 #[test]
