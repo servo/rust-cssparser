@@ -576,6 +576,7 @@ fn consume_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool) -> Toke
 fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
                              -> Result<Cow<'a, str>, ()> {
     tokenizer.advance(1);  // Skip the initial quote
+    // start_pos is at code point boundary, after " or '
     let start_pos = tokenizer.position();
     let mut string_bytes;
     loop {
@@ -598,6 +599,11 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
                 }
             }
             b'\\' | b'\0' => {
+                // * The tokenizer’s input is UTF-8 since it’s `&str`.
+                // * start_pos is at a code point boundary
+                // * so is the current position (which is before '\\' or '\0'
+                //
+                // So `string_bytes` is well-formed UTF-8.
                 string_bytes = tokenizer.slice_from(start_pos).as_bytes().to_owned();
                 break
             }
@@ -611,8 +617,8 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
         if matches!(tokenizer.next_byte_unchecked(), b'\n' | b'\r' | b'\x0C') {
             return Err(());
         }
-        let c = tokenizer.consume_byte();
-        match_byte! { c,
+        let b = tokenizer.consume_byte();
+        match_byte! { b,
             b'"' => {
                 if !single_quote {
                     break;
@@ -634,6 +640,7 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
                                 tokenizer.advance(1);
                             }
                         }
+                        // This pushes one well-formed code point
                         _ => consume_escape_and_write(tokenizer, &mut string_bytes)
                     }
                 }
@@ -641,19 +648,21 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
                 continue;
             }
             b'\0' => {
-                // string.push('\u{FFFD}'),
-                string_bytes.push(0xef);
-                string_bytes.push(0xbf);
-                string_bytes.push(0xbd);
+                string_bytes.extend("\u{FFFD}".as_bytes());
                 continue;
             }
             _ => {},
         }
 
-        string_bytes.push(c);
+        // If this byte is part of a multi-byte code point,
+        // we’ll end up copying the whole code point before this loop does something else.
+        string_bytes.push(b);
     }
 
-    Ok(Owned(to_utf8(string_bytes)))
+    Ok(Owned(
+        // string_bytes is well-formed UTF-8, see other comments.
+        unsafe { from_utf8_release_unchecked(string_bytes) }
+    ))
 }
 
 
@@ -695,6 +704,7 @@ fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 }
 
 fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> Cow<'a, str> {
+    // start_pos is the end of the previous token, therefore at a code point boundary
     let start_pos = tokenizer.position();
     let mut value_bytes;
     loop {
@@ -704,11 +714,16 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> Cow<'a, str> {
         match_byte! { tokenizer.next_byte_unchecked(),
             b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' | b'-' => { tokenizer.advance(1) },
             b'\\' | b'\0' => {
+                // * The tokenizer’s input is UTF-8 since it’s `&str`.
+                // * start_pos is at a code point boundary
+                // * so is the current position (which is before '\\' or '\0'
+                //
+                // So `value_bytes` is well-formed UTF-8.
                 value_bytes = tokenizer.slice_from(start_pos).as_bytes().to_owned();
                 break
             }
-            c => {
-                if c.is_ascii() {
+            b => {
+                if b.is_ascii() {
                     return Borrowed(tokenizer.slice_from(start_pos));
                 }
                 tokenizer.advance(1);
@@ -717,34 +732,37 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> Cow<'a, str> {
     }
 
     while !tokenizer.is_eof() {
-        let c = tokenizer.next_byte_unchecked();
-        match_byte! { c,
+        let b = tokenizer.next_byte_unchecked();
+        match_byte! { b,
             b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' | b'-'  => {
                 tokenizer.advance(1);
-                value_bytes.push(c)
+                value_bytes.push(b)  // ASCII
             }
             b'\\' => {
                 if tokenizer.has_newline_at(1) { break }
                 tokenizer.advance(1);
+                // This pushes one well-formed code point
                 consume_escape_and_write(tokenizer, &mut value_bytes)
             }
             b'\0' => {
                 tokenizer.advance(1);
-                // value.push('\u{FFFD}')
-                value_bytes.push(0xef);
-                value_bytes.push(0xbf);
-                value_bytes.push(0xbd);
+                value_bytes.extend("\u{FFFD}".as_bytes());
             },
             _ => {
-                if c.is_ascii() {
+                if b.is_ascii() {
                     break;
                 }
                 tokenizer.advance(1);
-                value_bytes.push(c)
+                // This byte *is* part of a multi-byte code point,
+                // we’ll end up copying the whole code point before this loop does something else.
+                value_bytes.push(b)
             }
         }
     }
-    Owned(to_utf8(value_bytes))
+    Owned(
+        // string_bytes is well-formed UTF-8, see other comments.
+        unsafe { from_utf8_release_unchecked(value_bytes) }
+    )
 }
 
 
@@ -867,17 +885,16 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 
 
 #[inline]
-fn to_utf8(string_bytes: Vec<u8>) -> String {
+unsafe fn from_utf8_release_unchecked(string_bytes: Vec<u8>) -> String {
     if cfg!(debug_assertions) {
         String::from_utf8(string_bytes).unwrap()
     } else {
-        unsafe {
-            String::from_utf8_unchecked(string_bytes)
-        }
+        String::from_utf8_unchecked(string_bytes)
     }
 }
 
 fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
+    // This is only called after "url(", so the current position is a code point boundary.
     for (offset, c) in tokenizer.input[tokenizer.position..].bytes().enumerate() {
         match_byte! { c,
             b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' => {},
@@ -888,6 +905,8 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
             }
             _ => {
                 tokenizer.advance(offset);
+                // This function only consumed ASCII (whitespace) bytes,
+                // so the current position is a code point boundary.
                 return Ok(consume_unquoted_url_internal(tokenizer))
             }
         }
@@ -896,6 +915,7 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
     return Ok(UnquotedUrl(Borrowed("")));
 
     fn consume_unquoted_url_internal<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
+        // This function is only called with start_pos at a code point boundary.
         let start_pos = tokenizer.position();
         let mut string_bytes: Vec<u8>;
         loop {
@@ -919,6 +939,11 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
                     return consume_bad_url(tokenizer)
                 },
                 b'\\' | b'\0' => {
+                    // * The tokenizer’s input is UTF-8 since it’s `&str`.
+                    // * start_pos is at a code point boundary
+                    // * so is the current position (which is before '\\' or '\0'
+                    //
+                    // So `string_bytes` is well-formed UTF-8.
                     string_bytes = tokenizer.slice_from(start_pos).as_bytes().to_owned();
                     break
                 }
@@ -930,7 +955,10 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
         while !tokenizer.is_eof() {
             match_byte! { tokenizer.consume_byte(),
                 b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' => {
-                    return consume_url_end(tokenizer, Owned(to_utf8(string_bytes)));
+                    return consume_url_end(tokenizer, Owned(
+                        // string_bytes is well-formed UTF-8, see other comments.
+                        unsafe { from_utf8_release_unchecked(string_bytes) }
+                    ))
                 }
                 b')' => {
                     break;
@@ -944,18 +972,21 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
                         return consume_bad_url(tokenizer)
                     }
 
+                    // This pushes one well-formed code point to string_bytes
                     consume_escape_and_write(tokenizer, &mut string_bytes)
                 },
                 b'\0' => {
-                    // string.push('\u{FFFD}');
-                    string_bytes.push(0xef);
-                    string_bytes.push(0xbf);
-                    string_bytes.push(0xbd);
+                    string_bytes.extend("\u{FFFD}".as_bytes());
                 }
-                c => { string_bytes.push(c) }
+                // If this byte is part of a multi-byte code point,
+                // we’ll end up copying the whole code point before this loop does something else.
+                b => { string_bytes.push(b) }
             }
         }
-        UnquotedUrl(Owned(to_utf8(string_bytes)))
+        UnquotedUrl(Owned(
+            // string_bytes is well-formed UTF-8, see other comments.
+            unsafe { from_utf8_release_unchecked(string_bytes) }
+        ))
     }
 
     fn consume_url_end<'a>(tokenizer: &mut Tokenizer<'a>, string: Cow<'a, str>) -> Token<'a> {
@@ -1039,11 +1070,8 @@ fn consume_hex_digits<'a>(tokenizer: &mut Tokenizer<'a>) -> (u32, u32) {
 
 // Same constraints as consume_escape except it writes into `bytes` the result
 // instead of returning it.
-//
-// TODO: This could be made more efficient with char::encode_utf8, I guess.
 fn consume_escape_and_write(tokenizer: &mut Tokenizer, bytes: &mut Vec<u8>) {
-    use std::io::Write;
-    write!(bytes, "{}", consume_escape(tokenizer)).unwrap();
+    bytes.extend(consume_escape(tokenizer).encode_utf8(&mut [0; 4]).as_bytes())
 }
 
 // Assumes that the U+005C REVERSE SOLIDUS (\) has already been consumed
