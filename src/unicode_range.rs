@@ -14,6 +14,7 @@ use tokenizer::{Token, NumericValue};
 /// One contiguous range of code points.
 ///
 /// Can not be empty. Can represent a single code point when start == end.
+#[derive(PartialEq, Eq, Clone, Hash)]
 pub struct UnicodeRange {
     /// Inclusive start of the range. In [0, end].
     pub start: u32,
@@ -202,6 +203,12 @@ fn consume_question_marks(text: &mut &[u8]) -> usize {
         *text = rest
     }
     question_marks
+}
+
+impl fmt::Debug for UnicodeRange {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        self.to_css(formatter)
+    }
 }
 
 impl ToCss for UnicodeRange {
