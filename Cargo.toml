@@ -5,7 +5,7 @@ version = "0.10.0"
 authors = [ "Simon Sapin <simon.sapin@exyr.org>" ]
 
 description = "Rust implementation of CSS Syntax Level 3"
-documentation = "http://servo.github.io/rust-cssparser/cssparser/index.html"
+documentation = "https://docs.rs/cssparser/"
 repository = "https://github.com/servo/rust-cssparser"
 readme = "README.md"
 keywords = ["css", "syntax", "parser"]
