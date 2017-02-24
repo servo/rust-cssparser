@@ -20,7 +20,7 @@ doctest = false
 [dev-dependencies]
 rustc-serialize = "0.3"
 tempdir = "0.3"
-encoding_rs = "0.3.2"
+encoding_rs = "0.5"
 
 [dependencies]
 heapsize = {version = "0.3", optional = true}
@@ -28,7 +28,7 @@ matches = "0.1"
 serde = {version = "0.9", optional = true}
 
 [build-dependencies]
-syn = { version = "0.10.6", features = ["full", "visit"]}
+syn = "0.11"
 quote = "0.3"
 
 [features]
