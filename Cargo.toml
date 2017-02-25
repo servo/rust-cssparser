@@ -26,6 +26,7 @@ encoding_rs = "0.5"
 cssparser-macros = {path = "./macros", version = "0.1"}
 heapsize = {version = "0.3", optional = true}
 matches = "0.1"
+phf = "0.7"
 serde = {version = "0.9", optional = true}
 
 [build-dependencies]
