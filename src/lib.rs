@@ -234,7 +234,8 @@ macro_rules! _cssparser_internal__to_lowercase {
         let mut buffer: [u8; MAX_LENGTH] = unsafe {
             ::std::mem::uninitialized()
         };
-        let $output = $crate::_internal__to_lowercase(&mut buffer, $input);
+        let input: &str = $input;
+        let $output = $crate::_internal__to_lowercase(&mut buffer, input);
     }
 }
 
