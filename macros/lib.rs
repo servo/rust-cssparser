@@ -27,8 +27,7 @@ pub fn assert_ascii_lowercase(input: proc_macro::TokenStream) -> proc_macro::Tok
 }
 
 /// Find a `#[cssparser__max_len__data(string = "…", string = "…")]` attribute,
-/// panic if any string contains ASCII uppercase letters,
-/// emit a `MAX_LENGTH` constant with the length of the longest string.
+/// and emit a `MAX_LENGTH` constant with the length of the longest string.
 #[proc_macro_derive(cssparser__max_len,
                     attributes(cssparser__max_len__data))]
 pub fn max_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
