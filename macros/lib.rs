@@ -94,14 +94,15 @@ pub fn phf_map(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// Panic if the first attribute isn’t `#[foo(…)]` with the given name,
 /// or return the parameters.
 fn list_attr<'a>(input: &'a syn::DeriveInput, expected_name: &str) -> &'a [syn::NestedMetaItem] {
-    match input.attrs[0].value {
-        syn::MetaItem::List(ref name, ref nested) if name == expected_name => {
-            nested
-        }
-        _ => {
-            panic!("expected a {} attribute", expected_name)
+    for attr in &input.attrs {
+        match attr.value {
+            syn::MetaItem::List(ref name, ref nested) if name == expected_name => {
+                return nested
+            }
+            _ => {}
         }
     }
+    panic!("expected a {} attribute", expected_name)
 }
 
 /// Panic if `sub_attr` is not a name-value like `foo = "…"` with the given name,
