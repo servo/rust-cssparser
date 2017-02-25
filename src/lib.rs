@@ -106,9 +106,6 @@ match_ignore_ascii_case! { string,
 }
 ```
 
-The macro also takes a slice of the value,
-so that a `String` or `CowString` could be passed directly instead of a `&str`.
-
 */
 #[macro_export]
 macro_rules! match_ignore_ascii_case {
@@ -125,7 +122,7 @@ macro_rules! match_ignore_ascii_case {
     // finished parsing
     (@inner $value:expr, () -> ($(($string:expr => $result:expr))*) $fallback:expr ) => {
         {
-            _cssparser_internal__max_len!(&$value[..] => lowercase, $($string),+);
+            _cssparser_internal__max_len!($value => lowercase, $($string),+);
             match lowercase {
                 $(
                     Some($string) => $result,
