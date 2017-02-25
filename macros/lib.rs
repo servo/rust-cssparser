@@ -9,6 +9,9 @@ extern crate syn;
 
 use std::ascii::AsciiExt;
 
+/// Find a `#[cssparser__match_ignore_ascii_case__data(string = "…", string = "…")]` attribute,
+/// panic if any string contains ASCII uppercase letters,
+/// emit a `MAX_LENGTH` constant with the length of the longest string.
 #[proc_macro_derive(cssparser__match_ignore_ascii_case__max_len,
                     attributes(cssparser__match_ignore_ascii_case__data))]
 pub fn max_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -30,7 +33,10 @@ pub fn max_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     tokens.as_str().parse().unwrap()
 }
 
-
+/// On `struct $Name($ValueType)`, add a new static method
+/// `fn map() -> &'static ::phf::Map<&'static str, $ValueType>`.
+/// The map’s content is given as:
+/// `#[cssparser__phf_map__kv_pairs(key = "…", value = "…", key = "…", value = "…")]`.
 #[proc_macro_derive(cssparser__phf_map,
                     attributes(cssparser__phf_map__kv_pairs))]
 pub fn phf_map(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -70,6 +76,8 @@ pub fn phf_map(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     tokens.as_str().parse().unwrap()
 }
 
+/// Panic if the first attribute isn’t `#[foo(…)]` with the given name,
+/// or return the parameters.
 fn list_attr<'a>(input: &'a syn::DeriveInput, expected_name: &str) -> &'a [syn::NestedMetaItem] {
     match input.attrs[0].value {
         syn::MetaItem::List(ref name, ref nested) if name == expected_name => {
@@ -81,6 +89,8 @@ fn list_attr<'a>(input: &'a syn::DeriveInput, expected_name: &str) -> &'a [syn::
     }
 }
 
+/// Panic if `sub_attr` is not a name-value like `foo = "…"` with the given name,
+/// or return the value.
 fn sub_attr_value<'a>(sub_attr: &'a syn::NestedMetaItem, expected_name: &str) -> &'a str {
     match *sub_attr {
         syn::NestedMetaItem::MetaItem(

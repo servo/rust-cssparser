@@ -89,24 +89,36 @@ pub use serializer::{ToCss, CssStringWriter, serialize_identifier, serialize_str
 pub use parser::{Parser, Delimiter, Delimiters, SourcePosition};
 pub use unicode_range::UnicodeRange;
 
-
-/**
-
-This macro is equivalent to a `match` expression on an `&str` value,
-but matching is case-insensitive in the ASCII range.
-
-Usage example:
-
-```{rust,ignore}
-match_ignore_ascii_case! { string,
-    "foo" => Some(Foo),
-    "bar" => Some(Bar),
-    "baz" => Some(Baz),
-    _ => None
-}
-```
-
-*/
+/// Expands to an expression equivalent to a `match` with string patterns,
+/// but matching is case-insensitive in the ASCII range.
+///
+/// Requirements:
+///
+/// * The `cssparser_macros` crate must also be imported at the crate root
+/// * The patterns must not contain ASCII upper case letters. (They must be already be lower-cased.)
+///
+/// # Example
+///
+/// ```rust
+/// #[macro_use] extern crate cssparser;
+/// #[macro_use] extern crate cssparser_macros;
+///
+/// # fn main() {}  // Make doctest not wrap everythig in its own main
+/// # fn dummy(function_name: &String) { let _ =
+/// match_ignore_ascii_case! { &function_name,
+///     "rgb" => parse_rgb(..),
+///     "rgba" => parse_rgba(..),
+///     "hsl" => parse_hsl(..),
+///     "hsla" => parse_hsla(..),
+///     _ => Err("unknown function")
+/// }
+/// # ;}
+/// # use std::ops::RangeFull;
+/// # fn parse_rgb(_: RangeFull) -> Result<(), &'static str> { Err("") }
+/// # fn parse_rgba(_: RangeFull) -> Result<(), &'static str> { Err("") }
+/// # fn parse_hsl(_: RangeFull) -> Result<(), &'static str> { Err("") }
+/// # fn parse_hsla(_: RangeFull) -> Result<(), &'static str> { Err("") }
+/// ```
 #[macro_export]
 macro_rules! match_ignore_ascii_case {
     // parse the last case plus the fallback
@@ -138,6 +150,38 @@ macro_rules! match_ignore_ascii_case {
     };
 }
 
+/// Define a placeholder type `$Name`
+/// with a method `fn get(input: &str) -> Option<&'static $ValueType>`.
+///
+/// This method uses finds a match for the input string
+/// in a [`phf` map](https://github.com/sfackler/rust-phf).
+/// Matching is case-insensitive in the ASCII range.
+///
+/// Requirements:
+///
+/// * The `phf` and `cssparser_macros` crates must also be imported at the crate root
+/// * The keys must not contain ASCII upper case letters. (They must be already be lower-cased.)
+/// * The values must be given a strings that contain Rust syntax for a constant expression.
+///
+/// ## Example:
+///
+/// ```rust
+/// extern crate phf;
+/// #[macro_use] extern crate cssparser;
+/// #[macro_use] extern crate cssparser_macros;
+///
+/// # fn main() {}  // Make doctest not wrap everythig in its own main
+///
+/// fn color_rgb(input: &str) -> Option<(u8, u8, u8)> {
+///     ascii_case_insensitive_phf_map! {
+///         KEYWORDS: Map<(u8, u8, u8)> = {
+///             "red" => "(255, 0, 0)",
+///             "green" => "(0, 255, 0)",
+///             "blue" => "(0, 0, 255)",
+///         }
+///     }
+///     KEYWORDS::get(input).cloned()
+/// }
 #[macro_export]
 macro_rules! ascii_case_insensitive_phf_map {
     ($Name: ident : Map<$ValueType: ty> = {
@@ -162,7 +206,14 @@ macro_rules! ascii_case_insensitive_phf_map {
     }
 }
 
+/// Implementation detail of match_ignore_ascii_case! and ascii_case_insensitive_phf_map! macros.
+///
+/// * Check at compile-time that none of the `$string`s contain ASCII uppercase letters
+/// * Define a local variable named `$output`
+///   to the result of calling `_match_ignore_ascii_case__to_lowercase`
+///   with a stack-allocated buffer as long as the longest `$string`.
 #[macro_export]
+#[doc(hidden)]
 macro_rules! _cssparser_internal__max_len {
     ($input: expr => $output: ident, $($string: expr),+) => {
         #[derive(cssparser__match_ignore_ascii_case__max_len)]
@@ -183,7 +234,10 @@ macro_rules! _cssparser_internal__max_len {
 }
 
 
-/// Implementation detail of macros.
+/// Implementation detail of match_ignore_ascii_case! and ascii_case_insensitive_phf_map! macros.
+///
+/// Return `input`, lower-cased, unless larger than `buffer`
+/// which is used temporary space for lower-casing a copy of `input` if necessary.
 #[doc(hidden)]
 #[allow(non_snake_case)]
 pub fn _match_ignore_ascii_case__to_lowercase<'a>(buffer: &'a mut [u8], input: &'a str) -> Option<&'a str> {
