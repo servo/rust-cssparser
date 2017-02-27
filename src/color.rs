@@ -180,7 +180,7 @@ pub fn parse_color_keyword(ident: &str) -> Result<Color, ()> {
         }
     }
     ascii_case_insensitive_phf_map! {
-        KEYWORDS: Map<Color> = {
+        keyword -> Color = {
             "black" => rgb!(0, 0, 0),
             "silver" => rgb!(192, 192, 192),
             "gray" => rgb!(128, 128, 128),
@@ -335,7 +335,7 @@ pub fn parse_color_keyword(ident: &str) -> Result<Color, ()> {
             "currentcolor" => Color::CurrentColor,
         }
     }
-    KEYWORDS::get(ident).cloned().ok_or(())
+    keyword(ident).cloned().ok_or(())
 }
 
 

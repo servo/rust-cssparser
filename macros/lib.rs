@@ -23,7 +23,7 @@ pub fn assert_ascii_lowercase(input: proc_macro::TokenStream) -> proc_macro::Tok
     "".parse().unwrap()
 }
 
-/// and emit a `MAX_LENGTH` constant with the length of the longest string.
+/// Emit a `MAX_LENGTH` constant with the length of the longest string.
 #[proc_macro_derive(cssparser__max_len)]
 pub fn max_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input(&input.to_string()).unwrap();
@@ -40,16 +40,13 @@ pub fn max_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 /// ```
-/// impl $Name {
-///     fn map() -> &'static ::phf::Map<&'static str, $ValueType> { … }
-/// }
+/// static MAP: &'static ::phf::Map<&'static str, $ValueType> = …;
 /// ```
 ///
 /// Map keys are ASCII-lowercased.
 #[proc_macro_derive(cssparser__phf_map)]
 pub fn phf_map(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input(&input.to_string()).unwrap();
-    let name = &input.ident;
 
     let token_trees = find_smuggled_tokens(&input);
     let value_type = &token_trees[0];
@@ -64,20 +61,13 @@ pub fn phf_map(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         map.entry(&**key, &**value);
     }
 
-    let mut initializer_bytes = Vec::<u8>::new();
-    let mut initializer_tokens = quote::Tokens::new();
-    map.build(&mut initializer_bytes).unwrap();
-    initializer_tokens.append(::std::str::from_utf8(&initializer_bytes).unwrap());
-
-    let tokens = quote! {
-        impl #name {
-            #[inline]
-            fn map() -> &'static ::phf::Map<&'static str, #value_type> {
-                static MAP: ::phf::Map<&'static str, #value_type> = #initializer_tokens;
-                &MAP
-            }
-        }
+    let mut tokens = quote! {
+        static MAP: ::phf::Map<&'static str, #value_type> =
     };
+    let mut initializer_bytes = Vec::new();
+    map.build(&mut initializer_bytes).unwrap();
+    tokens.append(::std::str::from_utf8(&initializer_bytes).unwrap());
+    tokens.append(";");
 
     tokens.as_str().parse().unwrap()
 }
@@ -85,7 +75,7 @@ pub fn phf_map(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// Return the `…` part in:
 ///
 /// ```rust
-/// enum $Name {
+/// enum Somthing {
 ///     Input = (0, stringify!(…)).0
 /// }
 /// ```

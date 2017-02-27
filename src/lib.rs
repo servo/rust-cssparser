@@ -134,18 +134,18 @@ macro_rules! match_ignore_ascii_case {
     // finished parsing
     (@inner $value:expr, () -> ($(($string:expr => $result:expr))*) $fallback:expr ) => {
         {
-            #[derive(cssparser__assert_ascii_lowercase)]
-            #[allow(unused)]
-            enum Dummy {
-                Input = (0, stringify!( $( $string )+ )).0
+            _cssparser_internal__pretend_proc_macro! {
+                cssparser__assert_ascii_lowercase!( $( $string )+ )
             }
 
-            _cssparser_internal__to_lowercase!($value => lowercase, $($string),+);
-            match lowercase {
-                $(
-                    Some($string) => $result,
-                )+
-                _ => $fallback
+            {
+                _cssparser_internal__to_lowercase!($value => lowercase, $($string),+);
+                match lowercase {
+                    $(
+                        Some($string) => $result,
+                    )+
+                    _ => $fallback
+                }
             }
         }
     };
@@ -156,11 +156,11 @@ macro_rules! match_ignore_ascii_case {
     };
 }
 
-/// Define a placeholder type `$Name`
-/// with a method `fn get(input: &str) -> Option<&'static $ValueType>`.
+/// Define a function `$name(&str) -> Option<&'static $ValueType>`
 ///
-/// This method uses finds a match for the input string
-/// in a [`phf` map](https://github.com/sfackler/rust-phf).
+/// The function finds a match for the input string
+/// in a [`phf` map](https://github.com/sfackler/rust-phf)
+/// and returns a reference to the corresponding value.
 /// Matching is case-insensitive in the ASCII range.
 ///
 /// The `phf` and `cssparser_macros` crates must also be imported at the crate root
@@ -176,30 +176,25 @@ macro_rules! match_ignore_ascii_case {
 ///
 /// fn color_rgb(input: &str) -> Option<(u8, u8, u8)> {
 ///     ascii_case_insensitive_phf_map! {
-///         KEYWORDS: Map<(u8, u8, u8)> = {
+///         keyword -> (u8, u8, u8) = {
 ///             "red" => (255, 0, 0),
 ///             "green" => (0, 255, 0),
 ///             "blue" => (0, 0, 255),
 ///         }
 ///     }
-///     KEYWORDS::get(input).cloned()
+///     keyword(input).cloned()
 /// }
 #[macro_export]
 macro_rules! ascii_case_insensitive_phf_map {
-    ($Name: ident : Map<$ValueType: ty> = {
-        $( $key: expr => $value: expr, )*
-    }) => {
-        #[derive(cssparser__phf_map)]
-        #[allow(unused)]
-        enum $Name {
-            Input = (0, stringify!( ($ValueType) $( $key ($value) )+ )).0
-        }
+    ($name: ident -> $ValueType: ty = { $( $key: expr => $value: expr, )* }) => {
+        fn $name(input: &str) -> Option<&'static $ValueType> {
+            _cssparser_internal__pretend_proc_macro! {
+                cssparser__phf_map!( ($ValueType) $( $key ($value) )+ )
+            }
 
-        impl $Name {
-            #[inline]
-            fn get(input: &str) -> Option<&'static $ValueType> {
+            {
                 _cssparser_internal__to_lowercase!(input => lowercase, $($key),+);
-                lowercase.and_then(|string| $Name::map().get(string))
+                lowercase.and_then(|s| MAP.get(s))
             }
         }
     }
@@ -216,10 +211,8 @@ macro_rules! ascii_case_insensitive_phf_map {
 #[doc(hidden)]
 macro_rules! _cssparser_internal__to_lowercase {
     ($input: expr => $output: ident, $($string: expr),+) => {
-        #[derive(cssparser__max_len)]
-        #[allow(unused)]
-        enum Dummy2 {
-            Input = (0, stringify!( $( $string )+ )).0
+        _cssparser_internal__pretend_proc_macro! {
+            cssparser__max_len!( $( $string )+ )
         }
 
         // mem::uninitialized() is ok because `buffer` is only used in `_internal__to_lowercase`,
@@ -232,6 +225,21 @@ macro_rules! _cssparser_internal__to_lowercase {
         };
         let input: &str = $input;
         let $output = $crate::_internal__to_lowercase(&mut buffer, input);
+    }
+}
+
+/// Implementation detail of match_ignore_ascii_case! and ascii_case_insensitive_phf_map! macros.
+///
+/// **This macro is not part of the public API. It can change or be removed between any versions.**
+#[macro_export]
+#[doc(hidden)]
+macro_rules! _cssparser_internal__pretend_proc_macro {
+    ($macro_name: ident ! ( $($tt: tt)* )) => {
+        #[derive($macro_name)]
+        #[allow(unused)]
+        enum Dummy {
+            Input = (0, stringify!( $( $tt )* )).0
+        }
     }
 }
 
