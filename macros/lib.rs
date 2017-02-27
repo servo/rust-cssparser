@@ -11,7 +11,7 @@ use std::ascii::AsciiExt;
 
 /// Panic if any string contains ASCII uppercase letters.
 /// Emit a `MAX_LENGTH` constant with the length of the longest string.
-#[proc_macro_derive(cssparser__assert_ascii_lowercase__max_len)]
+#[proc_macro_derive(cssparser_internal__assert_ascii_lowercase__max_len)]
 pub fn assert_ascii_lowercase_max_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     max_len_common(input, |token_trees| {
         let tokens = quote!( match x { #( #token_trees )* } );
@@ -47,7 +47,7 @@ pub fn assert_ascii_lowercase_max_len(input: proc_macro::TokenStream) -> proc_ma
 }
 
 /// Emit a `MAX_LENGTH` constant with the length of the longest string.
-#[proc_macro_derive(cssparser__max_len)]
+#[proc_macro_derive(cssparser_internal__max_len)]
 pub fn max_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     max_len_common(input, |token_trees| {
         token_trees.iter().map(|tt| string_literal(tt).len()).max()
@@ -69,7 +69,7 @@ where F : FnOnce(&[syn::TokenTree]) -> Option<usize> {
 /// ```
 ///
 /// Map keys are ASCII-lowercased.
-#[proc_macro_derive(cssparser__phf_map)]
+#[proc_macro_derive(cssparser_internal__phf_map)]
 pub fn phf_map(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     common(input, |token_trees| {
         let value_type = &token_trees[0];
