@@ -70,6 +70,7 @@ fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
 
 #[macro_use] extern crate cssparser_macros;
 #[macro_use] extern crate matches;
+#[macro_use] extern crate procedural_masquarade;
 extern crate phf;
 #[cfg(test)] extern crate encoding_rs;
 #[cfg(test)] extern crate tempdir;
