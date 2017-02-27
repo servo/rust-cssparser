@@ -44,32 +44,31 @@ pub fn max_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     tokens.as_str().parse().unwrap()
 }
 
-/// On `struct $Name($ValueType)`, add a new static method
-/// `fn map() -> &'static ::phf::Map<&'static str, $ValueType>`.
-/// The map’s content is given as:
-/// `#[cssparser__phf_map__kv_pairs(key = "…", value = "…", key = "…", value = "…")]`.
-/// Keys are ASCII-lowercased.
-#[proc_macro_derive(cssparser__phf_map,
-                    attributes(cssparser__phf_map__kv_pairs))]
+/// ```
+/// impl $Name {
+///     fn map() -> &'static ::phf::Map<&'static str, $ValueType> { … }
+/// }
+/// ```
+///
+/// Map keys are ASCII-lowercased.
+#[proc_macro_derive(cssparser__phf_map)]
 pub fn phf_map(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input(&input.to_string()).unwrap();
     let name = &input.ident;
-    let value_type = match input.body {
-        syn::Body::Struct(syn::VariantData::Tuple(ref fields)) if fields.len() == 1 => {
-            &fields[0].ty
-        }
-        _ => panic!("expected tuple struct newtype, got {:?}", input.body)
-    };
-
-    let pairs: Vec<_> = list_attr(&input, "cssparser__phf_map__kv_pairs").chunks(2).map(|chunk| {
-        let key = sub_attr_value(&chunk[0], "key");
-        let value = sub_attr_value(&chunk[1], "value");
-        (key.to_ascii_lowercase(), value)
+    let token_trees = find_smuggled_tokens(&input);
+    let value_type = &token_trees[0];
+    let pairs: Vec<_> = token_trees[1..].chunks(2).map(|chunk| {
+        let key = match chunk[0] {
+            syn::TokenTree::Token(syn::Token::Literal(syn::Lit::Str(ref string, _))) => string,
+            _ => panic!("expected string literal, got {:?}", chunk[0])
+        };
+        let value = &chunk[1];
+        (key.to_ascii_lowercase(), quote!(#value).to_string())
     }).collect();
 
     let mut map = phf_codegen::Map::new();
-    for &(ref key, value) in &pairs {
-        map.entry(&**key, value);
+    for &(ref key, ref value) in &pairs {
+        map.entry(&**key, &**value);
     }
 
     let mut initializer_bytes = Vec::<u8>::new();
@@ -88,6 +87,42 @@ pub fn phf_map(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     };
 
     tokens.as_str().parse().unwrap()
+}
+
+/// Return the `…` part in:
+///
+/// ```rust
+/// enum $Name {
+///     Input = (0, stringify!(…)).0
+/// }
+/// ```
+fn find_smuggled_tokens(input: &syn::DeriveInput) -> &[syn::TokenTree] {
+    let discriminant = match input.body {
+        syn::Body::Enum(ref variants) if variants.len() == 1 => &variants[0].discriminant,
+        _ => panic!("expected single-variant enum, got {:?}", input.body)
+    };
+    let tuple = match *discriminant {
+        Some(syn::ConstExpr::Other(syn::Expr { node: syn::ExprKind::TupField(ref t, 0), .. })) => t,
+        _ => panic!("expected a discriminant like tuple.0, got {:?}", discriminant)
+    };
+    let expr = match **tuple {
+        syn::Expr { node: syn::ExprKind::Tup(ref values), .. } if values.len() == 2 => &values[1],
+        _ => panic!("expected non-empty tuple, got {:?}", tuple)
+    };
+    let macro_args = match *expr {
+        syn::Expr { node: syn::ExprKind::Mac(
+            syn::Mac { ref tts, path: syn::Path { global: false, ref segments }}
+        ),  .. }
+        if segments.len() == 1
+            && segments[0] == syn::PathSegment::from("stringify")
+            && tts.len() == 1
+        => &tts[0],
+        _ => panic!("expected a stringify!(…) macro, got {:?}", expr)
+    };
+    match *macro_args {
+        syn::TokenTree::Delimited(syn::Delimited { ref tts, delim: syn::DelimToken::Paren }) => tts,
+        _ => panic!("expected (…) parentheses, got {:?}", macro_args)
+    }
 }
 
 /// Panic if the first attribute isn’t `#[foo(…)]` with the given name,

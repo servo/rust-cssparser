@@ -162,10 +162,7 @@ macro_rules! match_ignore_ascii_case {
 /// in a [`phf` map](https://github.com/sfackler/rust-phf).
 /// Matching is case-insensitive in the ASCII range.
 ///
-/// Requirements:
-///
-/// * The `phf` and `cssparser_macros` crates must also be imported at the crate root
-/// * The values must be given a strings that contain Rust syntax for a constant expression.
+/// The `phf` and `cssparser_macros` crates must also be imported at the crate root
 ///
 /// ## Example:
 ///
@@ -179,9 +176,9 @@ macro_rules! match_ignore_ascii_case {
 /// fn color_rgb(input: &str) -> Option<(u8, u8, u8)> {
 ///     ascii_case_insensitive_phf_map! {
 ///         KEYWORDS: Map<(u8, u8, u8)> = {
-///             "red" => "(255, 0, 0)",
-///             "green" => "(0, 255, 0)",
-///             "blue" => "(0, 0, 255)",
+///             "red" => (255, 0, 0),
+///             "green" => (0, 255, 0),
+///             "blue" => (0, 0, 255),
 ///         }
 ///     }
 ///     KEYWORDS::get(input).cloned()
@@ -192,13 +189,10 @@ macro_rules! ascii_case_insensitive_phf_map {
         $( $key: expr => $value: expr, )*
     }) => {
         #[derive(cssparser__phf_map)]
-        #[cssparser__phf_map__kv_pairs(
-            $(
-                key = $key,
-                value = $value
-            ),+
-        )]
-        struct $Name($ValueType);
+        #[allow(unused)]
+        enum $Name {
+            Input = (0, stringify!( ($ValueType) $( $key ($value) )+ )).0
+        }
 
         impl $Name {
             #[inline]
@@ -238,7 +232,6 @@ macro_rules! _cssparser_internal__to_lowercase {
         let $output = $crate::_internal__to_lowercase(&mut buffer, input);
     }
 }
-
 
 /// Implementation detail of match_ignore_ascii_case! and ascii_case_insensitive_phf_map! macros.
 ///
