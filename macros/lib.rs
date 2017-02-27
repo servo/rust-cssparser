@@ -67,12 +67,13 @@ define_proc_macros! {
         }).collect();
 
         let mut map = phf_codegen::Map::new();
+        map.phf_path("::cssparser::phf");
         for &(ref key, ref value) in &pairs {
             map.entry(&**key, &**value);
         }
 
         let mut tokens = quote! {
-            static MAP: ::phf::Map<&'static str, #value_type> =
+            static MAP: ::cssparser::phf::Map<&'static str, #value_type> =
         };
         let mut initializer_bytes = Vec::new();
         map.build(&mut initializer_bytes).unwrap();

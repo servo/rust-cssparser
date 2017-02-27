@@ -7,16 +7,12 @@ define_invoke_proc_macro!(cssparser_internal__invoke_proc_macro);
 /// Expands to an expression equivalent to a `match` with string patterns,
 /// but matching is case-insensitive in the ASCII range.
 ///
-/// Requirements:
-///
-/// * The `cssparser_macros` crate must also be imported at the crate root
-/// * The patterns must not contain ASCII upper case letters. (They must be already be lower-cased.)
+/// The patterns must not contain ASCII upper case letters. (They must be already be lower-cased.)
 ///
 /// # Example
 ///
 /// ```rust
 /// #[macro_use] extern crate cssparser;
-/// #[macro_use] extern crate cssparser_macros;
 ///
 /// # fn main() {}  // Make doctest not wrap everythig in its own main
 /// # fn dummy(function_name: &String) { let _ =
@@ -62,14 +58,10 @@ macro_rules! match_ignore_ascii_case {
 /// and returns a reference to the corresponding value.
 /// Matching is case-insensitive in the ASCII range.
 ///
-/// The `phf` and `cssparser_macros` crates must also be imported at the crate root
-///
 /// ## Example:
 ///
 /// ```rust
-/// extern crate phf;
 /// #[macro_use] extern crate cssparser;
-/// #[macro_use] extern crate cssparser_macros;
 ///
 /// # fn main() {}  // Make doctest not wrap everythig in its own main
 ///
