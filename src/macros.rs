@@ -2,10 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/// See docs of the `procedural-masquarade` crate.
 define_invoke_proc_macro!(cssparser_internal__invoke_proc_macro);
 
-/// Expands to an expression equivalent to a `match` with string patterns,
-/// but matching is case-insensitive in the ASCII range.
+/// Expands to a `match` expression with string patterns,
+/// matching case-insensitively in the ASCII range.
 ///
 /// The patterns must not contain ASCII upper case letters. (They must be already be lower-cased.)
 ///
@@ -63,7 +64,7 @@ macro_rules! match_ignore_ascii_case {
 /// ```rust
 /// #[macro_use] extern crate cssparser;
 ///
-/// # fn main() {}  // Make doctest not wrap everythig in its own main
+/// # fn main() {}  // Make doctest not wrap everything in its own main
 ///
 /// fn color_rgb(input: &str) -> Option<(u8, u8, u8)> {
 ///     ascii_case_insensitive_phf_map! {
@@ -99,18 +100,18 @@ macro_rules! ascii_case_insensitive_phf_map {
 ///
 /// **This macro is not part of the public API. It can change or be removed between any versions.**
 ///
-/// * Check at compile-time that none of the `$string`s contain ASCII uppercase letters
-/// * Define a local variable named `$output` to the result of calling `_internal__to_lowercase`
-///   with a stack-allocated buffer as long as the longest `$string`.
+/// Define a local variable named `$output`
+/// and assign it the result of calling `_internal__to_lowercase`
+/// with a stack-allocated buffer of length `$BUFFER_SIZE`.
 #[macro_export]
 #[doc(hidden)]
 macro_rules! cssparser_internal__to_lowercase {
-    ($input: expr, $MAX_LENGTH: expr => $output: ident) => {
+    ($input: expr, $BUFFER_SIZE: expr => $output: ident) => {
         // mem::uninitialized() is ok because `buffer` is only used in `_internal__to_lowercase`,
         // which initializes with `copy_from_slice` the part of the buffer it uses,
         // before it uses it.
         #[allow(unsafe_code)]
-        let mut buffer: [u8; $MAX_LENGTH] = unsafe {
+        let mut buffer: [u8; $BUFFER_SIZE] = unsafe {
             ::std::mem::uninitialized()
         };
         let input: &str = $input;
@@ -122,8 +123,8 @@ macro_rules! cssparser_internal__to_lowercase {
 ///
 /// **This function is not part of the public API. It can change or be removed between any verisons.**
 ///
-/// Return `input`, lower-cased, unless larger than `buffer`
-/// which is used temporary space for lower-casing a copy of `input` if necessary.
+/// If `input` is larger than buffer, return `None`.
+/// Otherwise, return `input` ASCII-lowercased, using `buffer` as temporary space if necessary.
 #[doc(hidden)]
 #[allow(non_snake_case)]
 pub fn _internal__to_lowercase<'a>(buffer: &'a mut [u8], input: &'a str) -> Option<&'a str> {

@@ -11,8 +11,12 @@ extern crate syn;
 use std::ascii::AsciiExt;
 
 define_proc_macros! {
-    /// Panic if any string contains ASCII uppercase letters.
-    /// Emit a `MAX_LENGTH` constant with the length of the longest string.
+    /// Input: the arms of a `match` expression.
+    ///
+    /// Output: a `MAX_LENGTH` constant with the length of the longest string pattern.
+    ///
+    /// Panic if the arms contain non-string patterns,
+    /// or string patterns that contains ASCII uppercase letters.
     #[allow(non_snake_case)]
     pub fn cssparser_internal__assert_ascii_lowercase__max_len(input: &str) -> String {
         let expr = syn::parse_expr(&format!("match x {{ {} }}", input)).unwrap();
@@ -45,17 +49,22 @@ define_proc_macros! {
         }))
     }
 
-    /// Emit a `MAX_LENGTH` constant with the length of the longest string.
+    /// Input: string literals with no separator
+    ///
+    /// Output: a `MAX_LENGTH` constant with the length of the longest string.
     #[allow(non_snake_case)]
     pub fn cssparser_internal__max_len(input: &str) -> String {
         max_len(syn::parse_token_trees(input).unwrap().iter().map(|tt| string_literal(tt).len()))
     }
 
-    /// ```
-    /// static MAP: &'static ::phf::Map<&'static str, $ValueType> = …;
-    /// ```
+    /// Input: parsed as token trees. The first TT is a type. (Can be wrapped in parens.)
+    /// following TTs are grouped in pairs, each pair being a key as a string literal
+    /// and the corresponding value as a const expression.
     ///
-    /// Map keys are ASCII-lowercased.
+    /// Output: a rust-phf map, with keys ASCII-lowercased:
+    /// ```
+    /// static MAP: &'static ::cssparser::phf::Map<&'static str, $ValueType> = …;
+    /// ```
     #[allow(non_snake_case)]
     pub fn cssparser_internal__phf_map(input: &str) -> String {
         let token_trees = syn::parse_token_trees(input).unwrap();
