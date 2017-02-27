@@ -50,7 +50,7 @@
 //! but not expressions directly.
 //!
 //! ```rust
-//! #[macro_use] extern crate procedural_masquarade;
+//! #[macro_use] extern crate procedural_masquerade;
 //! extern crate proc_macro;
 //!
 //! define_proc_macros! {
@@ -117,7 +117,7 @@
 //! 6. Here we use the macro defined in (3),
 //!    which allows us to write something that look like invoking a functional procedural macro,
 //!    but really uses a custom `derive`.
-//!    This will define a type called `ProceduralMasquaradeDummyType`,
+//!    This will define a type called `ProceduralMasqueradeDummyType`,
 //!    as a placeholder to use `derive`.
 //!    If `libfoo__invoke_proc_macro!` is to be used more than once,
 //!    each use needs to be nested in another block
@@ -214,7 +214,7 @@ macro_rules! define_invoke_proc_macro {
             ($proc_macro_name: ident ! $paren: tt) => {
                 #[derive($proc_macro_name)]
                 #[allow(unused)]
-                enum ProceduralMasquaradeDummyType {
+                enum ProceduralMasqueradeDummyType {
                     // The magic happens here.
                     //
                     // We use an `enum` with an explicit discriminant

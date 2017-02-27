@@ -1,9 +1,9 @@
 [package]
-name = "procedural-masquarade"
+name = "procedural-masquerade"
 version = "0.1.0"
 authors = ["Simon Sapin <simon.sapin@exyr.org>"]
 description = "macro_rules for making proc_macro_derive pretending to be proc_macro"
-documentation = "https://docs.rs/procedural-masquarade/"
+documentation = "https://docs.rs/procedural-masquerade/"
 repository = "https://github.com/servo/rust-cssparser"
 license = "MIT/Apache-2.0"
 

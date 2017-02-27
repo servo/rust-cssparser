@@ -12,7 +12,7 @@ path = "lib.rs"
 proc-macro = true
 
 [dependencies]
-procedural-masquarade = {path = "../procedural-masquarade", version = "0.1"}
+procedural-masquerade = {path = "../procedural-masquerade", version = "0.1"}
 phf_codegen = "0.7"
 quote = "0.3.14"
 syn = {version = "0.11.8", features = ["full"]}
