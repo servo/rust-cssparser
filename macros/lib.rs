@@ -9,32 +9,27 @@ extern crate syn;
 
 use std::ascii::AsciiExt;
 
-/// Find a `#[cssparser__assert_ascii_lowercase__data(string = "…", string = "…")]` attribute,
-/// and panic if any string contains ASCII uppercase letters.
-#[proc_macro_derive(cssparser__assert_ascii_lowercase,
-                    attributes(cssparser__assert_ascii_lowercase__data))]
+/// Panic if any string contains ASCII uppercase letters.
+#[proc_macro_derive(cssparser__assert_ascii_lowercase)]
 pub fn assert_ascii_lowercase(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input(&input.to_string()).unwrap();
-    let data = list_attr(&input, "cssparser__assert_ascii_lowercase__data");
 
-    for sub_attr in data {
-        let string = sub_attr_value(sub_attr, "string");
+    for token in find_smuggled_tokens(&input) {
+        let string = string_literal(token);
         assert_eq!(*string, string.to_ascii_lowercase(),
-                   "the expected strings must be given in ASCII lowercase");
+                   "the string patterns must be given in ASCII lowercase");
     }
 
     "".parse().unwrap()
 }
 
-/// Find a `#[cssparser__max_len__data(string = "…", string = "…")]` attribute,
 /// and emit a `MAX_LENGTH` constant with the length of the longest string.
-#[proc_macro_derive(cssparser__max_len,
-                    attributes(cssparser__max_len__data))]
+#[proc_macro_derive(cssparser__max_len)]
 pub fn max_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input(&input.to_string()).unwrap();
-    let data = list_attr(&input, "cssparser__max_len__data");
 
-    let lengths = data.iter().map(|sub_attr| sub_attr_value(sub_attr, "string").len());
+    let token_trees = find_smuggled_tokens(&input);
+    let lengths = token_trees.iter().map(|tt| string_literal(tt).len());
     let max_length = lengths.max().expect("expected at least one string");
 
     let tokens = quote! {
@@ -55,13 +50,11 @@ pub fn max_len(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 pub fn phf_map(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input(&input.to_string()).unwrap();
     let name = &input.ident;
+
     let token_trees = find_smuggled_tokens(&input);
     let value_type = &token_trees[0];
     let pairs: Vec<_> = token_trees[1..].chunks(2).map(|chunk| {
-        let key = match chunk[0] {
-            syn::TokenTree::Token(syn::Token::Literal(syn::Lit::Str(ref string, _))) => string,
-            _ => panic!("expected string literal, got {:?}", chunk[0])
-        };
+        let key = string_literal(&chunk[0]);
         let value = &chunk[1];
         (key.to_ascii_lowercase(), quote!(#value).to_string())
     }).collect();
@@ -125,33 +118,9 @@ fn find_smuggled_tokens(input: &syn::DeriveInput) -> &[syn::TokenTree] {
     }
 }
 
-/// Panic if the first attribute isn’t `#[foo(…)]` with the given name,
-/// or return the parameters.
-fn list_attr<'a>(input: &'a syn::DeriveInput, expected_name: &str) -> &'a [syn::NestedMetaItem] {
-    for attr in &input.attrs {
-        match attr.value {
-            syn::MetaItem::List(ref name, ref nested) if name == expected_name => {
-                return nested
-            }
-            _ => {}
-        }
-    }
-    panic!("expected a {} attribute", expected_name)
-}
-
-/// Panic if `sub_attr` is not a name-value like `foo = "…"` with the given name,
-/// or return the value.
-fn sub_attr_value<'a>(sub_attr: &'a syn::NestedMetaItem, expected_name: &str) -> &'a str {
-    match *sub_attr {
-        syn::NestedMetaItem::MetaItem(
-            syn::MetaItem::NameValue(ref name, syn::Lit::Str(ref value, _))
-        )
-        if name == expected_name => {
-            value
-        }
-        _ => {
-            panic!("expected a `{} = \"…\"` parameter to the attribute, got {:?}",
-                   expected_name, sub_attr)
-        }
+fn string_literal(token: &syn::TokenTree) -> &str {
+    match *token {
+        syn::TokenTree::Token(syn::Token::Literal(syn::Lit::Str(ref string, _))) => string,
+        _ => panic!("expected string literal, got {:?}", token)
     }
 }

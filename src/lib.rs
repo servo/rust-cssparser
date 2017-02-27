@@ -135,9 +135,10 @@ macro_rules! match_ignore_ascii_case {
     (@inner $value:expr, () -> ($(($string:expr => $result:expr))*) $fallback:expr ) => {
         {
             #[derive(cssparser__assert_ascii_lowercase)]
-            #[cssparser__assert_ascii_lowercase__data($(string = $string),+)]
-            #[allow(dead_code)]
-            struct Dummy;
+            #[allow(unused)]
+            enum Dummy {
+                Input = (0, stringify!( $( $string )+ )).0
+            }
 
             _cssparser_internal__to_lowercase!($value => lowercase, $($string),+);
             match lowercase {
@@ -216,9 +217,10 @@ macro_rules! ascii_case_insensitive_phf_map {
 macro_rules! _cssparser_internal__to_lowercase {
     ($input: expr => $output: ident, $($string: expr),+) => {
         #[derive(cssparser__max_len)]
-        #[cssparser__max_len__data($(string = $string),+)]
-        #[allow(dead_code)]
-        struct Dummy2;
+        #[allow(unused)]
+        enum Dummy2 {
+            Input = (0, stringify!( $( $string )+ )).0
+        }
 
         // mem::uninitialized() is ok because `buffer` is only used in `_internal__to_lowercase`,
         // which initializes with `copy_from_slice` the part of the buffer it uses,
