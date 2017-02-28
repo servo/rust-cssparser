@@ -209,6 +209,8 @@ pub fn _extract_input(derive_input: &str) -> String {
 #[macro_export]
 macro_rules! define_invoke_proc_macro {
     ($macro_name: ident) => {
+        /// Implementation detail of other macros in this crate.
+        #[doc(hidden)]
         #[macro_export]
         macro_rules! $macro_name {
             ($proc_macro_name: ident ! $paren: tt) => {
