@@ -175,7 +175,7 @@ macro_rules! define_proc_macros {
             pub fn $proc_macro_name(derive_input: ::proc_macro::TokenStream)
                                     -> ::proc_macro::TokenStream {
                 let $input = derive_input.to_string();
-                let $input: &str = &$crate::_extract_input(&$input);
+                let $input = $crate::_extract_input(&$input);
                 $body.parse().unwrap()
             }
         )+
@@ -186,21 +186,26 @@ macro_rules! define_proc_macros {
 ///
 /// **This function is not part of the public API. It can change or be removed between any versions.**
 #[doc(hidden)]
-pub fn _extract_input(derive_input: &str) -> String {
-    let mut normalized = String::with_capacity(derive_input.len());
-    for piece in derive_input.split_whitespace() {
-        normalized.push_str(piece);
-        normalized.push(' ');
+pub fn _extract_input(derive_input: &str) -> &str {
+    let mut input = derive_input;
+
+    for expected in &["#[allow(unused)]", "enum", "ProceduralMasqueradeDummyType", "{",
+                     "Input", "=", "(0,", "stringify!", "("] {
+        input = input.trim_left();
+        assert!(input.starts_with(expected),
+                "expected prefix {:?} not found in {:?}", expected, derive_input);
+        input = &input[expected.len()..];
     }
 
-    let prefix = "#[allow(unused)] enum ProceduralMasqueradeDummyType { Input = (0, stringify!(";
-    let suffix = ")).0, } ";
-    assert!(normalized.starts_with(prefix), "expected prefix not found in {:?}", derive_input);
-    assert!(normalized.ends_with(suffix), "expected suffix not found in {:?}", derive_input);
+    for expected in [")", ").0,", "}"].iter().rev() {
+        input = input.trim_right();
+        assert!(input.ends_with(expected),
+                "expected suffix {:?} not found in {:?}", expected, derive_input);
+        let end = input.len() - expected.len();
+        input = &input[..end];
+    }
 
-    let start = prefix.len();
-    let end = normalized.len() - suffix.len();
-    normalized[start..end].to_owned()
+    input
 }
 
 /// This macro expands to the definition of another macro (whose name is given as a parameter).
