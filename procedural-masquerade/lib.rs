@@ -172,30 +172,35 @@ macro_rules! define_proc_macros {
         $(
             $( #[$attr] )*
             #[proc_macro_derive($proc_macro_name)]
-            pub fn $proc_macro_name(input: ::proc_macro::TokenStream) -> ::proc_macro::TokenStream {
-                // Use another function to hide this one’s local variables from $block
-                #[inline]
-                fn implementation($input: &str) -> String $body
-
-                let input = input.to_string();
-                let mut normalized = String::with_capacity(input.len());
-                for piece in input.split_whitespace() {
-                    normalized.push_str(piece);
-                    normalized.push(' ');
-                }
-
-                let prefix = "#[allow(unused)] enum ProceduralMasqueradeDummyType { Input = (0, stringify!(";
-                let suffix = ")).0, } ";
-                assert!(normalized.starts_with(prefix), "expected prefix not found in {:?}", input);
-                assert!(normalized.ends_with(suffix), "expected suffix not found in {:?}", input);
-
-                let start = prefix.len();
-                let end = normalized.len() - suffix.len();
-                let output = implementation(&normalized[start..end]);
-                output.parse().unwrap()
+            pub fn $proc_macro_name(derive_input: ::proc_macro::TokenStream)
+                                    -> ::proc_macro::TokenStream {
+                let $input = derive_input.to_string();
+                let $input: &str = &$crate::_extract_input(&$input);
+                $body.parse().unwrap()
             }
         )+
     }
+}
+
+/// Implementation detail of `define_proc_macros!`.
+///
+/// **This function is not part of the public API. It can change or be removed between any versions.**
+#[doc(hidden)]
+pub fn _extract_input(derive_input: &str) -> String {
+    let mut normalized = String::with_capacity(derive_input.len());
+    for piece in derive_input.split_whitespace() {
+        normalized.push_str(piece);
+        normalized.push(' ');
+    }
+
+    let prefix = "#[allow(unused)] enum ProceduralMasqueradeDummyType { Input = (0, stringify!(";
+    let suffix = ")).0, } ";
+    assert!(normalized.starts_with(prefix), "expected prefix not found in {:?}", derive_input);
+    assert!(normalized.ends_with(suffix), "expected suffix not found in {:?}", derive_input);
+
+    let start = prefix.len();
+    let end = normalized.len() - suffix.len();
+    normalized[start..end].to_owned()
 }
 
 /// This macro expands to the definition of another macro (whose name is given as a parameter).
