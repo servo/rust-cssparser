@@ -156,11 +156,6 @@
 //! and
 //! [`cssparser-macros`’s `macros/lib.rs](https://github.com/servo/rust-cssparser/blob/master/macros/lib.rs).
 
-/////
-///// This indirection is necessary because re-exporting `macro_rules!` macros doesn’t work.
-///// Without it, when a library `libfoo` defines a macro whose expansion uses directly
-///// a macro
-
 /// This macro wraps `&str -> String` functions
 /// in custom `derive` implementations with `#[proc_macro_derive]`.
 ///
