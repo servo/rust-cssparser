@@ -88,13 +88,13 @@ define_proc_macros! {
         map.build(&mut initializer_bytes).unwrap();
         tokens.append(::std::str::from_utf8(&initializer_bytes).unwrap());
         tokens.append(";");
-        tokens.to_string()
+        tokens.into_string()
     }
 }
 
 fn max_len<I: Iterator<Item=usize>>(lengths: I) -> String {
     let max_length = lengths.max().expect("expected at least one string");
-    quote!( const MAX_LENGTH: usize = #max_length; ).to_string()
+    quote!( const MAX_LENGTH: usize = #max_length; ).into_string()
 }
 
 fn string_literal(token: &syn::TokenTree) -> &str {
