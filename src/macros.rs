@@ -78,6 +78,9 @@ macro_rules! match_ignore_ascii_case {
 /// }
 #[macro_export]
 macro_rules! ascii_case_insensitive_phf_map {
+    ($name: ident -> $ValueType: ty = { $( $key: expr => $value: expr ),* }) => {
+        ascii_case_insensitive_phf_map!($name -> $ValueType = { $( $key => $value, )* })
+    };
     ($name: ident -> $ValueType: ty = { $( $key: expr => $value: expr, )* }) => {
         fn $name(input: &str) -> Option<&'static $ValueType> {
             cssparser_internal__invoke_proc_macro! {
