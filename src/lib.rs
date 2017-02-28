@@ -71,7 +71,7 @@ fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
 #[macro_use] extern crate cssparser_macros;
 #[macro_use] extern crate matches;
 #[macro_use] extern crate procedural_masquerade;
-pub extern crate phf;
+#[doc(hidden)] pub extern crate phf as _internal__phf;
 #[cfg(test)] extern crate encoding_rs;
 #[cfg(test)] extern crate tempdir;
 #[cfg(test)] extern crate rustc_serialize;
@@ -96,7 +96,7 @@ pub use unicode_range::UnicodeRange;
 #[doc(hidden)] pub use macros::_internal__to_lowercase;
 
 // For macros when used in this crate. Unsure how $crate works with procedural-masquerade.
-mod cssparser { pub use phf; }
+mod cssparser { pub use _internal__phf; }
 
 #[macro_use]
 mod macros;
