@@ -250,12 +250,17 @@ impl<'a, W> fmt::Write for CssStringWriter<'a, W> where W: fmt::Write {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let mut chunk_start = 0;
         for (i, b) in s.bytes().enumerate() {
+            let string;
             let escaped = match b {
                 b'"' => "\\\"",
                 b'\\' => "\\\\",
                 b'\n' => "\\A ",
                 b'\r' => "\\D ",
-                b'\x0C' => "\\C ",
+                b'\0' => "\u{FFFD}",
+                x if (x >= b'\x01' && x <= b'\x1F') || x == b'\x7F' => {
+                    string = format!("\\{:x} ", x);
+                    &string
+                },
                 _ => continue,
             };
             try!(self.inner.write_str(&s[chunk_start..i]));
