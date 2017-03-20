@@ -257,8 +257,8 @@ impl<'a, W> fmt::Write for CssStringWriter<'a, W> where W: fmt::Write {
                 b'\n' => "\\A ",
                 b'\r' => "\\D ",
                 b'\0' => "\u{FFFD}",
-                x if (x >= b'\x01' && x <= b'\x1F') || x == b'\x7F' => {
-                    string = format!("\\{:x} ", x);
+                b'\x01'...b'\x1F' | b'\x7F' => {
+                    string = format!("\\{:x} ", b);
                     &string
                 },
                 _ => continue,
