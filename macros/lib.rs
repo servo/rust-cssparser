@@ -62,7 +62,7 @@ define_proc_macros! {
     /// and the corresponding value as a const expression.
     ///
     /// Output: a rust-phf map, with keys ASCII-lowercased:
-    /// ```
+    /// ```text
     /// static MAP: &'static ::cssparser::phf::Map<&'static str, $ValueType> = …;
     /// ```
     #[allow(non_snake_case)]
