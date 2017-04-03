@@ -16,7 +16,7 @@ exclude = ["src/css-parsing-tests"]
 
 [dev-dependencies]
 rustc-serialize = "0.3"
-tempdir = "0.3"
+difference = "1.0"
 encoding_rs = "0.5"
 
 [dependencies]
