@@ -632,6 +632,18 @@ fn unquoted_url(b: &mut Bencher) {
     })
 }
 
+
+#[cfg(feature = "bench")]
+#[bench]
+fn numeric(b: &mut Bencher) {
+    b.iter(|| {
+        for _ in 0..1000000 {
+            let mut input = Parser::new("10px");
+            let _ = test::black_box(input.next());
+        }
+    })
+}
+
 struct JsonParser;
 
 #[test]
