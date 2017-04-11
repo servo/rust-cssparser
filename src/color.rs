@@ -399,16 +399,10 @@ fn clamp_f32(val: f32) -> u8 {
 
 #[inline]
 fn parse_color_function(name: &str, arguments: &mut Parser) -> Result<Color, ()> {
-    let is_rgb = match_ignore_ascii_case! { name,
-        "rgb" | "rgba" => true,
-        "hsl" | "hsla" => false,
+    let (red, green, blue, uses_commas) = match_ignore_ascii_case! { name,
+        "rgb" | "rgba" => parse_rgb_components_rgb(arguments)?,
+        "hsl" | "hsla" => parse_rgb_components_hsl(arguments)?,
         _ => return Err(())
-    };
-
-    let (red, green, blue, uses_commas) = if is_rgb {
-        parse_rgb_components_rgb(arguments)?
-    } else {
-        parse_rgb_components_hsl(arguments)?
     };
 
     let alpha = if !arguments.is_exhausted() {
