@@ -176,7 +176,10 @@ macro_rules! define_proc_macros {
                                     -> ::proc_macro::TokenStream {
                 let $input = derive_input.to_string();
                 let $input = $crate::_extract_input(&$input);
-                $body.parse().unwrap()
+                fn wrapper($input: &str) -> String {
+                    $body
+                }
+                wrapper($input).parse().unwrap()
             }
         )+
     }
