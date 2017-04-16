@@ -80,7 +80,7 @@ fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
 
 pub use cssparser_macros::*;
 
-pub use tokenizer::{Token, NumericValue, PercentageValue, SourceLocation};
+pub use tokenizer::{Token, NumericValue, PercentageValue, Tokenizer, SourceLocation};
 pub use rules_and_declarations::{parse_important};
 pub use rules_and_declarations::{DeclarationParser, DeclarationListParser, parse_one_declaration};
 pub use rules_and_declarations::{RuleListParser, parse_one_rule};
