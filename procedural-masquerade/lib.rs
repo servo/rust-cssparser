@@ -174,12 +174,11 @@ macro_rules! define_proc_macros {
             #[proc_macro_derive($proc_macro_name)]
             pub fn $proc_macro_name(derive_input: ::proc_macro::TokenStream)
                                     -> ::proc_macro::TokenStream {
-                let $input = derive_input.to_string();
-                let $input = $crate::_extract_input(&$input);
-                fn wrapper($input: &str) -> String {
+                fn wrapped($input: &str) -> String {
                     $body
                 }
-                wrapper($input).parse().unwrap()
+                let derive_input_string = derive_input.to_string();
+                wrapped($crate::_extract_input(&derive_input_string)).parse().unwrap()
             }
         )+
     }
