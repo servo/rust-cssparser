@@ -22,7 +22,7 @@ define_invoke_proc_macro!(cssparser_internal__invoke_proc_macro);
 ///     "rgba" => parse_rgba(..),
 ///     "hsl" => parse_hsl(..),
 ///     "hsla" => parse_hsla(..),
-///     name @ _ => Err(format!("unknown function: {}", name))
+///     _ => Err(format!("unknown function: {}", function_name))
 /// }
 /// # ;}
 /// # use std::ops::RangeFull;
