@@ -12,7 +12,7 @@ use rustc_serialize::json::{self, Json, ToJson};
 #[cfg(feature = "bench")]
 use self::test::Bencher;
 
-use super::{Parser, Delimiter, Token, NumericValue, PercentageValue, SourceLocation,
+use super::{Parser, Delimiter, Token, NumericValue, PercentageValue, SourceLocation, ParseError,
             DeclarationListParser, DeclarationParser, RuleListParser,
             AtRuleType, AtRuleParser, QualifiedRuleParser,
             parse_one_declaration, parse_one_rule, parse_important,
@@ -253,7 +253,7 @@ fn outer_block_end_consumed() {
     assert!(input.expect_parenthesis_block().is_ok());
     assert!(input.parse_nested_block(|input| input.expect_function_matching("calc")).is_ok());
     println!("{:?}", input.position());
-    assert_eq!(input.next(), Err(()));
+    assert!(input.next().is_err());
 }
 
 #[test]
@@ -278,7 +278,7 @@ fn unquoted_url_escaping() {
 
 #[test]
 fn test_expect_url() {
-    fn parse(s: &str) -> Result<Cow<str>, ()> {
+    fn parse(s: &str) -> Result<Cow<str>, ParseError> {
         Parser::new(s).expect_url()
     }
     assert_eq!(parse("url()").unwrap(), "");
@@ -286,16 +286,16 @@ fn test_expect_url() {
     assert_eq!(parse("url( abc").unwrap(), "abc");
     assert_eq!(parse("url( abc \t)").unwrap(), "abc");
     assert_eq!(parse("url( 'abc' \t)").unwrap(), "abc");
-    assert_eq!(parse("url(abc more stuff)"), Err(()));
+    assert!(parse("url(abc more stuff)").is_err());
     // The grammar at https://drafts.csswg.org/css-values/#urls plans for `<url-modifier>*`
     // at the position of "more stuff", but no such modifier is defined yet.
-    assert_eq!(parse("url('abc' more stuff)"), Err(()));
+    assert!(parse("url('abc' more stuff)").is_err());
 }
 
 
 fn run_color_tests<F: Fn(Result<Color, ()>) -> Json>(json_data: &str, to_json: F) {
     run_json_tests(json_data, |input| {
-        to_json(input.parse_entirely(Color::parse))
+        to_json(input.parse_entirely(Color::parse).map_err(|_| ()))
     });
 }
 
@@ -438,7 +438,7 @@ fn line_numbers() {
 
     assert_eq!(input.next_including_whitespace(), Ok(Token::QuotedString(Borrowed("ab"))));
     assert_eq!(input.current_source_location(), SourceLocation { line: 5, column: 3 });
-    assert_eq!(input.next_including_whitespace(), Err(()));
+    assert!(input.next_including_whitespace().is_err());
 }
 
 #[test]
@@ -501,9 +501,9 @@ fn overflow() {
 fn line_delimited() {
     let mut input = Parser::new(" { foo ; bar } baz;,");
     assert_eq!(input.next(), Ok(Token::CurlyBracketBlock));
-    assert_eq!(input.parse_until_after(Delimiter::Semicolon, |_| Ok(42)), Err(()));
+    assert!(input.parse_until_after(Delimiter::Semicolon, |_| Ok(42)).is_err());
     assert_eq!(input.next(), Ok(Token::Comma));
-    assert_eq!(input.next(), Err(()));
+    assert!(input.next().is_err());
 }
 
 #[test]
@@ -636,7 +636,8 @@ fn no_stack_overflow_multiple_nested_blocks() {
 impl DeclarationParser for JsonParser {
     type Declaration = Json;
 
-    fn parse_value(&mut self, name: &str, input: &mut Parser) -> Result<Json, ()> {
+    fn parse_value<'i, 't>(&mut self, name: &str, input: &mut Parser<'i, 't>)
+                           -> Result<Json, ParseError<'i>> {
         let mut value = vec![];
         let mut important = false;
         loop {
@@ -675,8 +676,8 @@ impl AtRuleParser for JsonParser {
     type Prelude = Vec<Json>;
     type AtRule = Json;
 
-    fn parse_prelude(&mut self, name: &str, input: &mut Parser)
-                     -> Result<AtRuleType<Vec<Json>, Json>, ()> {
+    fn parse_prelude<'i, 't>(&mut self, name: &str, input: &mut Parser<'i, 't>)
+                     -> Result<AtRuleType<Vec<Json>, Json>, ParseError<'i>> {
         Ok(AtRuleType::OptionalBlock(vec![
             "at-rule".to_json(),
             name.to_json(),
@@ -684,7 +685,8 @@ impl AtRuleParser for JsonParser {
         ]))
     }
 
-    fn parse_block(&mut self, mut prelude: Vec<Json>, input: &mut Parser) -> Result<Json, ()> {
+    fn parse_block<'i, 't>(&mut self, mut prelude: Vec<Json>, input: &mut Parser<'i, 't>)
+                           -> Result<Json, ParseError<'i>> {
         prelude.push(Json::Array(component_values_to_json(input)));
         Ok(Json::Array(prelude))
     }
@@ -699,11 +701,12 @@ impl QualifiedRuleParser for JsonParser {
     type Prelude = Vec<Json>;
     type QualifiedRule = Json;
 
-    fn parse_prelude(&mut self, input: &mut Parser) -> Result<Vec<Json>, ()> {
+    fn parse_prelude<'i, 't>(&mut self, input: &mut Parser<'i, 't>) -> Result<Vec<Json>, ParseError<'i>> {
         Ok(component_values_to_json(input))
     }
 
-    fn parse_block(&mut self, prelude: Vec<Json>, input: &mut Parser) -> Result<Json, ()> {
+    fn parse_block<'i, 't>(&mut self, prelude: Vec<Json>, input: &mut Parser<'i, 't>)
+                           -> Result<Json, ParseError<'i>> {
         Ok(JArray![
             "qualified rule",
             prelude,
