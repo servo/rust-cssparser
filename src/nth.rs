@@ -4,14 +4,14 @@
 
 use std::ascii::AsciiExt;
 
-use super::{Token, Parser, ParseError};
+use super::{Token, Parser, BasicParseError};
 
 
 /// Parse the *An+B* notation, as found in the `:nth-child()` selector.
 /// The input is typically the arguments of a function,
 /// in which case the caller needs to check if the arguments’ parser is exhausted.
 /// Return `Ok((A, B))`, or `Err(())` for a syntax error.
-pub fn parse_nth<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(i32, i32), ParseError<'i>> {
+pub fn parse_nth<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(i32, i32), BasicParseError<'i>> {
     let token = try!(input.next());
     match token {
         Token::Number(ref value) => {
@@ -59,14 +59,14 @@ pub fn parse_nth<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(i32, i32), Parse
                     _ => parse_n_dash_digits(&*value).map(|v| (1, v))
                 }
             }
-            t => return Err(ParseError::UnexpectedToken(t)),
+            t => return Err(BasicParseError::UnexpectedToken(t)),
         },
         _ => Err(()),
-    }.map_err(|()| ParseError::UnexpectedToken(token))
+    }.map_err(|()| BasicParseError::UnexpectedToken(token))
 }
 
 
-fn parse_b<'i, 't>(input: &mut Parser<'i, 't>, a: i32) -> Result<(i32, i32), ParseError<'i>> {
+fn parse_b<'i, 't>(input: &mut Parser<'i, 't>, a: i32) -> Result<(i32, i32), BasicParseError<'i>> {
     let start_position = input.position();
     let token = input.next();
     match token {
@@ -82,10 +82,10 @@ fn parse_b<'i, 't>(input: &mut Parser<'i, 't>, a: i32) -> Result<(i32, i32), Par
             input.reset(start_position);
             Ok((a, 0))
         }
-    }.map_err(|()| ParseError::UnexpectedToken(token.unwrap()))
+    }.map_err(|()| BasicParseError::UnexpectedToken(token.unwrap()))
 }
 
-fn parse_signless_b<'i, 't>(input: &mut Parser<'i, 't>, a: i32, b_sign: i32) -> Result<(i32, i32), ParseError<'i>> {
+fn parse_signless_b<'i, 't>(input: &mut Parser<'i, 't>, a: i32, b_sign: i32) -> Result<(i32, i32), BasicParseError<'i>> {
     let token = try!(input.next());
     match token {
         Token::Number(ref value) if !value.has_sign => {
@@ -95,7 +95,7 @@ fn parse_signless_b<'i, 't>(input: &mut Parser<'i, 't>, a: i32, b_sign: i32) -> 
             }
         }
         _ => Err(())
-    }.map_err(|()| ParseError::UnexpectedToken(token))
+    }.map_err(|()| BasicParseError::UnexpectedToken(token))
 }
 
 fn parse_n_dash_digits(string: &str) -> Result<i32, ()> {
