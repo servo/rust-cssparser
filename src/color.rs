@@ -386,18 +386,25 @@ fn parse_color_hash(value: &str) -> Result<Color, ()> {
 }
 
 fn clamp_unit_f32(val: f32) -> u8 {
-    // Scale by 256, not 255, so that each of the 256 u8 values has an equal range
-    // of f32 values mapping to it. Floor before clamping.
+    // Whilst scaling by 256 and flooring would provide
+    // an equal distribution of integers to percentage inputs,
+    // this is not what Gecko does so we instead multiply by 255
+    // and round (adding 0.5 and flooring is equivalent to rounding)
     //
-    // Clamping to 256 and flooring after would let 1.0 map to 256, and
+    // Chrome does something similar for the alpha value, but not
+    // the rgb values.
+    //
+    // See https://bugzilla.mozilla.org/show_bug.cgi?id=1340484
+    //
+    // Clamping to 256 and rounding after would let 1.0 map to 256, and
     // `256.0_f32 as u8` is undefined behavior:
     //
     // https://github.com/rust-lang/rust/issues/10184
-    clamp_256_f32(val * 256.)
+    clamp_256_f32(val * 255.)
 }
 
 fn clamp_256_f32(val: f32) -> u8 {
-    val.floor().max(0.).min(255.) as u8
+    val.round().max(0.).min(255.) as u8
 }
 
 #[inline]
