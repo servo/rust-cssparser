@@ -158,7 +158,7 @@ impl Color {
 
     /// Parse a color hash, without the leading '#' character.
     #[inline]
-    fn parse_hash(value: &[u8]) -> Result<Self, ()> {
+    pub fn parse_hash(value: &[u8]) -> Result<Self, ()> {
         match value.len() {
             8 => rgba(
                 try!(from_hex(value[0])) * 16 + try!(from_hex(value[1])),
