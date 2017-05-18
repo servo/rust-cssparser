@@ -4,7 +4,7 @@
 
 //! https://drafts.csswg.org/css-syntax/#urange
 
-use {Parser, ToCss, BasicParseError};
+use {Parser, ToCss};
 use std::char;
 use std::cmp;
 use std::fmt;
@@ -24,7 +24,7 @@ pub struct UnicodeRange {
 
 impl UnicodeRange {
     /// https://drafts.csswg.org/css-syntax/#urange-syntax
-    pub fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, BasicParseError<'i>> {
+    pub fn parse(input: &mut Parser) -> Result<Self, ()> {
         // <urange> =
         //   u '+' <ident-token> '?'* |
         //   u <dimension-token> '?'* |
@@ -42,25 +42,22 @@ impl UnicodeRange {
         // but oh well…
         let concatenated_tokens = input.slice_from(after_u);
 
-        let range = match parse_concatenated(concatenated_tokens.as_bytes()) {
-            Ok(range) => range,
-            Err(()) => return Err(BasicParseError::UnexpectedToken(Token::Ident(concatenated_tokens.into()))),
-        };
+        let range = parse_concatenated(concatenated_tokens.as_bytes())?;
         if range.end > char::MAX as u32 || range.start > range.end {
-            Err(BasicParseError::UnexpectedToken(Token::Ident(concatenated_tokens.into())))
+            Err(())
         } else {
             Ok(range)
         }
     }
 }
 
-fn parse_tokens<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(), BasicParseError<'i>> {
+fn parse_tokens(input: &mut Parser) -> Result<(), ()> {
     match input.next_including_whitespace()? {
         Token::Delim('+') => {
             match input.next_including_whitespace()? {
                 Token::Ident(_) => {}
                 Token::Delim('?') => {}
-                t => return Err(BasicParseError::UnexpectedToken(t))
+                _ => return Err(())
             }
             parse_question_marks(input)
         }
@@ -76,7 +73,7 @@ fn parse_tokens<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(), BasicParseErro
                 _ => input.reset(after_number)
             }
         }
-        t => return Err(BasicParseError::UnexpectedToken(t))
+        _ => return Err(())
     }
     Ok(())
 }
