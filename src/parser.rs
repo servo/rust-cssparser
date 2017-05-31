@@ -61,46 +61,35 @@ impl<'a, T> ParseError<'a, T> {
     }
 }
 
-/// Like std::borrow::Cow, except the borrowed variant contains a mutable
-/// reference.
-enum MaybeOwned<'a, T: 'a> {
-    Owned(T),
-    Borrowed(&'a mut T),
-}
+/// The owned input for a parser.
+pub struct ParserInput<'t>(Tokenizer<'t>);
 
-impl<'a, T> ops::Deref for MaybeOwned<'a, T> {
-    type Target = T;
-
-    fn deref<'b>(&'b self) -> &'b T {
-        match *self {
-            MaybeOwned::Owned(ref t) => t,
-            MaybeOwned::Borrowed(ref pointer) => &**pointer,
-        }
+impl<'t> ParserInput<'t> {
+    /// Create a new input for a parser.
+    pub fn new(input: &'t str) -> ParserInput<'t> {
+        ParserInput(Tokenizer::new(input))
     }
 }
 
-impl<'a, T> ops::DerefMut for MaybeOwned<'a, T> {
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T {
-        match *self {
-            MaybeOwned::Owned(ref mut t) => t,
-            MaybeOwned::Borrowed(ref mut pointer) => &mut **pointer,
-        }
+impl<'t> ops::Deref for ParserInput<'t> {
+    type Target = Tokenizer<'t>;
+
+    fn deref(&self) -> &Tokenizer<'t> {
+        &self.0
     }
 }
 
-impl<'a, T> Clone for MaybeOwned<'a, T> where T: Clone {
-    fn clone(&self) -> MaybeOwned<'a, T> {
-        MaybeOwned::Owned((**self).clone())
+impl<'t> ops::DerefMut for ParserInput<'t> {
+    fn deref_mut(&mut self) -> &mut Tokenizer<'t> {
+        &mut self.0
     }
 }
-
 
 /// A CSS parser that borrows its `&str` input,
 /// yields `Token`s,
 /// and keeps track of nested blocks and functions.
-#[derive(Clone)]
 pub struct Parser<'i: 't, 't> {
-    tokenizer: MaybeOwned<'t, Tokenizer<'i>>,
+    tokenizer: &'t mut ParserInput<'i>,
     /// If `Some(_)`, .parse_nested_block() can be called.
     at_start_of: Option<BlockType>,
     /// For parsers from `parse_until` or `parse_nested_block`
@@ -203,12 +192,12 @@ impl Delimiters {
     }
 }
 
-impl<'i, 't> Parser<'i, 't> {
+impl<'i: 't, 't> Parser<'i, 't> {
     /// Create a new parser
     #[inline]
-    pub fn new(input: &'i str) -> Parser<'i, 'i> {
+    pub fn new(input: &'t mut ParserInput<'i>) -> Parser<'i, 't> {
         Parser {
-            tokenizer: MaybeOwned::Owned(Tokenizer::new(input)),
+            tokenizer: input,
             at_start_of: None,
             stop_before: Delimiter::None,
         }
@@ -400,10 +389,10 @@ impl<'i, 't> Parser<'i, 't> {
     /// or if a closure call leaves some input before the next comma or the end of the input.
     #[inline]
     pub fn parse_comma_separated<F, T, E>(&mut self, mut parse_one: F) -> Result<Vec<T>, ParseError<'i, E>>
-    where F: for <'ii, 'tt> FnMut(&mut Parser<'ii, 'tt>) -> Result<T, ParseError<'ii, E>> {
+    where F: for<'tt> FnMut(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>> {
         let mut values = vec![];
         loop {
-            values.push(try!(self.parse_until_before(Delimiter::Comma, |parser| parse_one(parser))));
+            values.push(try!(self.parse_until_before(Delimiter::Comma, &mut parse_one)));
             match self.next() {
                 Err(_) => return Ok(values),
                 Ok(Token::Comma) => continue,
@@ -426,31 +415,7 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn parse_nested_block<F, T, E>(&mut self, parse: F) -> Result <T, ParseError<'i, E>>
     where F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>> {
-        let block_type = self.at_start_of.take().expect("\
-            A nested parser can only be created when a Function, \
-            ParenthesisBlock, SquareBracketBlock, or CurlyBracketBlock \
-            token was just consumed.\
-        ");
-        let closing_delimiter = match block_type {
-            BlockType::CurlyBracket => ClosingDelimiter::CloseCurlyBracket,
-            BlockType::SquareBracket => ClosingDelimiter::CloseSquareBracket,
-            BlockType::Parenthesis => ClosingDelimiter::CloseParenthesis,
-        };
-        let result;
-        // Introduce a new scope to limit duration of nested_parser’s borrow
-        {
-            let mut nested_parser = Parser {
-                tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
-                at_start_of: None,
-                stop_before: closing_delimiter,
-            };
-            result = nested_parser.parse_entirely(parse);
-            if let Some(block_type) = nested_parser.at_start_of {
-                consume_until_end_of_block(block_type, &mut *nested_parser.tokenizer);
-            }
-        }
-        consume_until_end_of_block(block_type, &mut *self.tokenizer);
-        result
+        parse_nested_block(self, parse)
     }
 
     /// Limit parsing to until a given delimiter. (E.g. a semicolon for a property value.)
@@ -463,35 +428,8 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn parse_until_before<F, T, E>(&mut self, delimiters: Delimiters, parse: F)
                                     -> Result <T, ParseError<'i, E>>
-    where F: for<'ii, 'tt> FnOnce(&mut Parser<'ii, 'tt>) -> Result<T, ParseError<'ii, E>> {
-        let delimiters = self.stop_before | delimiters;
-        let result;
-        // Introduce a new scope to limit duration of nested_parser’s borrow
-        {
-            let mut delimited_parser = Parser {
-                tokenizer: MaybeOwned::Borrowed(&mut *self.tokenizer),
-                at_start_of: self.at_start_of.take(),
-                stop_before: delimiters,
-            };
-            result = delimited_parser.parse_entirely(parse);
-            if let Some(block_type) = delimited_parser.at_start_of {
-                consume_until_end_of_block(block_type, &mut *delimited_parser.tokenizer);
-            }
-        }
-        // FIXME: have a special-purpose tokenizer method for this that does less work.
-        loop {
-            if delimiters.contains(Delimiters::from_byte(self.tokenizer.next_byte())) {
-                break
-            }
-            if let Ok(token) = self.tokenizer.next() {
-                if let Some(block_type) = BlockType::opening(&token) {
-                    consume_until_end_of_block(block_type, &mut *self.tokenizer);
-                }
-            } else {
-                break
-            }
-        }
-        result
+    where F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>> {
+        parse_until_before(self, delimiters, parse)
     }
 
     /// Like `parse_until_before`, but also consume the delimiter token.
@@ -502,17 +440,8 @@ impl<'i, 't> Parser<'i, 't> {
     #[inline]
     pub fn parse_until_after<F, T, E>(&mut self, delimiters: Delimiters, parse: F)
                                    -> Result <T, ParseError<'i, E>>
-    where F: for<'ii, 'tt> FnOnce(&mut Parser<'ii, 'tt>) -> Result<T, ParseError<'ii, E>> {
-        let result = self.parse_until_before(delimiters, parse);
-        let next_byte = self.tokenizer.next_byte();
-        if next_byte.is_some() && !self.stop_before.contains(Delimiters::from_byte(next_byte)) {
-            debug_assert!(delimiters.contains(Delimiters::from_byte(next_byte)));
-            self.tokenizer.advance(1);
-            if next_byte == Some(b'{') {
-                consume_until_end_of_block(BlockType::CurlyBracket, &mut *self.tokenizer);
-            }
-        }
-        result
+    where F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>> {
+        parse_until_after(self, delimiters, parse)
     }
 
     /// Parse a <whitespace-token> and return its value.
@@ -736,6 +665,87 @@ impl<'i, 't> Parser<'i, 't> {
     }
 }
 
+pub fn parse_until_before<'i: 't, 't, F, T, E>(parser: &mut Parser<'i, 't>,
+                                               delimiters: Delimiters,
+                                               parse: F)
+                                               -> Result <T, ParseError<'i, E>>
+    where F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>> {
+    let delimiters = parser.stop_before | delimiters;
+    let result;
+    // Introduce a new scope to limit duration of nested_parser’s borrow
+    {
+        let mut delimited_parser = Parser {
+            tokenizer: parser.tokenizer,
+            at_start_of: parser.at_start_of.take(),
+            stop_before: delimiters,
+        };
+        result = delimited_parser.parse_entirely(parse);
+        if let Some(block_type) = delimited_parser.at_start_of {
+            consume_until_end_of_block(block_type, &mut *delimited_parser.tokenizer);
+        }
+    }
+    // FIXME: have a special-purpose tokenizer method for this that does less work.
+    loop {
+        if delimiters.contains(Delimiters::from_byte(parser.tokenizer.next_byte())) {
+            break
+        }
+        if let Ok(token) = parser.tokenizer.next() {
+            if let Some(block_type) = BlockType::opening(&token) {
+                consume_until_end_of_block(block_type, &mut *parser.tokenizer);
+            }
+        } else {
+            break
+        }
+    }
+    result
+}
+
+pub fn parse_until_after<'i: 't, 't, F, T, E>(parser: &mut Parser<'i, 't>,
+                                              delimiters: Delimiters,
+                                              parse: F)
+                                              -> Result <T, ParseError<'i, E>>
+    where F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>> {
+    let result = parser.parse_until_before(delimiters, parse);
+    let next_byte = parser.tokenizer.next_byte();
+    if next_byte.is_some() && !parser.stop_before.contains(Delimiters::from_byte(next_byte)) {
+        debug_assert!(delimiters.contains(Delimiters::from_byte(next_byte)));
+        parser.tokenizer.advance(1);
+        if next_byte == Some(b'{') {
+            consume_until_end_of_block(BlockType::CurlyBracket, &mut *parser.tokenizer);
+        }
+    }
+    result
+}
+
+pub fn parse_nested_block<'i: 't, 't, F, T, E>(parser: &mut Parser<'i, 't>, parse: F)
+                                               -> Result <T, ParseError<'i, E>>
+    where F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>> {
+    let block_type = parser.at_start_of.take().expect("\
+        A nested parser can only be created when a Function, \
+        ParenthesisBlock, SquareBracketBlock, or CurlyBracketBlock \
+        token was just consumed.\
+        ");
+    let closing_delimiter = match block_type {
+        BlockType::CurlyBracket => ClosingDelimiter::CloseCurlyBracket,
+        BlockType::SquareBracket => ClosingDelimiter::CloseSquareBracket,
+        BlockType::Parenthesis => ClosingDelimiter::CloseParenthesis,
+    };
+    let result;
+    // Introduce a new scope to limit duration of nested_parser’s borrow
+    {
+        let mut nested_parser = Parser {
+            tokenizer: parser.tokenizer,
+            at_start_of: None,
+            stop_before: closing_delimiter,
+        };
+        result = nested_parser.parse_entirely(parse);
+        if let Some(block_type) = nested_parser.at_start_of {
+            consume_until_end_of_block(block_type, &mut *nested_parser.tokenizer);
+        }
+    }
+    consume_until_end_of_block(block_type, &mut *parser.tokenizer);
+    result
+}
 
 fn consume_until_end_of_block(block_type: BlockType, tokenizer: &mut Tokenizer) {
     let mut stack = vec![block_type];
