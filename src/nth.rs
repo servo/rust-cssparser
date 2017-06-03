@@ -12,7 +12,7 @@ use super::{Token, Parser};
 /// in which case the caller needs to check if the arguments’ parser is exhausted.
 /// Return `Ok((A, B))`, or `Err(())` for a syntax error.
 pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
-    match try!(input.next()) {
+    match input.next()? {
         Token::Number(value) => Ok((0, try!(value.int_value.ok_or(())) as i32)),
         Token::Dimension(value, unit) => {
             let a = try!(value.int_value.ok_or(())) as i32;
@@ -37,15 +37,20 @@ pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), ()> {
                 }
             }
         }
-        Token::Delim('+') => match try!(input.next_including_whitespace()) {
-            Token::Ident(value) => {
-                match_ignore_ascii_case! { &value,
-                    "n" => parse_b(input, 1),
-                    "n-" => parse_signless_b(input, 1, -1),
-                    _ => Ok((1, try!(parse_n_dash_digits(&*value))))
-                }
+        Token::Delim(delim) => {
+            let val = match delim {
+                '+' => 1,
+                '-' => -1,
+                _ => return Err(()),
+            };
+            match input.next_including_whitespace()? {
+                Token::Ident(n) => match_ignore_ascii_case! { &n,
+                    "n" => parse_b(input, val),
+                    "n-" => parse_signless_b(input, val, -1),
+                    _ => Ok((1, try!(parse_n_dash_digits(&*n))))
+                },
+                _ => Err(())
             }
-            _ => Err(())
         },
         _ => Err(())
     }
