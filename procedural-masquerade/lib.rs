@@ -137,7 +137,7 @@
 //! ## For users
 //!
 //! Users of `libfoo` don’t need to worry about any of these implementation details.
-//! They can use the `foo_stringify` macro as if it were a simle `macro_rules` macro:
+//! They can use the `foo_stringify` macro as if it were a simple `macro_rules` macro:
 //!
 //! ```rust
 //! #[macro_use] extern crate libfoo;

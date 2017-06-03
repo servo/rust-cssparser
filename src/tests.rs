@@ -831,3 +831,21 @@ fn procedural_masquerade_whitespace() {
         _ => panic!("4"),
     }
 }
+
+#[test]
+fn known_not_matching() {
+    match_ignore_ascii_case! { "fo",
+        "bar" => {},
+        value => assert_eq!(value, "fo"),
+    }
+
+    match_ignore_ascii_case! { "foo",
+        "bar" => {},
+        value => assert_eq!(value, "foo"),
+    }
+
+    match_ignore_ascii_case! { "fooo",
+        "bar" => {},
+        value => assert_eq!(value, "fooo"),
+    }
+}
