@@ -60,16 +60,16 @@ pub enum Token<'a> {
 
     /// A [`<dimension-token>`](https://drafts.csswg.org/css-syntax/#dimension-token-diagram)
     Dimension {
+        /// Whether the number had a `+` or `-` sign.
+        ///
+        /// This is used is some cases like the <An+B> micro syntax. (See the `parse_nth` function.)
+        has_sign: bool,
+
         /// The value as a float
         value: f32,
 
         /// If the origin source did not include a fractional part, the value as an integer.
         int_value: Option<i32>,
-
-        /// Whether the number had a `+` or `-` sign.
-        ///
-        /// This is used is some cases like the <An+B> micro syntax. (See the `parse_nth` function.)
-        has_sign: bool,
 
         /// The unit, e.g. "px" in `12px`
         unit: CompactCowStr<'a>

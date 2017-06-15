@@ -105,7 +105,7 @@ impl<'a> Clone for CompactCowStr<'a> {
         if self.is_borrowed() {
             CompactCowStr { ..*self }
         } else {
-            Self::from(Box::from(&**self))
+            Self::from(String::from(&**self).into_boxed_str())
         }
     }
 }
@@ -142,7 +142,7 @@ impl<'a> From<CompactCowStr<'a>> for Cow<'a, str> {
             if is_borrowed {
                 Cow::Borrowed(&*raw)
             } else {
-                Cow::Owned(String::from(Box::from_raw(raw as *mut str)))
+                Cow::Owned(Box::from_raw(raw as *mut str).into_string())
             }
         }
     }
