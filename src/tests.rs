@@ -6,7 +6,6 @@
 extern crate test;
 
 use encoding_rs;
-use std::borrow::Cow::{self, Borrowed};
 use rustc_serialize::json::{self, Json, ToJson};
 
 #[cfg(feature = "bench")]
@@ -17,7 +16,7 @@ use super::{Parser, Delimiter, Token, NumericValue, PercentageValue, SourceLocat
             AtRuleType, AtRuleParser, QualifiedRuleParser, ParserInput,
             parse_one_declaration, parse_one_rule, parse_important,
             stylesheet_encoding, EncodingSupport,
-            TokenSerializationType,
+            TokenSerializationType, CompactCowStr,
             Color, RGBA, parse_nth, UnicodeRange, ToCss};
 
 macro_rules! JArray {
@@ -290,12 +289,12 @@ fn unquoted_url_escaping() {
         )\
         ");
     let mut input = ParserInput::new(&serialized);
-    assert_eq!(Parser::new(&mut input).next(), Ok(token))
+    assert_eq!(Parser::new(&mut input).next(), Ok(token));
 }
 
 #[test]
 fn test_expect_url() {
-    fn parse<'a>(s: &mut ParserInput<'a>) -> Result<Cow<'a, str>, BasicParseError<'a>> {
+    fn parse<'a>(s: &mut ParserInput<'a>) -> Result<CompactCowStr<'a>, BasicParseError<'a>> {
         Parser::new(s).expect_url()
     }
     let mut input = ParserInput::new("url()");
@@ -453,15 +452,15 @@ fn line_numbers() {
     let mut input = ParserInput::new("foo bar\nbaz\r\n\n\"a\\\r\nb\"");
     let mut input = Parser::new(&mut input);
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 1 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("foo"))));
+    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident("foo".into())));
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 4 });
     assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace(" ")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 5 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("bar"))));
+    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident("bar".into())));
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 8 });
     assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace("\n")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 1 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident(Borrowed("baz"))));
+    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident("baz".into())));
     assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 4 });
     let position = input.position();
 
@@ -470,7 +469,7 @@ fn line_numbers() {
 
     assert_eq!(input.source_location(position), SourceLocation { line: 2, column: 4 });
 
-    assert_eq!(input.next_including_whitespace(), Ok(Token::QuotedString(Borrowed("ab"))));
+    assert_eq!(input.next_including_whitespace(), Ok(Token::QuotedString("ab".into())));
     assert_eq!(input.current_source_location(), SourceLocation { line: 5, column: 3 });
     assert!(input.next_including_whitespace().is_err());
 }
@@ -679,7 +678,7 @@ impl<'i> DeclarationParser<'i> for JsonParser {
     type Declaration = Json;
     type Error = ();
 
-    fn parse_value<'t>(&mut self, name: Cow<'i, str>, input: &mut Parser<'i, 't>)
+    fn parse_value<'t>(&mut self, name: CompactCowStr<'i>, input: &mut Parser<'i, 't>)
                        -> Result<Json, ParseError<'i, ()>> {
         let mut value = vec![];
         let mut important = false;
@@ -720,7 +719,7 @@ impl<'i> AtRuleParser<'i> for JsonParser {
     type AtRule = Json;
     type Error = ();
 
-    fn parse_prelude<'t>(&mut self, name: Cow<'i, str>, input: &mut Parser<'i, 't>)
+    fn parse_prelude<'t>(&mut self, name: CompactCowStr<'i>, input: &mut Parser<'i, 't>)
                          -> Result<AtRuleType<Vec<Json>, Json>, ParseError<'i, ()>> {
         Ok(AtRuleType::OptionalBlock(vec![
             "at-rule".to_json(),
