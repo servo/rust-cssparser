@@ -6,7 +6,7 @@ use compact_cow_str::CompactCowStr;
 use std::ops::Range;
 use std::ascii::AsciiExt;
 use std::ops::BitOr;
-use tokenizer::{self, Token, PercentageValue, Tokenizer, SourceLocation};
+use tokenizer::{self, Token, Tokenizer, SourceLocation};
 
 
 /// A capture of the internal state of a `Parser` (including the position within the input),
@@ -529,7 +529,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     #[inline]
     pub fn expect_percentage(&mut self) -> Result<f32, BasicParseError<'i>> {
         match try!(self.next()) {
-            Token::Percentage(PercentageValue { unit_value, .. }) => Ok(unit_value),
+            Token::Percentage { unit_value, .. } => Ok(unit_value),
             t => Err(BasicParseError::UnexpectedToken(t))
         }
     }
