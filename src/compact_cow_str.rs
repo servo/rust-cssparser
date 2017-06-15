@@ -96,6 +96,21 @@ impl<'a> CompactCowStr<'a> {
             None
         }
     }
+
+    /// Convert into `String`, re-using the memory allocation it was already owned.
+    #[inline]
+    pub fn into_owned(self) -> String {
+        unsafe {
+            let raw = self.as_raw_str();
+            let is_borrowed = self.is_borrowed();
+            mem::forget(self);
+            if is_borrowed {
+                String::from(&*raw)
+            } else {
+                Box::from_raw(raw as *mut str).into_string()
+            }
+        }
+    }
 }
 
 impl<'a> Clone for CompactCowStr<'a> {
