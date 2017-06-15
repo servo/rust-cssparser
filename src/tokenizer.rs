@@ -8,10 +8,9 @@ use std::ops::Range;
 use std::cell::Cell;
 use std::char;
 use std::ascii::AsciiExt;
-use std::borrow::{Cow, ToOwned};
-use std::borrow::Cow::{Owned, Borrowed};
 use std::i32;
 
+use compact_cow_str::CompactCowStr;
 use self::Token::*;
 
 
@@ -23,32 +22,32 @@ use self::Token::*;
 pub enum Token<'a> {
 
     /// A [`<ident-token>`](https://drafts.csswg.org/css-syntax/#ident-token-diagram)
-    Ident(Cow<'a, str>),
+    Ident(CompactCowStr<'a>),
 
     /// A [`<at-keyword-token>`](https://drafts.csswg.org/css-syntax/#at-keyword-token-diagram)
     ///
     /// The value does not include the `@` marker.
-    AtKeyword(Cow<'a, str>),
+    AtKeyword(CompactCowStr<'a>),
 
     /// A [`<hash-token>`](https://drafts.csswg.org/css-syntax/#hash-token-diagram) with the type flag set to "unrestricted"
     ///
     /// The value does not include the `#` marker.
-    Hash(Cow<'a, str>),
+    Hash(CompactCowStr<'a>),
 
     /// A [`<hash-token>`](https://drafts.csswg.org/css-syntax/#hash-token-diagram) with the type flag set to "id"
     ///
     /// The value does not include the `#` marker.
-    IDHash(Cow<'a, str>),  // Hash that is a valid ID selector.
+    IDHash(CompactCowStr<'a>),  // Hash that is a valid ID selector.
 
     /// A [`<string-token>`](https://drafts.csswg.org/css-syntax/#string-token-diagram)
     ///
     /// The value does not include the quotes.
-    QuotedString(Cow<'a, str>),
+    QuotedString(CompactCowStr<'a>),
 
     /// A [`<url-token>`](https://drafts.csswg.org/css-syntax/#url-token-diagram) or `url( <string-token> )` function
     ///
     /// The value does not include the `url(` `)` markers or the quotes.
-    UnquotedUrl(Cow<'a, str>),
+    UnquotedUrl(CompactCowStr<'a>),
 
     /// A `<delim-token>`
     Delim(char),
@@ -60,7 +59,7 @@ pub enum Token<'a> {
     Percentage(PercentageValue),
 
     /// A [`<dimension-token>`](https://drafts.csswg.org/css-syntax/#dimension-token-diagram)
-    Dimension(NumericValue, Cow<'a, str>),
+    Dimension(NumericValue, CompactCowStr<'a>),
 
     /// A [`<whitespace-token>`](https://drafts.csswg.org/css-syntax/#whitespace-token-diagram)
     WhiteSpace(&'a str),
@@ -109,7 +108,7 @@ pub enum Token<'a> {
     /// A [`<function-token>`](https://drafts.csswg.org/css-syntax/#function-token-diagram)
     ///
     /// The value (name) does not include the `(` marker.
-    Function(Cow<'a, str>),
+    Function(CompactCowStr<'a>),
 
     /// A `<(-token>`
     ParenthesisBlock,
@@ -559,28 +558,28 @@ fn consume_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool) -> Toke
 
 /// Return `Err(())` on syntax error (ie. unescaped newline)
 fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
-                             -> Result<Cow<'a, str>, ()> {
+                             -> Result<CompactCowStr<'a>, ()> {
     tokenizer.advance(1);  // Skip the initial quote
     // start_pos is at code point boundary, after " or '
     let start_pos = tokenizer.position();
     let mut string_bytes;
     loop {
         if tokenizer.is_eof() {
-            return Ok(Borrowed(tokenizer.slice_from(start_pos)))
+            return Ok(tokenizer.slice_from(start_pos).into())
         }
         match_byte! { tokenizer.next_byte_unchecked(),
             b'"' => {
                 if !single_quote {
                     let value = tokenizer.slice_from(start_pos);
                     tokenizer.advance(1);
-                    return Ok(Borrowed(value))
+                    return Ok(value.into())
                 }
             }
             b'\'' => {
                 if single_quote {
                     let value = tokenizer.slice_from(start_pos);
                     tokenizer.advance(1);
-                    return Ok(Borrowed(value))
+                    return Ok(value.into())
                 }
             }
             b'\\' | b'\0' => {
@@ -644,10 +643,10 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
         string_bytes.push(b);
     }
 
-    Ok(Owned(
+    Ok(
         // string_bytes is well-formed UTF-8, see other comments.
-        unsafe { from_utf8_release_unchecked(string_bytes) }
-    ))
+        unsafe { from_utf8_release_unchecked(string_bytes) }.into()
+    )
 }
 
 
@@ -688,13 +687,13 @@ fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     }
 }
 
-fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> Cow<'a, str> {
+fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CompactCowStr<'a> {
     // start_pos is the end of the previous token, therefore at a code point boundary
     let start_pos = tokenizer.position();
     let mut value_bytes;
     loop {
         if tokenizer.is_eof() {
-            return Borrowed(tokenizer.slice_from(start_pos))
+            return tokenizer.slice_from(start_pos).into()
         }
         match_byte! { tokenizer.next_byte_unchecked(),
             b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' | b'-' => { tokenizer.advance(1) },
@@ -709,7 +708,7 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> Cow<'a, str> {
             }
             b => {
                 if b.is_ascii() {
-                    return Borrowed(tokenizer.slice_from(start_pos));
+                    return tokenizer.slice_from(start_pos).into();
                 }
                 tokenizer.advance(1);
             }
@@ -744,10 +743,8 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> Cow<'a, str> {
             }
         }
     }
-    Owned(
-        // string_bytes is well-formed UTF-8, see other comments.
-        unsafe { from_utf8_release_unchecked(value_bytes) }
-    )
+    // string_bytes is well-formed UTF-8, see other comments.
+    unsafe { from_utf8_release_unchecked(value_bytes) }.into()
 }
 
 fn byte_to_hex_digit(b: u8) -> Option<u32> {
@@ -903,7 +900,7 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
             b'"' | b'\'' => { return Err(()) },  // Do not advance
             b')' => {
                 tokenizer.advance(offset + 1);
-                return Ok(UnquotedUrl(Borrowed("")));
+                return Ok(UnquotedUrl("".into()));
             }
             _ => {
                 tokenizer.advance(offset);
@@ -914,7 +911,7 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
         }
     }
     tokenizer.position = tokenizer.input.len();
-    return Ok(UnquotedUrl(Borrowed("")));
+    return Ok(UnquotedUrl("".into()));
 
     fn consume_unquoted_url_internal<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         // This function is only called with start_pos at a code point boundary.
@@ -922,18 +919,18 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
         let mut string_bytes: Vec<u8>;
         loop {
             if tokenizer.is_eof() {
-                return UnquotedUrl(Borrowed(tokenizer.slice_from(start_pos)))
+                return UnquotedUrl(tokenizer.slice_from(start_pos).into())
             }
             match_byte! { tokenizer.next_byte_unchecked(),
                 b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' => {
                     let value = tokenizer.slice_from(start_pos);
                     tokenizer.advance(1);
-                    return consume_url_end(tokenizer, Borrowed(value))
+                    return consume_url_end(tokenizer, value.into())
                 }
                 b')' => {
                     let value = tokenizer.slice_from(start_pos);
                     tokenizer.advance(1);
-                    return UnquotedUrl(Borrowed(value))
+                    return UnquotedUrl(value.into())
                 }
                 b'\x01'...b'\x08' | b'\x0B' | b'\x0E'...b'\x1F' | b'\x7F'  // non-printable
                     | b'"' | b'\'' | b'(' => {
@@ -957,10 +954,11 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
         while !tokenizer.is_eof() {
             match_byte! { tokenizer.consume_byte(),
                 b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' => {
-                    return consume_url_end(tokenizer, Owned(
+                    return consume_url_end(
+                        tokenizer,
                         // string_bytes is well-formed UTF-8, see other comments.
-                        unsafe { from_utf8_release_unchecked(string_bytes) }
-                    ))
+                        unsafe { from_utf8_release_unchecked(string_bytes) }.into()
+                    )
                 }
                 b')' => {
                     break;
@@ -985,13 +983,13 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
                 b => { string_bytes.push(b) }
             }
         }
-        UnquotedUrl(Owned(
+        UnquotedUrl(
             // string_bytes is well-formed UTF-8, see other comments.
-            unsafe { from_utf8_release_unchecked(string_bytes) }
-        ))
+            unsafe { from_utf8_release_unchecked(string_bytes) }.into()
+        )
     }
 
-    fn consume_url_end<'a>(tokenizer: &mut Tokenizer<'a>, string: Cow<'a, str>) -> Token<'a> {
+    fn consume_url_end<'a>(tokenizer: &mut Tokenizer<'a>, string: CompactCowStr<'a>) -> Token<'a> {
         while !tokenizer.is_eof() {
             match_byte! { tokenizer.consume_byte(),
                 b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' => {},

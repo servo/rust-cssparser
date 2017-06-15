@@ -32,7 +32,7 @@ macro_rules! size_of_test {
 }
 
 // These assume 64-bit
-size_of_test!(token, Token, 56);
+size_of_test!(token, Token, 40);
 size_of_test!(numeric_value, NumericValue, 16);
 size_of_test!(percentage_value, PercentageValue, 16);
 size_of_test!(std_cow_str, Cow<'static, str>, 32);
