@@ -432,8 +432,8 @@ fn parse_color_function<'i, 't>(name: &str, arguments: &mut Parser<'i, 't>) -> R
             Token::Number { value: v, .. } => {
                 clamp_unit_f32(v)
             }
-            Token::Percentage(ref v) => {
-                clamp_unit_f32(v.unit_value)
+            Token::Percentage { unit_value: v, .. } => {
+                clamp_unit_f32(v)
             }
             t => {
                 return Err(BasicParseError::UnexpectedToken(t))
@@ -473,10 +473,10 @@ fn parse_rgb_components_rgb<'i, 't>(arguments: &mut Parser<'i, 't>) -> Result<(u
             }
             blue = clamp_floor_256_f32(try!(arguments.expect_number()));
         }
-        Token::Percentage(ref v) => {
-            red = clamp_unit_f32(v.unit_value);
+        Token::Percentage { unit_value, .. } => {
+            red = clamp_unit_f32(unit_value);
             green = clamp_unit_f32(match try!(arguments.next()) {
-                Token::Percentage(ref v) => v.unit_value,
+                Token::Percentage { unit_value, .. } => unit_value,
                 Token::Comma => {
                     uses_commas = true;
                     try!(arguments.expect_percentage())
@@ -520,7 +520,7 @@ fn parse_rgb_components_hsl<'i, 't>(arguments: &mut Parser<'i, 't>) -> Result<(u
     // Saturation and lightness are clamped to 0% ... 100%
     // https://drafts.csswg.org/css-color/#the-hsl-notation
     let saturation = match try!(arguments.next()) {
-        Token::Percentage(ref v) => v.unit_value,
+        Token::Percentage { unit_value, .. } => unit_value,
         Token::Comma => {
             uses_commas = true;
             try!(arguments.expect_percentage())

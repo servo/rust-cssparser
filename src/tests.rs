@@ -11,7 +11,7 @@ use rustc_serialize::json::{self, Json, ToJson};
 #[cfg(feature = "bench")]
 use self::test::Bencher;
 
-use super::{Parser, Delimiter, Token, PercentageValue, SourceLocation, ParseError,
+use super::{Parser, Delimiter, Token, SourceLocation, ParseError,
             DeclarationListParser, DeclarationParser, RuleListParser, BasicParseError,
             AtRuleType, AtRuleParser, QualifiedRuleParser, ParserInput,
             parse_one_declaration, parse_one_rule, parse_important,
@@ -802,7 +802,7 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
             v.extend(numeric(value, int_value, has_sign));
             v
         }),
-        Token::Percentage(PercentageValue { unit_value, int_value, has_sign }) => Json::Array({
+        Token::Percentage { unit_value, int_value, has_sign } => Json::Array({
             let mut v = vec!["percentage".to_json()];
             v.extend(numeric(unit_value * 100., int_value, has_sign));
             v

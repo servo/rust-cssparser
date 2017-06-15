@@ -5,7 +5,7 @@
 use std::ascii::AsciiExt;
 use std::fmt::{self, Write};
 
-use super::{Token, PercentageValue};
+use super::Token;
 
 
 /// Trait for things the can serialize themselves in CSS syntax.
@@ -91,7 +91,7 @@ impl<'a> ToCss for Token<'a> {
             Token::Number { value, int_value, has_sign } => {
                 try!(write_numeric(value, int_value, has_sign, dest))
             }
-            Token::Percentage(PercentageValue { unit_value, int_value, has_sign }) => {
+            Token::Percentage { unit_value, int_value, has_sign } => {
                 try!(write_numeric(unit_value * 100., int_value, has_sign, dest));
                 try!(dest.write_str("%"));
             },
@@ -388,7 +388,7 @@ impl<'a> Token<'a> {
             Token::Delim('/') => DelimSlash,
             Token::Delim('*') => DelimAsterisk,
             Token::Number { .. } => Number,
-            Token::Percentage(_) => Percentage,
+            Token::Percentage { .. } => Percentage,
             Token::Dimension { .. } => Dimension,
             Token::WhiteSpace(_) => WhiteSpace,
             Token::Comment(_) => DelimSlash,
