@@ -117,5 +117,5 @@ mod nth;
 mod serializer;
 mod unicode_range;
 
-#[cfg(test)]
-mod tests;
+#[cfg(test)] mod tests;
+#[cfg(test)] mod size_of_tests;
