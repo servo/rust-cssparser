@@ -14,11 +14,8 @@ use super::{Token, Parser, BasicParseError};
 pub fn parse_nth<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(i32, i32), BasicParseError<'i>> {
     let token = try!(input.next());
     match token {
-        Token::Number(ref value) => {
-            match value.int_value {
-                Some(v) => Ok((0, v as i32)),
-                None => Err(()),
-            }
+        Token::Number { int_value: Some(b), .. } => {
+            Ok((0, b))
         }
         Token::Dimension { int_value: Some(a), ref unit, .. } => {
             match_ignore_ascii_case! {
@@ -66,12 +63,7 @@ fn parse_b<'i, 't>(input: &mut Parser<'i, 't>, a: i32) -> Result<(i32, i32), Bas
     match token {
         Ok(Token::Delim('+')) => Ok(try!(parse_signless_b(input, a, 1))),
         Ok(Token::Delim('-')) => Ok(try!(parse_signless_b(input, a, -1))),
-        Ok(Token::Number(ref value)) if value.has_sign => {
-            match value.int_value {
-                Some(v) => Ok((a, v as i32)),
-                None => Err(()),
-            }
-        }
+        Ok(Token::Number { has_sign: true, int_value: Some(b), .. }) => Ok((a, b)),
         _ => {
             input.reset(start_position);
             Ok((a, 0))
@@ -82,12 +74,7 @@ fn parse_b<'i, 't>(input: &mut Parser<'i, 't>, a: i32) -> Result<(i32, i32), Bas
 fn parse_signless_b<'i, 't>(input: &mut Parser<'i, 't>, a: i32, b_sign: i32) -> Result<(i32, i32), BasicParseError<'i>> {
     let token = try!(input.next());
     match token {
-        Token::Number(ref value) if !value.has_sign => {
-            match value.int_value {
-                Some(v) => Ok((a, b_sign * v as i32)),
-                None => Err(()),
-            }
-        }
+        Token::Number { has_sign: false, int_value: Some(b), .. } => Ok((a, b_sign * b)),
         _ => Err(())
     }.map_err(|()| BasicParseError::UnexpectedToken(token))
 }

@@ -11,7 +11,7 @@ use rustc_serialize::json::{self, Json, ToJson};
 #[cfg(feature = "bench")]
 use self::test::Bencher;
 
-use super::{Parser, Delimiter, Token, NumericValue, PercentageValue, SourceLocation, ParseError,
+use super::{Parser, Delimiter, Token, PercentageValue, SourceLocation, ParseError,
             DeclarationListParser, DeclarationParser, RuleListParser, BasicParseError,
             AtRuleType, AtRuleParser, QualifiedRuleParser, ParserInput,
             parse_one_declaration, parse_one_rule, parse_important,
@@ -768,11 +768,15 @@ fn component_values_to_json(input: &mut Parser) -> Vec<Json> {
 }
 
 fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
-    fn numeric(value: NumericValue) -> Vec<json::Json> {
+    fn numeric(value: f32, int_value: Option<i32>, has_sign: bool) -> Vec<json::Json> {
         vec![
-            Token::Number(value).to_css_string().to_json(),
-            match value.int_value { Some(i) => i.to_json(), None => value.value.to_json() },
-            match value.int_value { Some(_) => "integer", None => "number" }.to_json()
+            Token::Number {
+                value: value,
+                int_value: int_value,
+                has_sign: has_sign,
+            }.to_css_string().to_json(),
+            match int_value { Some(i) => i.to_json(), None => value.to_json() },
+            match int_value { Some(_) => "integer", None => "number" }.to_json()
         ]
     }
 
@@ -793,27 +797,19 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
         Token::Delim('\\') => "\\".to_json(),
         Token::Delim(value) => value.to_string().to_json(),
 
-        Token::Number(value) => Json::Array({
+        Token::Number { value, int_value, has_sign } => Json::Array({
             let mut v = vec!["number".to_json()];
-            v.extend(numeric(value));
+            v.extend(numeric(value, int_value, has_sign));
             v
         }),
         Token::Percentage(PercentageValue { unit_value, int_value, has_sign }) => Json::Array({
             let mut v = vec!["percentage".to_json()];
-            v.extend(numeric(NumericValue {
-                value: unit_value * 100.,
-                int_value: int_value,
-                has_sign: has_sign,
-            }));
+            v.extend(numeric(unit_value * 100., int_value, has_sign));
             v
         }),
         Token::Dimension { value, int_value, has_sign, unit } => Json::Array({
             let mut v = vec!["dimension".to_json()];
-            v.extend(numeric(NumericValue {
-                value: value,
-                int_value: int_value,
-                has_sign: has_sign,
-            }));
+            v.extend(numeric(value, int_value, has_sign));
             v.push(unit.to_json());
             v
         }),

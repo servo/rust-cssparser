@@ -6,7 +6,7 @@ use compact_cow_str::CompactCowStr;
 use std::ops::Range;
 use std::ascii::AsciiExt;
 use std::ops::BitOr;
-use tokenizer::{self, Token, NumericValue, PercentageValue, Tokenizer, SourceLocation};
+use tokenizer::{self, Token, PercentageValue, Tokenizer, SourceLocation};
 
 
 /// A capture of the internal state of a `Parser` (including the position within the input),
@@ -507,7 +507,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     #[inline]
     pub fn expect_number(&mut self) -> Result<f32, BasicParseError<'i>> {
         match try!(self.next()) {
-            Token::Number(NumericValue { value, .. }) => Ok(value),
+            Token::Number { value, .. } => Ok(value),
             t => Err(BasicParseError::UnexpectedToken(t))
         }
     }
@@ -517,7 +517,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     pub fn expect_integer(&mut self) -> Result<i32, BasicParseError<'i>> {
         let token = try!(self.next());
         match token {
-            Token::Number(NumericValue { int_value: Some(int_value), .. }) => {
+            Token::Number { int_value: Some(int_value), .. } => {
                 Ok(int_value)
             }
             t => Err(BasicParseError::UnexpectedToken(t))
