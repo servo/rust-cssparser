@@ -91,6 +91,7 @@ pub use nth::parse_nth;
 pub use serializer::{ToCss, CssStringWriter, serialize_identifier, serialize_string, TokenSerializationType};
 pub use parser::{Parser, Delimiter, Delimiters, SourcePosition, ParseError, BasicParseError, ParserInput};
 pub use unicode_range::UnicodeRange;
+pub use compact_cow_str::CompactCowStr;
 
 // For macros
 #[doc(hidden)] pub use macros::_internal__to_lowercase;
@@ -116,6 +117,7 @@ mod color;
 mod nth;
 mod serializer;
 mod unicode_range;
+mod compact_cow_str;
 
 #[cfg(test)] mod tests;
 #[cfg(test)] mod size_of_tests;

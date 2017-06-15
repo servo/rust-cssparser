@@ -17,7 +17,7 @@ use self::Token::*;
 
 /// One of the pieces the CSS input is broken into.
 ///
-/// Some components use `CowString` in order to borrow from the original input string
+/// Some components use `Cow` in order to borrow from the original input string
 /// and avoid allocating/copying when possible.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Token<'a> {
