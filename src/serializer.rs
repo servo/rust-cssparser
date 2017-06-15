@@ -97,8 +97,12 @@ impl<'a> ToCss for Token<'a> {
                 try!(write_numeric(value, dest));
                 try!(dest.write_str("%"));
             },
-            Token::Dimension(value, ref unit) => {
-                try!(write_numeric(value, dest));
+            Token::Dimension { value, int_value, has_sign, ref unit } => {
+                try!(write_numeric(NumericValue {
+                    value: value,
+                    int_value: int_value,
+                    has_sign: has_sign,
+                }, dest));
                 // Disambiguate with scientific notation.
                 let unit = &**unit;
                 if unit == "e" || unit == "E" || unit.starts_with("e-") || unit.starts_with("E-") {
@@ -391,7 +395,7 @@ impl<'a> Token<'a> {
             Token::Delim('*') => DelimAsterisk,
             Token::Number(_) => Number,
             Token::Percentage(_) => Percentage,
-            Token::Dimension(..) => Dimension,
+            Token::Dimension { .. } => Dimension,
             Token::WhiteSpace(_) => WhiteSpace,
             Token::Comment(_) => DelimSlash,
             Token::DashMatch => DashMatch,

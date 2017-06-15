@@ -59,7 +59,21 @@ pub enum Token<'a> {
     Percentage(PercentageValue),
 
     /// A [`<dimension-token>`](https://drafts.csswg.org/css-syntax/#dimension-token-diagram)
-    Dimension(NumericValue, CompactCowStr<'a>),
+    Dimension {
+        /// The value as a float
+        value: f32,
+
+        /// If the origin source did not include a fractional part, the value as an integer.
+        int_value: Option<i32>,
+
+        /// Whether the number had a `+` or `-` sign.
+        ///
+        /// This is used is some cases like the <An+B> micro syntax. (See the `parse_nth` function.)
+        has_sign: bool,
+
+        /// The unit, e.g. "px" in `12px`
+        unit: CompactCowStr<'a>
+    },
 
     /// A [`<whitespace-token>`](https://drafts.csswg.org/css-syntax/#whitespace-token-diagram)
     WhiteSpace(&'a str),
@@ -861,24 +875,29 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
             has_sign: has_sign,
         })
     }
-    let value = NumericValue {
-        value: value as f32,
-        int_value: int_value,
-        has_sign: has_sign,
-    };
+    let value = value as f32;
     if is_ident_start(tokenizer) {
-        let name = consume_name(tokenizer);
+        let unit = consume_name(tokenizer);
         if tokenizer.viewport_percentages == SeenStatus::LookingForThem {
-            if name.eq_ignore_ascii_case("vh") ||
-               name.eq_ignore_ascii_case("vw") ||
-               name.eq_ignore_ascii_case("vmin") ||
-               name.eq_ignore_ascii_case("vmax") {
+            if unit.eq_ignore_ascii_case("vh") ||
+               unit.eq_ignore_ascii_case("vw") ||
+               unit.eq_ignore_ascii_case("vmin") ||
+               unit.eq_ignore_ascii_case("vmax") {
                    tokenizer.viewport_percentages = SeenStatus::SeenAtLeastOne;
            }
         }
-        Dimension(value, name)
+        Dimension {
+            value: value,
+            int_value: int_value,
+            has_sign: has_sign,
+            unit: unit,
+        }
     } else {
-        Number(value)
+        Number(NumericValue {
+            value: value,
+            int_value: int_value,
+            has_sign: has_sign,
+        })
     }
 }
 

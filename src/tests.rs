@@ -807,9 +807,13 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
             }));
             v
         }),
-        Token::Dimension(value, unit) => Json::Array({
+        Token::Dimension { value, int_value, has_sign, unit } => Json::Array({
             let mut v = vec!["dimension".to_json()];
-            v.extend(numeric(value));
+            v.extend(numeric(NumericValue {
+                value: value,
+                int_value: int_value,
+                has_sign: has_sign,
+            }));
             v.push(unit.to_json());
             v
         }),

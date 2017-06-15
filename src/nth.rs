@@ -20,20 +20,14 @@ pub fn parse_nth<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(i32, i32), Basic
                 None => Err(()),
             }
         }
-        Token::Dimension(value, ref unit) => {
-            match value.int_value {
-                Some(v) => {
-                    let a = v as i32;
-                    match_ignore_ascii_case! {
-                        &unit,
-                        "n" => Ok(try!(parse_b(input, a))),
-                        "n-" => Ok(try!(parse_signless_b(input, a, -1))),
-                        _ => {
-                            parse_n_dash_digits(&*unit).map(|val| (a, val))
-                        }
-                    }
+        Token::Dimension { int_value: Some(a), ref unit, .. } => {
+            match_ignore_ascii_case! {
+                &unit,
+                "n" => Ok(try!(parse_b(input, a))),
+                "n-" => Ok(try!(parse_signless_b(input, a, -1))),
+                _ => {
+                    parse_n_dash_digits(&*unit).map(|val| (a, val))
                 }
-                None => Err(()),
             }
         }
         Token::Ident(ref value) => {
