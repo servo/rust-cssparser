@@ -502,7 +502,7 @@ fn parse_rgb_components_hsl<'i, 't>(arguments: &mut Parser<'i, 't>) -> Result<(u
     let token = try!(arguments.next());
     let hue_degrees = match token {
         Token::Number(NumericValue { value: v, .. }) => Ok(v),
-        Token::Dimension(NumericValue { value: v, .. }, ref unit) => {
+        Token::Dimension { value: v, ref unit, .. } => {
             match_ignore_ascii_case! { &*unit,
                 "deg" => Ok(v),
                 "grad" => Ok(v * 360. / 400.),
