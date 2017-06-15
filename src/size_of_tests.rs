@@ -4,7 +4,7 @@
 
 use compact_cow_str::CompactCowStr;
 use std::borrow::Cow;
-use tokenizer::{Token, NumericValue, PercentageValue};
+use tokenizer::{Token, PercentageValue};
 
 #[macro_export]
 macro_rules! size_of_test {
@@ -33,7 +33,6 @@ macro_rules! size_of_test {
 
 // These assume 64-bit
 size_of_test!(token, Token, 32);
-size_of_test!(numeric_value, NumericValue, 16);
 size_of_test!(percentage_value, PercentageValue, 16);
 size_of_test!(std_cow_str, Cow<'static, str>, 32);
 size_of_test!(compact_cow_str, CompactCowStr, 16);

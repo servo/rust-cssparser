@@ -53,7 +53,18 @@ pub enum Token<'a> {
     Delim(char),
 
     /// A [`<number-token>`](https://drafts.csswg.org/css-syntax/#number-token-diagram)
-    Number(NumericValue),
+    Number {
+        /// Whether the number had a `+` or `-` sign.
+        ///
+        /// This is used is some cases like the <An+B> micro syntax. (See the `parse_nth` function.)
+        has_sign: bool,
+
+        /// The value as a float
+        value: f32,
+
+        /// If the origin source did not include a fractional part, the value as an integer.
+        int_value: Option<i32>,
+    },
 
     /// A [`<percentage-token>`](https://drafts.csswg.org/css-syntax/#percentage-token-diagram)
     Percentage(PercentageValue),
@@ -176,22 +187,6 @@ impl<'a> Token<'a> {
             BadUrl | BadString | CloseParenthesis | CloseSquareBracket | CloseCurlyBracket
         )
     }
-}
-
-
-/// The numeric value of `Number` and `Dimension` tokens.
-#[derive(PartialEq, Debug, Copy, Clone)]
-pub struct NumericValue {
-    /// The value as a float
-    pub value: f32,
-
-    /// If the origin source did not include a fractional part, the value as an integer.
-    pub int_value: Option<i32>,
-
-    /// Whether the number had a `+` or `-` sign.
-    ///
-    /// This is used is some cases like the <An+B> micro syntax. (See the `parse_nth` function.)
-    pub has_sign: bool,
 }
 
 
@@ -893,11 +888,11 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
             unit: unit,
         }
     } else {
-        Number(NumericValue {
+        Number {
             value: value,
             int_value: int_value,
             has_sign: has_sign,
-        })
+        }
     }
 }
 

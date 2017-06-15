@@ -6,7 +6,6 @@ use std::fmt;
 use std::f32::consts::PI;
 
 use super::{Token, Parser, ToCss, ParseError, BasicParseError};
-use tokenizer::NumericValue;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -430,7 +429,7 @@ fn parse_color_function<'i, 't>(name: &str, arguments: &mut Parser<'i, 't>) -> R
         };
         let token = try!(arguments.next());
         match token {
-            Token::Number(NumericValue { value: v, .. }) => {
+            Token::Number { value: v, .. } => {
                 clamp_unit_f32(v)
             }
             Token::Percentage(ref v) => {
@@ -459,10 +458,10 @@ fn parse_rgb_components_rgb<'i, 't>(arguments: &mut Parser<'i, 't>) -> Result<(u
     // Either integers or percentages, but all the same type.
     // https://drafts.csswg.org/css-color/#rgb-functions
     match try!(arguments.next()) {
-        Token::Number(NumericValue { value: v, .. }) => {
+        Token::Number { value: v, .. } => {
             red = clamp_floor_256_f32(v);
             green = clamp_floor_256_f32(match try!(arguments.next()) {
-                Token::Number(NumericValue { value: v, .. }) => v,
+                Token::Number { value: v, .. } => v,
                 Token::Comma => {
                     uses_commas = true;
                     try!(arguments.expect_number())
@@ -501,7 +500,7 @@ fn parse_rgb_components_hsl<'i, 't>(arguments: &mut Parser<'i, 't>) -> Result<(u
     // https://drafts.csswg.org/css-values/#angles
     let token = try!(arguments.next());
     let hue_degrees = match token {
-        Token::Number(NumericValue { value: v, .. }) => Ok(v),
+        Token::Number { value: v, .. } => Ok(v),
         Token::Dimension { value: v, ref unit, .. } => {
             match_ignore_ascii_case! { &*unit,
                 "deg" => Ok(v),
