@@ -882,3 +882,42 @@ fn procedural_masquerade_whitespace() {
         _ => panic!("4"),
     }
 }
+
+#[test]
+fn parse_until_before_stops_at_delimiter_or_end_of_input() {
+    // For all j and k, inputs[i].1[j] should parse the same as inputs[i].1[k]
+    // when we use delimiters inputs[i].0.
+    let inputs = vec![
+        (Delimiter::Bang | Delimiter::Semicolon,
+         // Note that the ';extra' is fine, because the ';' acts the same as
+         // the end of input.
+         vec!["token stream;extra", "token stream!", "token stream"]),
+        (Delimiter::Bang | Delimiter::Semicolon,
+         vec![";", "!", ""]),
+    ];
+    for equivalent in inputs {
+        for (j, x) in equivalent.1.iter().enumerate() {
+            for y in equivalent.1[j + 1..].iter() {
+                let mut ix = ParserInput::new(x);
+                let mut ix = Parser::new(&mut ix);
+
+                let mut iy = ParserInput::new(y);
+                let mut iy = Parser::new(&mut iy);
+
+                let _ = ix.parse_until_before::<_, _, ()>(equivalent.0, |ix| {
+                    iy.parse_until_before::<_, _, ()>(equivalent.0, |iy| {
+                        loop {
+                            let ox = ix.next();
+                            let oy = iy.next();
+                            assert_eq!(ox, oy);
+                            if let Err(_) = ox {
+                                break
+                            }
+                        }
+                        Ok(())
+                    })
+                });
+            }
+        }
+    }
+}
