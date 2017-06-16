@@ -118,7 +118,7 @@ fn component_value_list() {
 fn one_component_value() {
     run_json_tests(include_str!("css-parsing-tests/one_component_value.json"), |input| {
         let result: Result<Json, ParseError<()>> = input.parse_entirely(|input| {
-            Ok(one_component_value_to_json(try!(input.next()), input))
+            Ok(one_component_value_to_json(input.next()?, input))
         });
         result.unwrap_or(JArray!["error", "invalid"])
     });
