@@ -403,11 +403,12 @@ impl<'i: 't, 't> Parser<'i, 't> {
         parse_nested_block(self, parse)
     }
 
-    /// Limit parsing to until a given delimiter. (E.g. a semicolon for a property value.)
+    /// Limit parsing to until a given delimiter or the end of the input. (E.g.
+    /// a semicolon for a property value.)
     ///
     /// The given closure is called with a "delimited" parser
     /// that stops before the first character at this block/function nesting level
-    /// that matches the given set of delimiters.
+    /// that matches the given set of delimiters, or at the end of the input.
     ///
     /// The result is overridden to `Err(())` if the closure leaves some input before that point.
     #[inline]
