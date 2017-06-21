@@ -426,7 +426,7 @@ fn serializer(preserve_comments: bool) {
 #[test]
 fn serialize_current_color() {
     let c = Color::CurrentColor;
-    assert!(c.to_css_string() == "currentColor");
+    assert!(c.to_css_string() == "currentcolor");
 }
 
 #[test]
@@ -622,7 +622,7 @@ impl ToJson for Color {
             Color::RGBA(ref rgba) => {
                 [rgba.red, rgba.green, rgba.blue, rgba.alpha].to_json()
             },
-            Color::CurrentColor => "currentColor".to_json(),
+            Color::CurrentColor => "currentcolor".to_json(),
         }
     }
 }

@@ -118,7 +118,7 @@ impl ToCss for RGBA {
 /// A <color> value.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Color {
-    /// The 'currentColor' keyword
+    /// The 'currentcolor' keyword
     CurrentColor,
     /// Everything else gets converted to RGBA during parsing
     RGBA(RGBA),
@@ -130,7 +130,7 @@ known_heap_size!(0, Color);
 impl ToCss for Color {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
         match *self {
-            Color::CurrentColor => dest.write_str("currentColor"),
+            Color::CurrentColor => dest.write_str("currentcolor"),
             Color::RGBA(ref rgba) => rgba.to_css(dest),
         }
     }
