@@ -188,6 +188,11 @@ impl<'i: 't, 't> Parser<'i, 't> {
         }
     }
 
+    /// Return the current line that is being parsed.
+    pub fn current_line(&self) -> &'i str {
+        self.tokenizer.0.current_source_line()
+    }
+
     /// Check whether the input is exhausted. That is, if `.next()` would return a token.
     ///
     /// This ignores whitespace and comments.

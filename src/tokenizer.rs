@@ -287,6 +287,17 @@ impl<'a> Tokenizer<'a> {
         self.source_location(position)
     }
 
+    pub fn current_source_line(&self) -> &'a str {
+        let current = self.position;
+        let start = self.input[0..current]
+            .rfind(|c| matches!(c, '\r' | '\n' | '\x0C'))
+            .map_or(0, |start| start + 1);
+        let end = self.input[current..]
+            .find(|c| matches!(c, '\r' | '\n' | '\x0C'))
+            .map_or(self.input.len(), |end| current + end);
+        &self.input[start..end]
+    }
+
     pub fn source_location(&self, position: SourcePosition) -> SourceLocation {
         let target = position.0;
         let mut location;

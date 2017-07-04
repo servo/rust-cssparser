@@ -920,3 +920,22 @@ fn parse_until_before_stops_at_delimiter_or_end_of_input() {
         }
     }
 }
+
+#[test]
+fn parser_maintains_current_line() {
+    let mut input = ParserInput::new("ident ident;\nident ident ident;\nident");
+    let mut parser = Parser::new(&mut input);
+    assert_eq!(parser.current_line(), "ident ident;");
+    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
+    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
+    assert_eq!(parser.next(), Ok(Token::Semicolon));
+
+    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
+    assert_eq!(parser.current_line(), "ident ident ident;");
+    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
+    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
+    assert_eq!(parser.next(), Ok(Token::Semicolon));
+
+    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
+    assert_eq!(parser.current_line(), "ident");
+}
