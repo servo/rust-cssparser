@@ -157,12 +157,12 @@ pub enum Token<'a> {
     /// A `<bad-url-token>`
     ///
     /// This token always indicates a parse error.
-    BadUrl,
+    BadUrl(CompactCowStr<'a>),
 
     /// A `<bad-string-token>`
     ///
     /// This token always indicates a parse error.
-    BadString,
+    BadString(CompactCowStr<'a>),
 
     /// A `<)-token>`
     ///
@@ -194,7 +194,7 @@ impl<'a> Token<'a> {
     pub fn is_parse_error(&self) -> bool {
         matches!(
             *self,
-            BadUrl | BadString | CloseParenthesis | CloseSquareBracket | CloseCurlyBracket
+            BadUrl(_) | BadString(_) | CloseParenthesis | CloseSquareBracket | CloseCurlyBracket
         )
     }
 }
@@ -567,14 +567,14 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
 fn consume_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool) -> Token<'a> {
     match consume_quoted_string(tokenizer, single_quote) {
         Ok(value) => QuotedString(value),
-        Err(()) => BadString
+        Err(value) => BadString(value)
     }
 }
 
 
 /// Return `Err(())` on syntax error (ie. unescaped newline)
 fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
-                             -> Result<CompactCowStr<'a>, ()> {
+                             -> Result<CompactCowStr<'a>, CompactCowStr<'a>> {
     tokenizer.advance(1);  // Skip the initial quote
     // start_pos is at code point boundary, after " or '
     let start_pos = tokenizer.position();
@@ -607,7 +607,9 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
                 string_bytes = tokenizer.slice_from(start_pos).as_bytes().to_owned();
                 break
             }
-            b'\n' | b'\r' | b'\x0C' => { return Err(()) },
+            b'\n' | b'\r' | b'\x0C' => {
+                return Err(tokenizer.slice_from(start_pos).into())
+            },
             _ => {}
         }
         tokenizer.consume_byte();
@@ -615,7 +617,12 @@ fn consume_quoted_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool)
 
     while !tokenizer.is_eof() {
         if matches!(tokenizer.next_byte_unchecked(), b'\n' | b'\r' | b'\x0C') {
-            return Err(());
+            return Err(
+                // string_bytes is well-formed UTF-8, see other comments.
+                unsafe {
+                    from_utf8_release_unchecked(string_bytes)
+                }.into()
+            );
         }
         let b = tokenizer.consume_byte();
         match_byte! { b,
@@ -1024,6 +1031,7 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
     }
 
     fn consume_bad_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
+        let start_pos = tokenizer.position();
         // Consume up to the closing )
         while !tokenizer.is_eof() {
             match_byte! { tokenizer.consume_byte(),
@@ -1034,7 +1042,7 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
                 _ => {},
             }
         }
-        BadUrl
+        BadUrl(tokenizer.slice_from(start_pos).into())
     }
 }
 
