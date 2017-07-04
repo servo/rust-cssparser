@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::borrow::{Borrow, Cow};
+use std::borrow::Borrow;
 use std::cmp;
 use std::fmt;
 use std::hash;
@@ -21,7 +21,7 @@ use std::usize;
 /// FIXME(https://github.com/rust-lang/rfcs/issues/1230): use an actual enum if/when
 /// the compiler can do this layout optimization.
 pub struct CowRcStr<'a> {
-    /// FIXME: https://github.com/rust-lang/rust/issues/27730 use NonZero or Shared
+    /// FIXME: https://github.com/rust-lang/rust/issues/27730 use NonZero or Shared.
     /// In the meantime we abuse `&'static _` to get the effect of `NonZero<*const _>`.
     /// `ptr` doesn’t really have the 'static lifetime!
     ptr: &'static (),
@@ -55,9 +55,16 @@ impl<'a> From<&'a str> for CowRcStr<'a> {
     }
 }
 
-impl<'a> From<Rc<String>> for CowRcStr<'a> {
+impl<'a> From<String> for CowRcStr<'a> {
     #[inline]
-    fn from(s: Rc<String>) -> Self {
+    fn from(s: String) -> Self {
+        CowRcStr::from_rc(Rc::new(s))
+    }
+}
+
+impl<'a> CowRcStr<'a> {
+    #[inline]
+    fn from_rc(s: Rc<String>) -> Self {
         let ptr = unsafe { &*(Rc::into_raw(s) as *const ()) };
         CowRcStr {
             ptr: ptr,
@@ -65,9 +72,7 @@ impl<'a> From<Rc<String>> for CowRcStr<'a> {
             phantom: PhantomData,
         }
     }
-}
 
-impl<'a> CowRcStr<'a> {
     #[inline]
     fn unpack(&self) -> Result<&'a str, *const String> {
         if self.borrowed_len_or_max == usize::MAX {
@@ -82,24 +87,21 @@ impl<'a> CowRcStr<'a> {
         }
     }
 
-    #[inline]
-    fn into_enum(self) -> Result<&'a str, Rc<String>> {
-        self.unpack().map_err(|ptr| {
-            mem::forget(self);
-            unsafe {
-                Rc::from_raw(ptr)
-            }
-        })
-    }
-
     /// Convert into `String`, re-using an existing memory allocation if possible.
     #[inline]
     pub fn into_owned(self) -> String {
-        match self.into_enum() {
+        let unpacked = self.unpack();
+
+        // Inhibit destructor: we’re taking ownership of this strong reference (if any)
+        mem::forget(self);
+
+        match unpacked {
             Ok(s) => s.to_owned(),
-            Err(rc) => match Rc::try_unwrap(rc) {
-                Ok(s) => s,
-                Err(rc) => (*rc).clone()
+            Err(ptr) => {
+                let rc = unsafe {
+                    Rc::from_raw(ptr)
+                };
+                Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
             }
         }
     }
@@ -115,7 +117,7 @@ impl<'a> Clone for CowRcStr<'a> {
                 };
                 let new_rc = rc.clone();
                 mem::forget(rc);  // Don’t actually take ownership of this strong reference
-                new_rc.into()
+                CowRcStr::from_rc(new_rc)
             }
             Ok(_) => {
                 CowRcStr { ..*self }
@@ -145,37 +147,6 @@ impl<'a> Deref for CowRcStr<'a> {
         })
     }
 }
-
-impl<'a> From<CowRcStr<'a>> for Cow<'a, str> {
-    #[inline]
-    fn from(cow: CowRcStr<'a>) -> Self {
-        match cow.into_enum() {
-            Ok(s) => Cow::Borrowed(s),
-            Err(rc) => match Rc::try_unwrap(rc) {
-                Ok(s) => Cow::Owned(s),
-                Err(rc) => Cow::Owned((*rc).clone())
-            }
-        }
-    }
-}
-
-impl<'a> From<String> for CowRcStr<'a> {
-    #[inline]
-    fn from(s: String) -> Self {
-        Self::from(Rc::new(s))
-    }
-}
-
-impl<'a> From<Cow<'a, str>> for CowRcStr<'a> {
-    #[inline]
-    fn from(s: Cow<'a, str>) -> Self {
-        match s {
-            Cow::Borrowed(s) => Self::from(s),
-            Cow::Owned(s) => Self::from(s),
-        }
-    }
-}
-
 
 // Boilerplate / trivial impls below.
 
