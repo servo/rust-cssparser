@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use compact_cow_str::CompactCowStr;
+use compact_cow_str::CowRcStr;
 use std::ops::Range;
 use std::ascii::AsciiExt;
 use std::ops::BitOr;
@@ -28,7 +28,7 @@ pub enum BasicParseError<'a> {
     /// The end of the input was encountered unexpectedly.
     EndOfInput,
     /// An `@` rule was encountered that was invalid.
-    AtRuleInvalid(CompactCowStr<'a>),
+    AtRuleInvalid(CowRcStr<'a>),
     /// The body of an '@' rule was invalid.
     AtRuleBodyInvalid,
     /// A qualified rule was encountered that was invalid.
@@ -446,7 +446,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// Parse a <ident-token> and return the unescaped value.
     #[inline]
-    pub fn expect_ident(&mut self) -> Result<CompactCowStr<'i>, BasicParseError<'i>> {
+    pub fn expect_ident(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
         match self.next()? {
             Token::Ident(value) => Ok(value),
             t => Err(BasicParseError::UnexpectedToken(t))
@@ -464,7 +464,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// Parse a <string-token> and return the unescaped value.
     #[inline]
-    pub fn expect_string(&mut self) -> Result<CompactCowStr<'i>, BasicParseError<'i>> {
+    pub fn expect_string(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
         match self.next()? {
             Token::QuotedString(value) => Ok(value),
             t => Err(BasicParseError::UnexpectedToken(t))
@@ -473,7 +473,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// Parse either a <ident-token> or a <string-token>, and return the unescaped value.
     #[inline]
-    pub fn expect_ident_or_string(&mut self) -> Result<CompactCowStr<'i>, BasicParseError<'i>> {
+    pub fn expect_ident_or_string(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
         match self.next()? {
             Token::Ident(value) => Ok(value),
             Token::QuotedString(value) => Ok(value),
@@ -483,7 +483,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// Parse a <url-token> and return the unescaped value.
     #[inline]
-    pub fn expect_url(&mut self) -> Result<CompactCowStr<'i>, BasicParseError<'i>> {
+    pub fn expect_url(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
         match self.next()? {
             Token::UnquotedUrl(value) => Ok(value),
             Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {
@@ -496,7 +496,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// Parse either a <url-token> or a <string-token>, and return the unescaped value.
     #[inline]
-    pub fn expect_url_or_string(&mut self) -> Result<CompactCowStr<'i>, BasicParseError<'i>> {
+    pub fn expect_url_or_string(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
         match self.next()? {
             Token::UnquotedUrl(value) => Ok(value),
             Token::QuotedString(value) => Ok(value),
@@ -612,7 +612,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     ///
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
-    pub fn expect_function(&mut self) -> Result<CompactCowStr<'i>, BasicParseError<'i>> {
+    pub fn expect_function(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
         match self.next()? {
             Token::Function(name) => Ok(name),
             t => Err(BasicParseError::UnexpectedToken(t))

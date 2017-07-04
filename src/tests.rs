@@ -16,7 +16,7 @@ use super::{Parser, Delimiter, Token, SourceLocation, ParseError,
             AtRuleType, AtRuleParser, QualifiedRuleParser, ParserInput,
             parse_one_declaration, parse_one_rule, parse_important,
             stylesheet_encoding, EncodingSupport,
-            TokenSerializationType, CompactCowStr,
+            TokenSerializationType, CowRcStr,
             Color, RGBA, parse_nth, UnicodeRange, ToCss};
 
 macro_rules! JArray {
@@ -294,7 +294,7 @@ fn unquoted_url_escaping() {
 
 #[test]
 fn test_expect_url() {
-    fn parse<'a>(s: &mut ParserInput<'a>) -> Result<CompactCowStr<'a>, BasicParseError<'a>> {
+    fn parse<'a>(s: &mut ParserInput<'a>) -> Result<CowRcStr<'a>, BasicParseError<'a>> {
         Parser::new(s).expect_url()
     }
     let mut input = ParserInput::new("url()");
@@ -678,7 +678,7 @@ impl<'i> DeclarationParser<'i> for JsonParser {
     type Declaration = Json;
     type Error = ();
 
-    fn parse_value<'t>(&mut self, name: CompactCowStr<'i>, input: &mut Parser<'i, 't>)
+    fn parse_value<'t>(&mut self, name: CowRcStr<'i>, input: &mut Parser<'i, 't>)
                        -> Result<Json, ParseError<'i, ()>> {
         let mut value = vec![];
         let mut important = false;
@@ -719,7 +719,7 @@ impl<'i> AtRuleParser<'i> for JsonParser {
     type AtRule = Json;
     type Error = ();
 
-    fn parse_prelude<'t>(&mut self, name: CompactCowStr<'i>, input: &mut Parser<'i, 't>)
+    fn parse_prelude<'t>(&mut self, name: CowRcStr<'i>, input: &mut Parser<'i, 't>)
                          -> Result<AtRuleType<Vec<Json>, Json>, ParseError<'i, ()>> {
         Ok(AtRuleType::OptionalBlock(vec![
             "at-rule".to_json(),
