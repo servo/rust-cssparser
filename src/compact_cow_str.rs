@@ -9,106 +9,97 @@ use std::hash;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::Deref;
+use std::rc::Rc;
 use std::slice;
 use std::str;
+use std::usize;
 
-// All bits set except the highest
-const MAX_LEN: usize = !0 >> 1;
-
-// Only the highest bit
-const OWNED_TAG: usize = MAX_LEN + 1;
-
-/// Like `Cow<'a, str>`, but with smaller `std::mem::size_of`. (Two words instead of four.)
+/// A string that is either shared (heap-allocated and reference-counted) or borrowed.
+///
+/// Equivalent to `enum { Borrowed(&'a str), Shared(Rc<String>) }`, but stored more compactly.
+///
+/// FIXME(https://github.com/rust-lang/rfcs/issues/1230): use an actual enum if/when
+/// the compiler can do this layout optimization.
 pub struct CompactCowStr<'a> {
-    // `tagged_len` is a tag in its highest bit, and the string length in the rest of the bits.
-    //
-    // * If the tag is 1, the memory pointed to by `ptr` is owned
-    //   and the lifetime parameter is irrelevant.
-    //   `ptr` and `len` are the components of a `Box<str>`.
-    //
-    // * If the tag is 0, the memory is borrowed.
-    //   `ptr` and `len` are the components of a `&'a str`.
+    /// FIXME: https://github.com/rust-lang/rust/issues/27730 use NonZero or Shared
+    /// In the meantime we abuse `&'static _` to get the effect of `NonZero<*const _>`.
+    /// `ptr` doesn’t really have the 'static lifetime!
+    ptr: &'static (),
 
-    // FIXME: https://github.com/rust-lang/rust/issues/27730 use NonZero or Shared
-    ptr: *const u8,
-    tagged_len: usize,
-    phantom: PhantomData<&'a str>,
+    /// * If `borrowed_len_or_max == usize::MAX`, then `ptr` represents `NonZero<*const String>`
+    ///   from `Rc::into_raw`.
+    ///   The lifetime parameter `'a` is irrelevant in this case.
+    ///
+    /// * Otherwise, `ptr` represents the `NonZero<*const u8>` data component of `&'a str`,
+    ///   and `borrowed_len_or_max` its length.
+    borrowed_len_or_max: usize,
+
+    phantom: PhantomData<Result<&'a str, Rc<String>>>,
+}
+
+fn _static_assert_same_size<'a>() {
+    // "Instantiate" the generic function without calling it.
+    let _ = mem::transmute::<CompactCowStr<'a>, Option<CompactCowStr<'a>>>;
 }
 
 impl<'a> From<&'a str> for CompactCowStr<'a> {
     #[inline]
     fn from(s: &'a str) -> Self {
         let len = s.len();
-        assert!(len <= MAX_LEN);
+        assert!(len < usize::MAX);
         CompactCowStr {
-            ptr: s.as_ptr(),
-            tagged_len: len,
+            ptr: unsafe { &*(s.as_ptr() as *const ()) },
+            borrowed_len_or_max: len,
             phantom: PhantomData,
         }
     }
 }
 
-impl<'a> From<Box<str>> for CompactCowStr<'a> {
+impl<'a> From<Rc<String>> for CompactCowStr<'a> {
     #[inline]
-    fn from(s: Box<str>) -> Self {
-        let ptr = s.as_ptr();
-        let len = s.len();
-        assert!(len <= MAX_LEN);
-        mem::forget(s);
+    fn from(s: Rc<String>) -> Self {
+        let ptr = unsafe { &*(Rc::into_raw(s) as *const ()) };
         CompactCowStr {
             ptr: ptr,
-            tagged_len: len | OWNED_TAG,
+            borrowed_len_or_max: usize::MAX,
             phantom: PhantomData,
         }
     }
 }
 
 impl<'a> CompactCowStr<'a> {
-    /// Whether this string refers to borrowed memory
-    /// (as opposed to owned, which would be freed when `CompactCowStr` goes out of scope).
     #[inline]
-    pub fn is_borrowed(&self) -> bool {
-        (self.tagged_len & OWNED_TAG) == 0
-    }
-
-    /// The length of this string
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.tagged_len & !OWNED_TAG
-    }
-
-    // Intentionally private since it is easy to use incorrectly.
-    #[inline]
-    fn as_raw_str(&self) -> *const str {
-        unsafe {
-            str::from_utf8_unchecked(slice::from_raw_parts(self.ptr, self.len()))
-        }
-    }
-
-    /// If this string is borrowed, return a slice with the original lifetime,
-    /// not borrowing `self`.
-    ///
-    /// (`Deref` is implemented unconditionally, but returns a slice with a shorter lifetime.)
-    #[inline]
-    pub fn as_str(&self) -> Option<&'a str> {
-        if self.is_borrowed() {
-            Some(unsafe { &*self.as_raw_str() })
+    fn unpack(&self) -> Result<&'a str, *const String> {
+        if self.borrowed_len_or_max == usize::MAX {
+            Err(self.ptr as *const () as *const String)
         } else {
-            None
+            unsafe {
+                Ok(str::from_utf8_unchecked(slice::from_raw_parts(
+                    self.ptr as *const () as *const u8,
+                    self.borrowed_len_or_max,
+                )))
+            }
         }
     }
 
-    /// Convert into `String`, re-using the memory allocation if it was already owned.
+    #[inline]
+    fn into_enum(self) -> Result<&'a str, Rc<String>> {
+        self.unpack().map_err(|ptr| {
+            mem::forget(self);
+            unsafe {
+                Rc::from_raw(ptr)
+            }
+        })
+    }
+
+    /// Convert into `String`, re-using an existing memory allocation if possible.
     #[inline]
     pub fn into_owned(self) -> String {
-        unsafe {
-            let raw = self.as_raw_str();
-            let is_borrowed = self.is_borrowed();
-            mem::forget(self);
-            if is_borrowed {
-                String::from(&*raw)
-            } else {
-                Box::from_raw(raw as *mut str).into_string()
+        match self.into_enum() {
+            Ok(s) => s.to_owned(),
+            Err(rc) => match Rc::try_unwrap(rc) {
+                Ok(s) => s,
+                Err(rc) => (*rc).clone()
             }
         }
     }
@@ -117,10 +108,18 @@ impl<'a> CompactCowStr<'a> {
 impl<'a> Clone for CompactCowStr<'a> {
     #[inline]
     fn clone(&self) -> Self {
-        if self.is_borrowed() {
-            CompactCowStr { ..*self }
-        } else {
-            Self::from(String::from(&**self).into_boxed_str())
+        match self.unpack() {
+            Err(ptr) => {
+                let rc = unsafe {
+                    Rc::from_raw(ptr)
+                };
+                let new_rc = rc.clone();
+                mem::forget(rc);  // Don’t actually take ownership of this strong reference
+                new_rc.into()
+            }
+            Ok(_) => {
+                CompactCowStr { ..*self }
+            }
         }
     }
 }
@@ -128,10 +127,10 @@ impl<'a> Clone for CompactCowStr<'a> {
 impl<'a> Drop for CompactCowStr<'a> {
     #[inline]
     fn drop(&mut self) {
-        if !self.is_borrowed() {
-            unsafe {
-                Box::from_raw(self.as_raw_str() as *mut str);
-            }
+        if let Err(ptr) = self.unpack() {
+            mem::drop(unsafe {
+                Rc::from_raw(ptr)
+            })
         }
     }
 }
@@ -141,23 +140,20 @@ impl<'a> Deref for CompactCowStr<'a> {
 
     #[inline]
     fn deref(&self) -> &str {
-        unsafe {
-            &*self.as_raw_str()
-        }
+        self.unpack().unwrap_or_else(|ptr| unsafe {
+            &**ptr
+        })
     }
 }
 
 impl<'a> From<CompactCowStr<'a>> for Cow<'a, str> {
     #[inline]
     fn from(cow: CompactCowStr<'a>) -> Self {
-        unsafe {
-            let raw = cow.as_raw_str();
-            let is_borrowed = cow.is_borrowed();
-            mem::forget(cow);
-            if is_borrowed {
-                Cow::Borrowed(&*raw)
-            } else {
-                Cow::Owned(Box::from_raw(raw as *mut str).into_string())
+        match cow.into_enum() {
+            Ok(s) => Cow::Borrowed(s),
+            Err(rc) => match Rc::try_unwrap(rc) {
+                Ok(s) => Cow::Owned(s),
+                Err(rc) => Cow::Owned((*rc).clone())
             }
         }
     }
@@ -166,7 +162,7 @@ impl<'a> From<CompactCowStr<'a>> for Cow<'a, str> {
 impl<'a> From<String> for CompactCowStr<'a> {
     #[inline]
     fn from(s: String) -> Self {
-        Self::from(s.into_boxed_str())
+        Self::from(Rc::new(s))
     }
 }
 
@@ -179,6 +175,9 @@ impl<'a> From<Cow<'a, str>> for CompactCowStr<'a> {
         }
     }
 }
+
+
+// Boilerplate / trivial impls below.
 
 impl<'a> AsRef<str> for CompactCowStr<'a> {
     #[inline]
