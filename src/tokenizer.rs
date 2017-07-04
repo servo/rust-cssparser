@@ -226,7 +226,7 @@ impl<'a> Tokenizer<'a> {
             input: input,
             position: 0,
             last_known_source_location: Cell::new((SourcePosition(0),
-                                                   SourceLocation { line: 1, column: 1 })),
+                                                   SourceLocation { line: 0, column: 0 })),
             var_functions: SeenStatus::DontCare,
             viewport_percentages: SeenStatus::DontCare,
         }
@@ -312,7 +312,7 @@ impl<'a> Tokenizer<'a> {
             // So if the requested position is before the last known one,
             // start over from the beginning.
             position = 0;
-            location = SourceLocation { line: 1, column: 1 };
+            location = SourceLocation { line: 0, column: 0 };
         }
         let mut source = &self.input[position..target];
         while let Some(newline_position) = source.find(|c| matches!(c, '\n' | '\r' | '\x0C')) {
@@ -321,7 +321,7 @@ impl<'a> Tokenizer<'a> {
             source = &source[offset..];
             position += offset;
             location.line += 1;
-            location.column = 1;
+            location.column = 0;
         }
         debug_assert!(position <= target);
         location.column += (target - position) as u32;

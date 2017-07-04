@@ -451,26 +451,26 @@ fn serialize_rgba_two_digit_float_if_roundtrips() {
 fn line_numbers() {
     let mut input = ParserInput::new("foo bar\nbaz\r\n\n\"a\\\r\nb\"");
     let mut input = Parser::new(&mut input);
-    assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 1 });
+    assert_eq!(input.current_source_location(), SourceLocation { line: 0, column: 0 });
     assert_eq!(input.next_including_whitespace(), Ok(Token::Ident("foo".into())));
-    assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 4 });
+    assert_eq!(input.current_source_location(), SourceLocation { line: 0, column: 3 });
     assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace(" ")));
-    assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 5 });
+    assert_eq!(input.current_source_location(), SourceLocation { line: 0, column: 4 });
     assert_eq!(input.next_including_whitespace(), Ok(Token::Ident("bar".into())));
-    assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 8 });
+    assert_eq!(input.current_source_location(), SourceLocation { line: 0, column: 7 });
     assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace("\n")));
-    assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 1 });
+    assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 0 });
     assert_eq!(input.next_including_whitespace(), Ok(Token::Ident("baz".into())));
-    assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 4 });
+    assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 3 });
     let position = input.position();
 
     assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace("\r\n\n")));
-    assert_eq!(input.current_source_location(), SourceLocation { line: 4, column: 1 });
+    assert_eq!(input.current_source_location(), SourceLocation { line: 3, column: 0 });
 
-    assert_eq!(input.source_location(position), SourceLocation { line: 2, column: 4 });
+    assert_eq!(input.source_location(position), SourceLocation { line: 1, column: 3 });
 
     assert_eq!(input.next_including_whitespace(), Ok(Token::QuotedString("ab".into())));
-    assert_eq!(input.current_source_location(), SourceLocation { line: 5, column: 3 });
+    assert_eq!(input.current_source_location(), SourceLocation { line: 4, column: 2 });
     assert!(input.next_including_whitespace().is_err());
 }
 
