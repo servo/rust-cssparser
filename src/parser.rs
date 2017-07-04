@@ -490,7 +490,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
             Token::UnquotedUrl(value) => Ok(value),
             Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {
                 self.parse_nested_block(|input| input.expect_string()
-                                        .map_err(|e| ParseError::Basic(e)))
+                        .map_err(|e| ParseError::Basic(e)))
                     .map_err(ParseError::<()>::basic)
             },
             t => Err(BasicParseError::UnexpectedToken(t))
@@ -504,7 +504,8 @@ impl<'i: 't, 't> Parser<'i, 't> {
             Token::UnquotedUrl(value) => Ok(value),
             Token::QuotedString(value) => Ok(value),
             Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {
-                self.parse_nested_block(|input| input.expect_string().map_err(|e| ParseError::Basic(e)))
+                self.parse_nested_block(|input| input.expect_string()
+                        .map_err(|e| ParseError::Basic(e)))
                     .map_err(ParseError::<()>::basic)
             },
             t => Err(BasicParseError::UnexpectedToken(t))
