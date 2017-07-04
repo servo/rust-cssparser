@@ -939,3 +939,13 @@ fn parser_maintains_current_line() {
     assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
     assert_eq!(parser.current_line(), "ident");
 }
+
+#[test]
+fn parse_entirely_reports_first_error() {
+    #[derive(PartialEq, Debug)]
+    enum E { Foo }
+    let mut input = ParserInput::new("ident");
+    let mut parser = Parser::new(&mut input);
+    let result: Result<(), _> = parser.parse_entirely(|_| Err(ParseError::Custom(E::Foo)));
+    assert_eq!(result, Err(ParseError::Custom(E::Foo)));
+}

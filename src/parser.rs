@@ -364,9 +364,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
     #[inline]
     pub fn parse_entirely<F, T, E>(&mut self, parse: F) -> Result<T, ParseError<'i, E>>
     where F: FnOnce(&mut Parser<'i, 't>) -> Result<T, ParseError<'i, E>> {
-        let result = parse(self);
+        let result = parse(self)?;
         self.expect_exhausted()?;
-        result
+        Ok(result)
     }
 
     /// Parse a list of comma-separated values, all with the same syntax.
