@@ -848,8 +848,8 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Json {
             v.extend(nested(input));
             v
         }),
-        Token::BadUrl => JArray!["error", "bad-url"],
-        Token::BadString => JArray!["error", "bad-string"],
+        Token::BadUrl(_) => JArray!["error", "bad-url"],
+        Token::BadString(_) => JArray!["error", "bad-string"],
         Token::CloseParenthesis => JArray!["error", ")"],
         Token::CloseSquareBracket => JArray!["error", "]"],
         Token::CloseCurlyBracket => JArray!["error", "}"],
