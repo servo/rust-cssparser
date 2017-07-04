@@ -25,8 +25,6 @@ pub struct SourcePosition {
 pub enum BasicParseError<'a> {
     /// An unexpected token was encountered.
     UnexpectedToken(Token<'a>),
-    /// A particular token was expected but not found.
-    ExpectedToken(Token<'a>),
     /// The end of the input was encountered unexpectedly.
     EndOfInput,
     /// An `@` rule was encountered that was invalid.

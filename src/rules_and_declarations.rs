@@ -257,9 +257,9 @@ where P: DeclarationParser<'i, Declaration = I, Error = E> +
                 Ok(Token::AtKeyword(name)) => {
                     return Some(parse_at_rule(start_position, name, self.input, &mut self.parser))
                 }
-                Ok(_) => {
+                Ok(t) => {
                     return Some(self.input.parse_until_after(Delimiter::Semicolon,
-                                                             |_| Err(ParseError::Basic(BasicParseError::ExpectedToken(Token::Semicolon))))
+                                                             |_| Err(ParseError::Basic(BasicParseError::UnexpectedToken(t))))
                                 .map_err(|e| PreciseParseError {
                                     error: e,
                                     span: start_position..self.input.position()
