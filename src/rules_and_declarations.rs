@@ -116,7 +116,7 @@ pub trait AtRuleParser<'i> {
                      -> Result<AtRuleType<Self::Prelude, Self::AtRule>, ParseError<'i, Self::Error>> {
         let _ = name;
         let _ = input;
-        Err(ParseError::Basic(BasicParseError::AtRuleInvalid))
+        Err(ParseError::Basic(BasicParseError::AtRuleInvalid(name)))
     }
 
     /// Parse the content of a `{ /* ... */ }` block for the body of the at-rule.
@@ -131,7 +131,7 @@ pub trait AtRuleParser<'i> {
                        -> Result<Self::AtRule, ParseError<'i, Self::Error>> {
         let _ = prelude;
         let _ = input;
-        Err(ParseError::Basic(BasicParseError::AtRuleInvalid))
+        Err(ParseError::Basic(BasicParseError::AtRuleBodyInvalid))
     }
 
     /// An `OptionalBlock` prelude was followed by `;`.

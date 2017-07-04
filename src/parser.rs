@@ -30,7 +30,9 @@ pub enum BasicParseError<'a> {
     /// The end of the input was encountered unexpectedly.
     EndOfInput,
     /// An `@` rule was encountered that was invalid.
-    AtRuleInvalid,
+    AtRuleInvalid(CompactCowStr<'a>),
+    /// The body of an '@' rule was invalid.
+    AtRuleBodyInvalid,
     /// A qualified rule was encountered that was invalid.
     QualifiedRuleInvalid,
 }
