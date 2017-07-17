@@ -61,12 +61,16 @@ impl<'a, T> ParseError<'a, T> {
 }
 
 /// The owned input for a parser.
-pub struct ParserInput<'t>(Tokenizer<'t>);
+pub struct ParserInput<'t> {
+    tokenizer: Tokenizer<'t>,
+}
 
 impl<'t> ParserInput<'t> {
     /// Create a new input for a parser.
     pub fn new(input: &'t str) -> ParserInput<'t> {
-        ParserInput(Tokenizer::new(input))
+        ParserInput {
+            tokenizer: Tokenizer::new(input),
+        }
     }
 }
 
@@ -74,7 +78,7 @@ impl<'t> ParserInput<'t> {
 /// yields `Token`s,
 /// and keeps track of nested blocks and functions.
 pub struct Parser<'i: 't, 't> {
-    tokenizer: &'t mut ParserInput<'i>,
+    input: &'t mut ParserInput<'i>,
     /// If `Some(_)`, .parse_nested_block() can be called.
     at_start_of: Option<BlockType>,
     /// For parsers from `parse_until` or `parse_nested_block`
@@ -182,7 +186,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     #[inline]
     pub fn new(input: &'t mut ParserInput<'i>) -> Parser<'i, 't> {
         Parser {
-            tokenizer: input,
+            input: input,
             at_start_of: None,
             stop_before: Delimiter::None,
         }
@@ -190,7 +194,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// Return the current line that is being parsed.
     pub fn current_line(&self) -> &'i str {
-        self.tokenizer.0.current_source_line()
+        self.input.tokenizer.current_source_line()
     }
 
     /// Check whether the input is exhausted. That is, if `.next()` would return a token.
@@ -223,7 +227,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     #[inline]
     pub fn position(&self) -> SourcePosition {
         SourcePosition {
-            position: self.tokenizer.0.position(),
+            position: self.input.tokenizer.position(),
             at_start_of: self.at_start_of,
         }
     }
@@ -234,35 +238,35 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// Should only be used with `SourcePosition` values from the same `Parser` instance.
     #[inline]
     pub fn reset(&mut self, new_position: SourcePosition) {
-        self.tokenizer.0.reset(new_position.position);
+        self.input.tokenizer.reset(new_position.position);
         self.at_start_of = new_position.at_start_of;
     }
 
     /// Start looking for `var()` functions. (See the `.seen_var_functions()` method.)
     #[inline]
     pub fn look_for_var_functions(&mut self) {
-        self.tokenizer.0.look_for_var_functions()
+        self.input.tokenizer.look_for_var_functions()
     }
 
     /// Return whether a `var()` function has been seen by the tokenizer since
     /// either `look_for_var_functions` was called, and stop looking.
     #[inline]
     pub fn seen_var_functions(&mut self) -> bool {
-        self.tokenizer.0.seen_var_functions()
+        self.input.tokenizer.seen_var_functions()
     }
 
     /// Start looking for viewport percentage lengths. (See the `seen_viewport_percentages`
     /// method.)
     #[inline]
     pub fn look_for_viewport_percentages(&mut self) {
-        self.tokenizer.0.look_for_viewport_percentages()
+        self.input.tokenizer.look_for_viewport_percentages()
     }
 
     /// Return whether a `vh`, `vw`, `vmin`, or `vmax` dimension has been seen by the tokenizer
     /// since `look_for_viewport_percentages` was called, and stop looking.
     #[inline]
     pub fn seen_viewport_percentages(&mut self) -> bool {
-        self.tokenizer.0.seen_viewport_percentages()
+        self.input.tokenizer.seen_viewport_percentages()
     }
 
     /// Execute the given closure, passing it the parser.
@@ -283,25 +287,25 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// Return a slice of the CSS input
     #[inline]
     pub fn slice(&self, range: Range<SourcePosition>) -> &'i str {
-        self.tokenizer.0.slice(range.start.position..range.end.position)
+        self.input.tokenizer.slice(range.start.position..range.end.position)
     }
 
     /// Return a slice of the CSS input, from the given position to the current one.
     #[inline]
     pub fn slice_from(&self, start_position: SourcePosition) -> &'i str {
-        self.tokenizer.0.slice_from(start_position.position)
+        self.input.tokenizer.slice_from(start_position.position)
     }
 
     /// Return the line and column number within the input for the current position.
     #[inline]
     pub fn current_source_location(&self) -> SourceLocation {
-        self.tokenizer.0.current_source_location()
+        self.input.tokenizer.current_source_location()
     }
 
     /// Return the line and column number within the input for the given position.
     #[inline]
     pub fn source_location(&self, target: SourcePosition) -> SourceLocation {
-        self.tokenizer.0.source_location(target.position)
+        self.input.tokenizer.source_location(target.position)
     }
 
     /// Return the next token in the input that is neither whitespace or a comment,
@@ -342,13 +346,13 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// comments should always be ignored between tokens.
     pub fn next_including_whitespace_and_comments(&mut self) -> Result<Token<'i>, BasicParseError<'i>> {
         if let Some(block_type) = self.at_start_of.take() {
-            consume_until_end_of_block(block_type, &mut self.tokenizer.0);
+            consume_until_end_of_block(block_type, &mut self.input.tokenizer);
         }
-        let byte = self.tokenizer.0.next_byte();
+        let byte = self.input.tokenizer.next_byte();
         if self.stop_before.contains(Delimiters::from_byte(byte)) {
             return Err(BasicParseError::EndOfInput)
         }
-        let token = self.tokenizer.0.next().map_err(|()| BasicParseError::EndOfInput)?;
+        let token = self.input.tokenizer.next().map_err(|()| BasicParseError::EndOfInput)?;
         if let Some(block_type) = BlockType::opening(&token) {
             self.at_start_of = Some(block_type);
         }
@@ -665,23 +669,23 @@ pub fn parse_until_before<'i: 't, 't, F, T, E>(parser: &mut Parser<'i, 't>,
     // Introduce a new scope to limit duration of nested_parser’s borrow
     {
         let mut delimited_parser = Parser {
-            tokenizer: parser.tokenizer,
+            input: parser.input,
             at_start_of: parser.at_start_of.take(),
             stop_before: delimiters,
         };
         result = delimited_parser.parse_entirely(parse);
         if let Some(block_type) = delimited_parser.at_start_of {
-            consume_until_end_of_block(block_type, &mut delimited_parser.tokenizer.0);
+            consume_until_end_of_block(block_type, &mut delimited_parser.input.tokenizer);
         }
     }
     // FIXME: have a special-purpose tokenizer method for this that does less work.
     loop {
-        if delimiters.contains(Delimiters::from_byte((parser.tokenizer.0).next_byte())) {
+        if delimiters.contains(Delimiters::from_byte((parser.input.tokenizer).next_byte())) {
             break
         }
-        if let Ok(token) = (parser.tokenizer.0).next() {
+        if let Ok(token) = (parser.input.tokenizer).next() {
             if let Some(block_type) = BlockType::opening(&token) {
-                consume_until_end_of_block(block_type, &mut parser.tokenizer.0);
+                consume_until_end_of_block(block_type, &mut parser.input.tokenizer);
             }
         } else {
             break
@@ -696,12 +700,12 @@ pub fn parse_until_after<'i: 't, 't, F, T, E>(parser: &mut Parser<'i, 't>,
                                               -> Result <T, ParseError<'i, E>>
     where F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>> {
     let result = parser.parse_until_before(delimiters, parse);
-    let next_byte = (parser.tokenizer.0).next_byte();
+    let next_byte = (parser.input.tokenizer).next_byte();
     if next_byte.is_some() && !parser.stop_before.contains(Delimiters::from_byte(next_byte)) {
         debug_assert!(delimiters.contains(Delimiters::from_byte(next_byte)));
-        (parser.tokenizer.0).advance(1);
+        (parser.input.tokenizer).advance(1);
         if next_byte == Some(b'{') {
-            consume_until_end_of_block(BlockType::CurlyBracket, &mut parser.tokenizer.0);
+            consume_until_end_of_block(BlockType::CurlyBracket, &mut parser.input.tokenizer);
         }
     }
     result
@@ -724,16 +728,16 @@ pub fn parse_nested_block<'i: 't, 't, F, T, E>(parser: &mut Parser<'i, 't>, pars
     // Introduce a new scope to limit duration of nested_parser’s borrow
     {
         let mut nested_parser = Parser {
-            tokenizer: parser.tokenizer,
+            input: parser.input,
             at_start_of: None,
             stop_before: closing_delimiter,
         };
         result = nested_parser.parse_entirely(parse);
         if let Some(block_type) = nested_parser.at_start_of {
-            consume_until_end_of_block(block_type, &mut nested_parser.tokenizer.0);
+            consume_until_end_of_block(block_type, &mut nested_parser.input.tokenizer);
         }
     }
-    consume_until_end_of_block(block_type, &mut parser.tokenizer.0);
+    consume_until_end_of_block(block_type, &mut parser.input.tokenizer);
     result
 }
 
