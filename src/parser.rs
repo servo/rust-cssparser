@@ -61,15 +61,23 @@ impl<'a, T> ParseError<'a, T> {
 }
 
 /// The owned input for a parser.
-pub struct ParserInput<'t> {
-    tokenizer: Tokenizer<'t>,
+pub struct ParserInput<'i> {
+    tokenizer: Tokenizer<'i>,
+    cached_token: Option<CachedToken<'i>>,
 }
 
-impl<'t> ParserInput<'t> {
+struct CachedToken<'i> {
+    token: Token<'i>,
+    start_position: tokenizer::SourcePosition,
+    end_position: tokenizer::SourcePosition,
+}
+
+impl<'i> ParserInput<'i> {
     /// Create a new input for a parser.
-    pub fn new(input: &'t str) -> ParserInput<'t> {
+    pub fn new(input: &'i str) -> ParserInput<'i> {
         ParserInput {
             tokenizer: Tokenizer::new(input),
+            cached_token: None,
         }
     }
 }
@@ -348,11 +356,49 @@ impl<'i: 't, 't> Parser<'i, 't> {
         if let Some(block_type) = self.at_start_of.take() {
             consume_until_end_of_block(block_type, &mut self.input.tokenizer);
         }
+
         let byte = self.input.tokenizer.next_byte();
         if self.stop_before.contains(Delimiters::from_byte(byte)) {
             return Err(BasicParseError::EndOfInput)
         }
-        let token = self.input.tokenizer.next().map_err(|()| BasicParseError::EndOfInput)?;
+
+        let token_start_position = self.input.tokenizer.position();
+        let token;
+        match self.input.cached_token {
+            Some(ref cached_token) if cached_token.start_position == token_start_position => {
+                self.input.tokenizer.reset(cached_token.end_position);
+                token = cached_token.token.clone();
+            }
+            _ => {
+                token = self.input.tokenizer.next().map_err(|()| BasicParseError::EndOfInput)?;
+                match token {
+                    // Don’t cache whitespace or comment tokens.
+                    // A typical pattern is:
+                    //
+                    // ```
+                    // parser.try(|parser| {
+                    //     match parser.next() { … }
+                    // }).or_else(|| {
+                    //     match parser.next() { … }
+                    // })
+                    // ```
+                    //
+                    // If the curren position at the start of this code is at a whitespace token,
+                    // the "interesting" token (returned by `next`) comes later.
+                    // So in the second call to `next`, we don’t want "uninteresting" tokens
+                    // to overwrite the cache.
+                    Token::WhiteSpace(_) | Token::Comment(_) => {}
+                    _ => {
+                        self.input.cached_token = Some(CachedToken {
+                            token: token.clone(),
+                            start_position: token_start_position,
+                            end_position: self.input.tokenizer.position(),
+                        })
+                    }
+                }
+            }
+        }
+
         if let Some(block_type) = BlockType::opening(&token) {
             self.at_start_of = Some(block_type);
         }
