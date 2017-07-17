@@ -223,7 +223,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     #[inline]
     pub fn position(&self) -> SourcePosition {
         SourcePosition {
-            position: (self.tokenizer.0).position(),
+            position: self.tokenizer.0.position(),
             at_start_of: self.at_start_of,
         }
     }
@@ -234,35 +234,35 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// Should only be used with `SourcePosition` values from the same `Parser` instance.
     #[inline]
     pub fn reset(&mut self, new_position: SourcePosition) {
-        (self.tokenizer.0).reset(new_position.position);
+        self.tokenizer.0.reset(new_position.position);
         self.at_start_of = new_position.at_start_of;
     }
 
     /// Start looking for `var()` functions. (See the `.seen_var_functions()` method.)
     #[inline]
     pub fn look_for_var_functions(&mut self) {
-        (self.tokenizer.0).look_for_var_functions()
+        self.tokenizer.0.look_for_var_functions()
     }
 
     /// Return whether a `var()` function has been seen by the tokenizer since
     /// either `look_for_var_functions` was called, and stop looking.
     #[inline]
     pub fn seen_var_functions(&mut self) -> bool {
-        (self.tokenizer.0).seen_var_functions()
+        self.tokenizer.0.seen_var_functions()
     }
 
     /// Start looking for viewport percentage lengths. (See the `seen_viewport_percentages`
     /// method.)
     #[inline]
     pub fn look_for_viewport_percentages(&mut self) {
-        (self.tokenizer.0).look_for_viewport_percentages()
+        self.tokenizer.0.look_for_viewport_percentages()
     }
 
     /// Return whether a `vh`, `vw`, `vmin`, or `vmax` dimension has been seen by the tokenizer
     /// since `look_for_viewport_percentages` was called, and stop looking.
     #[inline]
     pub fn seen_viewport_percentages(&mut self) -> bool {
-        (self.tokenizer.0).seen_viewport_percentages()
+        self.tokenizer.0.seen_viewport_percentages()
     }
 
     /// Execute the given closure, passing it the parser.
@@ -283,25 +283,25 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// Return a slice of the CSS input
     #[inline]
     pub fn slice(&self, range: Range<SourcePosition>) -> &'i str {
-        (self.tokenizer.0).slice(range.start.position..range.end.position)
+        self.tokenizer.0.slice(range.start.position..range.end.position)
     }
 
     /// Return a slice of the CSS input, from the given position to the current one.
     #[inline]
     pub fn slice_from(&self, start_position: SourcePosition) -> &'i str {
-        (self.tokenizer.0).slice_from(start_position.position)
+        self.tokenizer.0.slice_from(start_position.position)
     }
 
     /// Return the line and column number within the input for the current position.
     #[inline]
     pub fn current_source_location(&self) -> SourceLocation {
-        (self.tokenizer.0).current_source_location()
+        self.tokenizer.0.current_source_location()
     }
 
     /// Return the line and column number within the input for the given position.
     #[inline]
     pub fn source_location(&self, target: SourcePosition) -> SourceLocation {
-        (self.tokenizer.0).source_location(target.position)
+        self.tokenizer.0.source_location(target.position)
     }
 
     /// Return the next token in the input that is neither whitespace or a comment,
@@ -344,11 +344,11 @@ impl<'i: 't, 't> Parser<'i, 't> {
         if let Some(block_type) = self.at_start_of.take() {
             consume_until_end_of_block(block_type, &mut self.tokenizer.0);
         }
-        let byte = (self.tokenizer.0).next_byte();
+        let byte = self.tokenizer.0.next_byte();
         if self.stop_before.contains(Delimiters::from_byte(byte)) {
             return Err(BasicParseError::EndOfInput)
         }
-        let token = (self.tokenizer.0).next().map_err(|()| BasicParseError::EndOfInput)?;
+        let token = self.tokenizer.0.next().map_err(|()| BasicParseError::EndOfInput)?;
         if let Some(block_type) = BlockType::opening(&token) {
             self.at_start_of = Some(block_type);
         }
