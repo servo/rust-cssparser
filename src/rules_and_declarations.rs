@@ -4,7 +4,7 @@
 
 // https://drafts.csswg.org/css-syntax/#parsing
 
-use compact_cow_str::CowRcStr;
+use cow_rc_str::CowRcStr;
 use parser::{parse_until_before, parse_until_after, parse_nested_block};
 use std::ascii::AsciiExt;
 use std::ops::Range;
