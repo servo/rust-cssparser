@@ -380,7 +380,7 @@ pub fn parse_one_declaration<'i, 't, P, E>(input: &mut Parser<'i, 't>, parser: &
                                            where P: DeclarationParser<'i, Error = E> {
     let start_position = input.position();
     input.parse_entirely(|input| {
-        let name = input.expect_ident()?;
+        let name = input.expect_ident()?.clone();
         input.expect_colon()?;
         parser.parse_value(name, input)
     }).map_err(|e| PreciseParseError {

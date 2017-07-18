@@ -486,9 +486,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// Parse a <ident-token> and return the unescaped value.
     #[inline]
-    pub fn expect_ident(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
+    pub fn expect_ident(&mut self) -> Result<&CowRcStr<'i>, BasicParseError<'i>> {
         match *self.next()? {
-            Token::Ident(ref value) => Ok(value.clone()),
+            Token::Ident(ref value) => Ok(value),
             ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
@@ -504,19 +504,19 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// Parse a <string-token> and return the unescaped value.
     #[inline]
-    pub fn expect_string(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
+    pub fn expect_string(&mut self) -> Result<&CowRcStr<'i>, BasicParseError<'i>> {
         match *self.next()? {
-            Token::QuotedString(ref value) => Ok(value.clone()),
+            Token::QuotedString(ref value) => Ok(value),
             ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
     /// Parse either a <ident-token> or a <string-token>, and return the unescaped value.
     #[inline]
-    pub fn expect_ident_or_string(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
+    pub fn expect_ident_or_string(&mut self) -> Result<&CowRcStr<'i>, BasicParseError<'i>> {
         match *self.next()? {
-            Token::Ident(ref value) => Ok(value.clone()),
-            Token::QuotedString(ref value) => Ok(value.clone()),
+            Token::Ident(ref value) => Ok(value),
+            Token::QuotedString(ref value) => Ok(value),
             ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
@@ -530,7 +530,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
             Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {}
             ref t => return Err(BasicParseError::UnexpectedToken(t.clone()))
         }
-        self.parse_nested_block(|input| input.expect_string().map_err(ParseError::Basic))
+        self.parse_nested_block(|input| input.expect_string().map_err(ParseError::Basic).map(|s| s.clone()))
             .map_err(ParseError::<()>::basic)
     }
 
@@ -544,7 +544,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
             Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {}
             ref t => return Err(BasicParseError::UnexpectedToken(t.clone()))
         }
-        self.parse_nested_block(|input| input.expect_string().map_err(ParseError::Basic))
+        self.parse_nested_block(|input| input.expect_string().map_err(ParseError::Basic).map(|s| s.clone()))
             .map_err(ParseError::<()>::basic)
     }
 
@@ -651,9 +651,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
     ///
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
-    pub fn expect_function(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
+    pub fn expect_function(&mut self) -> Result<&CowRcStr<'i>, BasicParseError<'i>> {
         match *self.next()? {
-            Token::Function(ref name) => Ok(name.clone()),
+            Token::Function(ref name) => Ok(name),
             ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
