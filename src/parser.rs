@@ -371,30 +371,29 @@ impl<'i: 't, 't> Parser<'i, 't> {
             }
             _ => {
                 token = self.input.tokenizer.next().map_err(|()| BasicParseError::EndOfInput)?;
-                match token {
-                    // Don’t cache whitespace or comment tokens.
-                    // A typical pattern is:
-                    //
-                    // ```
-                    // parser.try(|parser| {
-                    //     match parser.next() { … }
-                    // }).or_else(|| {
-                    //     match parser.next() { … }
-                    // })
-                    // ```
-                    //
-                    // If the curren position at the start of this code is at a whitespace token,
-                    // the "interesting" token (returned by `next`) comes later.
-                    // So in the second call to `next`, we don’t want "uninteresting" tokens
-                    // to overwrite the cache.
-                    Token::WhiteSpace(_) | Token::Comment(_) => {}
-                    _ => {
-                        self.input.cached_token = Some(CachedToken {
-                            token: token.clone(),
-                            start_position: token_start_position,
-                            end_position: self.input.tokenizer.position(),
-                        })
-                    }
+
+                // Only overwrite an existing cached token if the new one is further in the stream.
+                // A typical pattern is:
+                //
+                // ```
+                // parser.try(|parser| {
+                //     match parser.next() { … }
+                // }).or_else(|| {
+                //     match parser.next() { … }
+                // })
+                // ```
+                //
+                // If the current position at the start of this code is at a whitespace token,
+                // `next` is going to skip it and go to the next token.
+                // If `try` then rewinds, the second token is the one that will be in the cache.
+                // To be able to get any cache hit in this case,
+                // we don’t want to overwrite the cache with the intermediate whitespace token.
+                if self.input.cached_token.as_ref().map_or(true, |c| c.start_position < token_start_position) {
+                    self.input.cached_token = Some(CachedToken {
+                        token: token.clone(),
+                        start_position: token_start_position,
+                        end_position: self.input.tokenizer.position(),
+                    })
                 }
             }
         }
