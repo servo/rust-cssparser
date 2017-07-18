@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::cmp;
 use std::fmt;
 use std::hash;
@@ -40,6 +40,16 @@ pub struct CowRcStr<'a> {
 fn _static_assert_same_size<'a>() {
     // "Instantiate" the generic function without calling it.
     let _ = mem::transmute::<CowRcStr<'a>, Option<CowRcStr<'a>>>;
+}
+
+impl<'a> From<Cow<'a, str>> for CowRcStr<'a> {
+    #[inline]
+    fn from(s: Cow<'a, str>) -> Self {
+        match s {
+            Cow::Borrowed(s) => CowRcStr::from(s),
+            Cow::Owned(s) => CowRcStr::from(s),
+        }
+    }
 }
 
 impl<'a> From<&'a str> for CowRcStr<'a> {
