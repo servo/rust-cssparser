@@ -80,6 +80,11 @@ impl<'i> ParserInput<'i> {
             cached_token: None,
         }
     }
+
+    #[inline]
+    fn cached_token_ref(&self) -> &Token<'i> {
+        &self.cached_token.as_ref().unwrap().token
+    }
 }
 
 /// A CSS parser that borrows its `&str` input,
@@ -223,7 +228,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
         let result = match self.next() {
             Err(BasicParseError::EndOfInput) => Ok(()),
             Err(e) => unreachable!("Unexpected error encountered: {:?}", e),
-            Ok(t) => Err(BasicParseError::UnexpectedToken(t)),
+            Ok(t) => Err(BasicParseError::UnexpectedToken(t.clone())),
         };
         self.reset(start_position);
         result
@@ -327,23 +332,27 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// See the `Parser::parse_nested_block` method to parse the content of functions or blocks.
     ///
     /// This only returns a closing token when it is unmatched (and therefore an error).
-    pub fn next(&mut self) -> Result<Token<'i>, BasicParseError<'i>> {
+    pub fn next(&mut self) -> Result<&Token<'i>, BasicParseError<'i>> {
         loop {
             match self.next_including_whitespace_and_comments() {
-                Ok(Token::WhiteSpace(_)) | Ok(Token::Comment(_)) => {},
-                result => return result
+                Err(e) => return Err(e),
+                Ok(&Token::WhiteSpace(_)) | Ok(&Token::Comment(_)) => {},
+                _ => break
             }
         }
+        Ok(self.input.cached_token_ref())
     }
 
     /// Same as `Parser::next`, but does not skip whitespace tokens.
-    pub fn next_including_whitespace(&mut self) -> Result<Token<'i>, BasicParseError<'i>> {
+    pub fn next_including_whitespace(&mut self) -> Result<&Token<'i>, BasicParseError<'i>> {
         loop {
             match self.next_including_whitespace_and_comments() {
-                Ok(Token::Comment(_)) => {},
-                result => return result
+                Err(e) => return Err(e),
+                Ok(&Token::Comment(_)) => {},
+                _ => break
             }
         }
+        Ok(self.input.cached_token_ref())
     }
 
     /// Same as `Parser::next`, but does not skip whitespace or comment tokens.
@@ -352,7 +361,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// where comments are preserved.
     /// When parsing higher-level values, per the CSS Syntax specification,
     /// comments should always be ignored between tokens.
-    pub fn next_including_whitespace_and_comments(&mut self) -> Result<Token<'i>, BasicParseError<'i>> {
+    pub fn next_including_whitespace_and_comments(&mut self) -> Result<&Token<'i>, BasicParseError<'i>> {
         if let Some(block_type) = self.at_start_of.take() {
             consume_until_end_of_block(block_type, &mut self.input.tokenizer);
         }
@@ -367,38 +376,20 @@ impl<'i: 't, 't> Parser<'i, 't> {
         match self.input.cached_token {
             Some(ref cached_token) if cached_token.start_position == token_start_position => {
                 self.input.tokenizer.reset(cached_token.end_position);
-                token = cached_token.token.clone();
+                token = &cached_token.token
             }
             _ => {
-                token = self.input.tokenizer.next().map_err(|()| BasicParseError::EndOfInput)?;
-
-                // Only overwrite an existing cached token if the new one is further in the stream.
-                // A typical pattern is:
-                //
-                // ```
-                // parser.try(|parser| {
-                //     match parser.next() { … }
-                // }).or_else(|| {
-                //     match parser.next() { … }
-                // })
-                // ```
-                //
-                // If the current position at the start of this code is at a whitespace token,
-                // `next` is going to skip it and go to the next token.
-                // If `try` then rewinds, the second token is the one that will be in the cache.
-                // To be able to get any cache hit in this case,
-                // we don’t want to overwrite the cache with the intermediate whitespace token.
-                if self.input.cached_token.as_ref().map_or(true, |c| c.start_position < token_start_position) {
-                    self.input.cached_token = Some(CachedToken {
-                        token: token.clone(),
-                        start_position: token_start_position,
-                        end_position: self.input.tokenizer.position(),
-                    })
-                }
+                let new_token = self.input.tokenizer.next().map_err(|()| BasicParseError::EndOfInput)?;
+                self.input.cached_token = Some(CachedToken {
+                    token: new_token,
+                    start_position: token_start_position,
+                    end_position: self.input.tokenizer.position(),
+                });
+                token = self.input.cached_token_ref()
             }
         }
 
-        if let Some(block_type) = BlockType::opening(&token) {
+        if let Some(block_type) = BlockType::opening(token) {
             self.at_start_of = Some(block_type);
         }
         Ok(token)
@@ -434,7 +425,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
             values.push(self.parse_until_before(Delimiter::Comma, &mut parse_one)?);
             match self.next() {
                 Err(_) => return Ok(values),
-                Ok(Token::Comma) => continue,
+                Ok(&Token::Comma) => continue,
                 Ok(_) => unreachable!(),
             }
         }
@@ -487,94 +478,93 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// Parse a <whitespace-token> and return its value.
     #[inline]
     pub fn expect_whitespace(&mut self) -> Result<&'i str, BasicParseError<'i>> {
-        match self.next_including_whitespace()? {
+        match *self.next_including_whitespace()? {
             Token::WhiteSpace(value) => Ok(value),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
     /// Parse a <ident-token> and return the unescaped value.
     #[inline]
     pub fn expect_ident(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
-        match self.next()? {
-            Token::Ident(value) => Ok(value),
-            t => Err(BasicParseError::UnexpectedToken(t))
+        match *self.next()? {
+            Token::Ident(ref value) => Ok(value.clone()),
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
     /// Parse a <ident-token> whose unescaped value is an ASCII-insensitive match for the given value.
     #[inline]
     pub fn expect_ident_matching(&mut self, expected_value: &str) -> Result<(), BasicParseError<'i>> {
-        match self.next()? {
+        match *self.next()? {
             Token::Ident(ref value) if value.eq_ignore_ascii_case(expected_value) => Ok(()),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
     /// Parse a <string-token> and return the unescaped value.
     #[inline]
     pub fn expect_string(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
-        match self.next()? {
-            Token::QuotedString(value) => Ok(value),
-            t => Err(BasicParseError::UnexpectedToken(t))
+        match *self.next()? {
+            Token::QuotedString(ref value) => Ok(value.clone()),
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
     /// Parse either a <ident-token> or a <string-token>, and return the unescaped value.
     #[inline]
     pub fn expect_ident_or_string(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
-        match self.next()? {
-            Token::Ident(value) => Ok(value),
-            Token::QuotedString(value) => Ok(value),
-            t => Err(BasicParseError::UnexpectedToken(t))
+        match *self.next()? {
+            Token::Ident(ref value) => Ok(value.clone()),
+            Token::QuotedString(ref value) => Ok(value.clone()),
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
     /// Parse a <url-token> and return the unescaped value.
     #[inline]
     pub fn expect_url(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
-        match self.next()? {
-            Token::UnquotedUrl(value) => Ok(value),
-            Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {
-                self.parse_nested_block(|input| input.expect_string().map_err(ParseError::Basic))
-                    .map_err(ParseError::<()>::basic)
-            },
-            t => Err(BasicParseError::UnexpectedToken(t))
+        // FIXME: revert early returns when lifetimes are non-lexical
+        match *self.next()? {
+            Token::UnquotedUrl(ref value) => return Ok(value.clone()),
+            Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {}
+            ref t => return Err(BasicParseError::UnexpectedToken(t.clone()))
         }
+        self.parse_nested_block(|input| input.expect_string().map_err(ParseError::Basic))
+            .map_err(ParseError::<()>::basic)
     }
 
     /// Parse either a <url-token> or a <string-token>, and return the unescaped value.
     #[inline]
     pub fn expect_url_or_string(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
-        match self.next()? {
-            Token::UnquotedUrl(value) => Ok(value),
-            Token::QuotedString(value) => Ok(value),
-            Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {
-                self.parse_nested_block(|input| input.expect_string().map_err(ParseError::Basic))
-                    .map_err(ParseError::<()>::basic)
-            },
-            t => Err(BasicParseError::UnexpectedToken(t))
+        // FIXME: revert early returns when lifetimes are non-lexical
+        match *self.next()? {
+            Token::UnquotedUrl(ref value) => return Ok(value.clone()),
+            Token::QuotedString(ref value) => return Ok(value.clone()),
+            Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {}
+            ref t => return Err(BasicParseError::UnexpectedToken(t.clone()))
         }
+        self.parse_nested_block(|input| input.expect_string().map_err(ParseError::Basic))
+            .map_err(ParseError::<()>::basic)
     }
 
     /// Parse a <number-token> and return the integer value.
     #[inline]
     pub fn expect_number(&mut self) -> Result<f32, BasicParseError<'i>> {
-        match self.next()? {
+        match *self.next()? {
             Token::Number { value, .. } => Ok(value),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
     /// Parse a <number-token> that does not have a fractional part, and return the integer value.
     #[inline]
     pub fn expect_integer(&mut self) -> Result<i32, BasicParseError<'i>> {
-        let token = self.next()?;
-        match token {
+        match *self.next()? {
             Token::Number { int_value: Some(int_value), .. } => {
                 Ok(int_value)
             }
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
@@ -582,45 +572,45 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// `0%` and `100%` map to `0.0` and `1.0` (not `100.0`), respectively.
     #[inline]
     pub fn expect_percentage(&mut self) -> Result<f32, BasicParseError<'i>> {
-        match self.next()? {
+        match *self.next()? {
             Token::Percentage { unit_value, .. } => Ok(unit_value),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
     /// Parse a `:` <colon-token>.
     #[inline]
     pub fn expect_colon(&mut self) -> Result<(), BasicParseError<'i>> {
-        match self.next()? {
+        match *self.next()? {
             Token::Colon => Ok(()),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
     /// Parse a `;` <semicolon-token>.
     #[inline]
     pub fn expect_semicolon(&mut self) -> Result<(), BasicParseError<'i>> {
-        match self.next()? {
+        match *self.next()? {
             Token::Semicolon => Ok(()),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
     /// Parse a `,` <comma-token>.
     #[inline]
     pub fn expect_comma(&mut self) -> Result<(), BasicParseError<'i>> {
-        match self.next()? {
+        match *self.next()? {
             Token::Comma => Ok(()),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
     /// Parse a <delim-token> with the given value.
     #[inline]
     pub fn expect_delim(&mut self, expected_value: char) -> Result<(), BasicParseError<'i>> {
-        match self.next()? {
+        match *self.next()? {
             Token::Delim(value) if value == expected_value => Ok(()),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
@@ -629,9 +619,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_curly_bracket_block(&mut self) -> Result<(), BasicParseError<'i>> {
-        match self.next()? {
+        match *self.next()? {
             Token::CurlyBracketBlock => Ok(()),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
@@ -640,9 +630,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_square_bracket_block(&mut self) -> Result<(), BasicParseError<'i>> {
-        match self.next()? {
+        match *self.next()? {
             Token::SquareBracketBlock => Ok(()),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
@@ -651,9 +641,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_parenthesis_block(&mut self) -> Result<(), BasicParseError<'i>> {
-        match self.next()? {
+        match *self.next()? {
             Token::ParenthesisBlock => Ok(()),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
@@ -662,9 +652,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_function(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
-        match self.next()? {
-            Token::Function(name) => Ok(name),
-            t => Err(BasicParseError::UnexpectedToken(t))
+        match *self.next()? {
+            Token::Function(ref name) => Ok(name.clone()),
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
@@ -673,9 +663,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// If the result is `Ok`, you can then call the `Parser::parse_nested_block` method.
     #[inline]
     pub fn expect_function_matching(&mut self, expected_name: &str) -> Result<(), BasicParseError<'i>> {
-        match self.next()? {
+        match *self.next()? {
             Token::Function(ref name) if name.eq_ignore_ascii_case(expected_name) => Ok(()),
-            t => Err(BasicParseError::UnexpectedToken(t))
+            ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
     }
 
@@ -686,20 +676,22 @@ impl<'i: 't, 't> Parser<'i, 't> {
     pub fn expect_no_error_token(&mut self) -> Result<(), BasicParseError<'i>> {
         loop {
             match self.next_including_whitespace_and_comments() {
-                Ok(Token::Function(_)) | Ok(Token::ParenthesisBlock) |
-                Ok(Token::SquareBracketBlock) | Ok(Token::CurlyBracketBlock) => {
-                    let result = self.parse_nested_block(|input| input.expect_no_error_token()
-                                                         .map_err(|e| ParseError::Basic(e)));
-                    result.map_err(ParseError::<()>::basic)?
-                }
+                Ok(&Token::Function(_)) |
+                Ok(&Token::ParenthesisBlock) |
+                Ok(&Token::SquareBracketBlock) |
+                Ok(&Token::CurlyBracketBlock) => {}
                 Ok(token) => {
                     if token.is_parse_error() {
                         //FIXME: maybe these should be separate variants of BasicParseError instead?
-                        return Err(BasicParseError::UnexpectedToken(token))
+                        return Err(BasicParseError::UnexpectedToken(token.clone()))
                     }
+                    continue
                 }
                 Err(_) => return Ok(())
             }
+            let result = self.parse_nested_block(|input| input.expect_no_error_token()
+                                                 .map_err(|e| ParseError::Basic(e)));
+            result.map_err(ParseError::<()>::basic)?
         }
     }
 }

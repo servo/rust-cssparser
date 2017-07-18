@@ -118,7 +118,7 @@ fn component_value_list() {
 fn one_component_value() {
     run_json_tests(include_str!("css-parsing-tests/one_component_value.json"), |input| {
         let result: Result<Json, ParseError<()>> = input.parse_entirely(|input| {
-            Ok(one_component_value_to_json(input.next()?, input))
+            Ok(one_component_value_to_json(input.next()?.clone(), input))
         });
         result.unwrap_or(JArray!["error", "invalid"])
     });
@@ -289,7 +289,7 @@ fn unquoted_url_escaping() {
         )\
         ");
     let mut input = ParserInput::new(&serialized);
-    assert_eq!(Parser::new(&mut input).next(), Ok(token));
+    assert_eq!(Parser::new(&mut input).next(), Ok(&token));
 }
 
 #[test]
@@ -389,9 +389,9 @@ fn serializer(preserve_comments: bool) {
                     string: &mut String,
                     preserve_comments: bool) {
             while let Ok(token) = if preserve_comments {
-                input.next_including_whitespace_and_comments()
+                input.next_including_whitespace_and_comments().map(|t| t.clone())
             } else {
-                input.next_including_whitespace()
+                input.next_including_whitespace().map(|t| t.clone())
             } {
                 let token_type = token.serialization_type();
                 if !preserve_comments && previous_token.needs_separator_when_before(token_type) {
@@ -452,24 +452,24 @@ fn line_numbers() {
     let mut input = ParserInput::new("foo bar\nbaz\r\n\n\"a\\\r\nb\"");
     let mut input = Parser::new(&mut input);
     assert_eq!(input.current_source_location(), SourceLocation { line: 0, column: 0 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident("foo".into())));
+    assert_eq!(input.next_including_whitespace(), Ok(&Token::Ident("foo".into())));
     assert_eq!(input.current_source_location(), SourceLocation { line: 0, column: 3 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace(" ")));
+    assert_eq!(input.next_including_whitespace(), Ok(&Token::WhiteSpace(" ")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 0, column: 4 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident("bar".into())));
+    assert_eq!(input.next_including_whitespace(), Ok(&Token::Ident("bar".into())));
     assert_eq!(input.current_source_location(), SourceLocation { line: 0, column: 7 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace("\n")));
+    assert_eq!(input.next_including_whitespace(), Ok(&Token::WhiteSpace("\n")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 0 });
-    assert_eq!(input.next_including_whitespace(), Ok(Token::Ident("baz".into())));
+    assert_eq!(input.next_including_whitespace(), Ok(&Token::Ident("baz".into())));
     assert_eq!(input.current_source_location(), SourceLocation { line: 1, column: 3 });
     let position = input.position();
 
-    assert_eq!(input.next_including_whitespace(), Ok(Token::WhiteSpace("\r\n\n")));
+    assert_eq!(input.next_including_whitespace(), Ok(&Token::WhiteSpace("\r\n\n")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 3, column: 0 });
 
     assert_eq!(input.source_location(position), SourceLocation { line: 1, column: 3 });
 
-    assert_eq!(input.next_including_whitespace(), Ok(Token::QuotedString("ab".into())));
+    assert_eq!(input.next_including_whitespace(), Ok(&Token::QuotedString("ab".into())));
     assert_eq!(input.current_source_location(), SourceLocation { line: 4, column: 2 });
     assert!(input.next_including_whitespace().is_err());
 }
@@ -535,12 +535,12 @@ fn overflow() {
 fn line_delimited() {
     let mut input = ParserInput::new(" { foo ; bar } baz;,");
     let mut input = Parser::new(&mut input);
-    assert_eq!(input.next(), Ok(Token::CurlyBracketBlock));
+    assert_eq!(input.next(), Ok(&Token::CurlyBracketBlock));
     assert!({
         let result: Result<_, ParseError<()>> = input.parse_until_after(Delimiter::Semicolon, |_| Ok(42));
         result
     }.is_err());
-    assert_eq!(input.next(), Ok(Token::Comma));
+    assert_eq!(input.next(), Ok(&Token::Comma));
     assert!(input.next().is_err());
 }
 
@@ -684,7 +684,7 @@ impl<'i> DeclarationParser<'i> for JsonParser {
         let mut important = false;
         loop {
             let start_position = input.position();
-            if let Ok(mut token) = input.next_including_whitespace() {
+            if let Ok(mut token) = input.next_including_whitespace().map(|t| t.clone()) {
                 // Hack to deal with css-parsing-tests assuming that
                 // `!important` in the middle of a declaration value is OK.
                 // This can never happen per spec
@@ -698,7 +698,7 @@ impl<'i> DeclarationParser<'i> for JsonParser {
                         }
                     }
                     input.reset(start_position);
-                    token = input.next_including_whitespace().unwrap();
+                    token = input.next_including_whitespace().unwrap().clone();
                 }
                 value.push(one_component_value_to_json(token, input));
             } else {
@@ -761,7 +761,7 @@ impl<'i> QualifiedRuleParser<'i> for JsonParser {
 
 fn component_values_to_json(input: &mut Parser) -> Vec<Json> {
     let mut values = vec![];
-    while let Ok(token) = input.next_including_whitespace() {
+    while let Ok(token) = input.next_including_whitespace().map(|t| t.clone()) {
         values.push(one_component_value_to_json(token, input));
     }
     values
@@ -926,17 +926,17 @@ fn parser_maintains_current_line() {
     let mut input = ParserInput::new("ident ident;\nident ident ident;\nident");
     let mut parser = Parser::new(&mut input);
     assert_eq!(parser.current_line(), "ident ident;");
-    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
-    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
-    assert_eq!(parser.next(), Ok(Token::Semicolon));
+    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
+    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
+    assert_eq!(parser.next(), Ok(&Token::Semicolon));
 
-    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
+    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
     assert_eq!(parser.current_line(), "ident ident ident;");
-    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
-    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
-    assert_eq!(parser.next(), Ok(Token::Semicolon));
+    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
+    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
+    assert_eq!(parser.next(), Ok(&Token::Semicolon));
 
-    assert_eq!(parser.next(), Ok(Token::Ident("ident".into())));
+    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
     assert_eq!(parser.current_line(), "ident");
 }
 

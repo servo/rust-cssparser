@@ -239,9 +239,17 @@ where P: DeclarationParser<'i, Declaration = I, Error = E> +
     fn next(&mut self) -> Option<Result<I, PreciseParseError<'i, E>>> {
         loop {
             let start_position = self.input.position();
-            match self.input.next_including_whitespace_and_comments() {
-                Ok(Token::WhiteSpace(_)) | Ok(Token::Comment(_)) | Ok(Token::Semicolon) => {}
-                Ok(Token::Ident(name)) => {
+            // FIXME: remove intermediate variable when lifetimes are non-lexical
+            let ident = match self.input.next_including_whitespace_and_comments() {
+                Ok(&Token::WhiteSpace(_)) | Ok(&Token::Comment(_)) | Ok(&Token::Semicolon) => continue,
+                Ok(&Token::Ident(ref name)) => Ok(Ok(name.clone())),
+                Ok(&Token::AtKeyword(ref name)) => Ok(Err(name.clone())),
+                Ok(token) => Err(token.clone()),
+                Err(_) => return None,
+            };
+            match ident {
+                Ok(Ok(name)) => {
+                    // Ident
                     return Some({
                         let parser = &mut self.parser;
                         // FIXME: https://github.com/rust-lang/rust/issues/42508
@@ -254,18 +262,18 @@ where P: DeclarationParser<'i, Declaration = I, Error = E> +
                         span: start_position..self.input.position()
                     }))
                 }
-                Ok(Token::AtKeyword(name)) => {
+                Ok(Err(name)) => {
+                    // At-keyword
                     return Some(parse_at_rule(start_position, name, self.input, &mut self.parser))
                 }
-                Ok(t) => {
+                Err(token) => {
                     return Some(self.input.parse_until_after(Delimiter::Semicolon,
-                                                             |_| Err(ParseError::Basic(BasicParseError::UnexpectedToken(t))))
+                                                             |_| Err(ParseError::Basic(BasicParseError::UnexpectedToken(token.clone()))))
                                 .map_err(|e| PreciseParseError {
                                     error: e,
                                     span: start_position..self.input.position()
                                 }))
                 }
-                Err(_) => return None,
             }
         }
     }
@@ -334,29 +342,31 @@ where P: QualifiedRuleParser<'i, QualifiedRule = R, Error = E> +
     fn next(&mut self) -> Option<Result<R, PreciseParseError<'i, E>>> {
         loop {
             let start_position = self.input.position();
-            match self.input.next_including_whitespace_and_comments() {
-                Ok(Token::WhiteSpace(_)) | Ok(Token::Comment(_)) => {}
-                Ok(Token::CDO) | Ok(Token::CDC) if self.is_stylesheet => {}
-                Ok(Token::AtKeyword(name)) => {
-                    let first_stylesheet_rule = self.is_stylesheet && !self.any_rule_so_far;
-                    self.any_rule_so_far = true;
-                    if first_stylesheet_rule && name.eq_ignore_ascii_case("charset") {
-                        let delimiters = Delimiter::Semicolon | Delimiter::CurlyBracketBlock;
-                        let _: Result<(), ParseError<()>> = self.input.parse_until_after(delimiters, |_| Ok(()));
-                    } else {
-                        return Some(parse_at_rule(start_position, name, self.input, &mut self.parser))
-                    }
-                }
-                Ok(_) => {
-                    self.any_rule_so_far = true;
-                    self.input.reset(start_position);
-                    return Some(parse_qualified_rule(self.input, &mut self.parser)
-                                .map_err(|e| PreciseParseError {
-                                    error: e,
-                                    span: start_position..self.input.position()
-                                }))
-                }
+            // FIXME: remove intermediate variable when lifetimes are non-lexical
+            let at_keyword = match self.input.next_including_whitespace_and_comments() {
+                Ok(&Token::WhiteSpace(_)) | Ok(&Token::Comment(_)) => continue,
+                Ok(&Token::CDO) | Ok(&Token::CDC) if self.is_stylesheet => continue,
+                Ok(&Token::AtKeyword(ref name)) => Some(name.clone()),
+                Ok(_) => None,
                 Err(_) => return None,
+            };
+            if let Some(name) = at_keyword {
+                let first_stylesheet_rule = self.is_stylesheet && !self.any_rule_so_far;
+                self.any_rule_so_far = true;
+                if first_stylesheet_rule && name.eq_ignore_ascii_case("charset") {
+                    let delimiters = Delimiter::Semicolon | Delimiter::CurlyBracketBlock;
+                    let _: Result<(), ParseError<()>> = self.input.parse_until_after(delimiters, |_| Ok(()));
+                } else {
+                    return Some(parse_at_rule(start_position, name.clone(), self.input, &mut self.parser))
+                }
+            } else {
+                self.any_rule_so_far = true;
+                self.input.reset(start_position);
+                return Some(parse_qualified_rule(self.input, &mut self.parser)
+                            .map_err(|e| PreciseParseError {
+                                error: e,
+                                span: start_position..self.input.position()
+                            }))
             }
         }
     }
@@ -388,15 +398,17 @@ where P: QualifiedRuleParser<'i, QualifiedRule = R, Error = E> +
     input.parse_entirely(|input| {
         loop {
             let start_position = input.position();
-            match input.next_including_whitespace_and_comments()? {
-                Token::WhiteSpace(_) | Token::Comment(_) => {}
-                Token::AtKeyword(name) => {
-                    return parse_at_rule(start_position, name, input, parser).map_err(|e| e.error)
-                }
-                _ => {
-                    input.reset(start_position);
-                    return parse_qualified_rule(input, parser)
-                }
+            // FIXME: remove intermediate variable when lifetimes are non-lexical
+            let at_keyword = match *input.next_including_whitespace_and_comments()? {
+                Token::WhiteSpace(_) | Token::Comment(_) => continue,
+                Token::AtKeyword(ref name) => Some(name.clone()),
+                _ => None
+            };
+            if let Some(name) = at_keyword {
+                return parse_at_rule(start_position, name, input, parser).map_err(|e| e.error)
+            } else {
+                input.reset(start_position);
+                return parse_qualified_rule(input, parser)
             }
         }
     })
@@ -419,8 +431,8 @@ fn parse_at_rule<'i: 't, 't, P, E>(start_position: SourcePosition, name: CowRcSt
     match result {
         Ok(AtRuleType::WithoutBlock(rule)) => {
             match input.next() {
-                Ok(Token::Semicolon) | Err(_) => Ok(rule),
-                Ok(Token::CurlyBracketBlock) => Err(PreciseParseError {
+                Ok(&Token::Semicolon) | Err(_) => Ok(rule),
+                Ok(&Token::CurlyBracketBlock) => Err(PreciseParseError {
                     error: ParseError::Basic(BasicParseError::UnexpectedToken(Token::CurlyBracketBlock)),
                     span: start_position..input.position(),
                 }),
@@ -429,7 +441,7 @@ fn parse_at_rule<'i: 't, 't, P, E>(start_position: SourcePosition, name: CowRcSt
         }
         Ok(AtRuleType::WithBlock(prelude)) => {
             match input.next() {
-                Ok(Token::CurlyBracketBlock) => {
+                Ok(&Token::CurlyBracketBlock) => {
                     // FIXME: https://github.com/rust-lang/rust/issues/42508
                     parse_nested_block::<'i, 't, _, _, _>(input, move |input| parser.parse_block(prelude, input))
                         .map_err(|e| PreciseParseError {
@@ -437,7 +449,7 @@ fn parse_at_rule<'i: 't, 't, P, E>(start_position: SourcePosition, name: CowRcSt
                             span: start_position..input.position(),
                         })
                 }
-                Ok(Token::Semicolon) => Err(PreciseParseError {
+                Ok(&Token::Semicolon) => Err(PreciseParseError {
                     error: ParseError::Basic(BasicParseError::UnexpectedToken(Token::Semicolon)),
                     span: start_position..input.position()
                 }),
@@ -450,8 +462,8 @@ fn parse_at_rule<'i: 't, 't, P, E>(start_position: SourcePosition, name: CowRcSt
         }
         Ok(AtRuleType::OptionalBlock(prelude)) => {
             match input.next() {
-                Ok(Token::Semicolon) | Err(_) => Ok(parser.rule_without_block(prelude)),
-                Ok(Token::CurlyBracketBlock) => {
+                Ok(&Token::Semicolon) | Err(_) => Ok(parser.rule_without_block(prelude)),
+                Ok(&Token::CurlyBracketBlock) => {
                     // FIXME: https://github.com/rust-lang/rust/issues/42508
                     parse_nested_block::<'i, 't, _, _, _>(input, move |input| parser.parse_block(prelude, input))
                         .map_err(|e| PreciseParseError {
@@ -465,7 +477,7 @@ fn parse_at_rule<'i: 't, 't, P, E>(start_position: SourcePosition, name: CowRcSt
         Err(error) => {
             let end_position = input.position();
             match input.next() {
-                Ok(Token::CurlyBracketBlock) | Ok(Token::Semicolon) | Err(_) => {},
+                Ok(&Token::CurlyBracketBlock) | Ok(&Token::Semicolon) | Err(_) => {},
                 _ => unreachable!()
             };
             Err(PreciseParseError {
@@ -484,7 +496,7 @@ fn parse_qualified_rule<'i, 't, P, E>(input: &mut Parser<'i, 't>, parser: &mut P
     let prelude = parse_until_before::<'i, 't, _, _, _>(input, Delimiter::CurlyBracketBlock, |input| {
         parser.parse_prelude(input)
     });
-    match input.next()? {
+    match *input.next()? {
         Token::CurlyBracketBlock => {
             // Do this here so that we consume the `{` even if the prelude is `Err`.
             let prelude = prelude?;
