@@ -96,25 +96,6 @@ impl<'a> CowRcStr<'a> {
             }
         }
     }
-
-    /// Convert into `String`, re-using an existing memory allocation if possible.
-    #[inline]
-    pub fn into_owned(self) -> String {
-        let unpacked = self.unpack();
-
-        // Inhibit destructor: we’re taking ownership of this strong reference (if any)
-        mem::forget(self);
-
-        match unpacked {
-            Ok(s) => s.to_owned(),
-            Err(ptr) => {
-                let rc = unsafe {
-                    Rc::from_raw(ptr)
-                };
-                Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
-            }
-        }
-    }
 }
 
 impl<'a> Clone for CowRcStr<'a> {
