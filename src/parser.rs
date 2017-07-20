@@ -493,6 +493,12 @@ impl<'i: 't, 't> Parser<'i, 't> {
         }
     }
 
+    /// expect_ident, but clone the CowRcStr
+    #[inline]
+    pub fn expect_ident_cloned(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
+        self.expect_ident().map(|s| s.clone())
+    }
+
     /// Parse a <ident-token> whose unescaped value is an ASCII-insensitive match for the given value.
     #[inline]
     pub fn expect_ident_matching(&mut self, expected_value: &str) -> Result<(), BasicParseError<'i>> {
@@ -509,6 +515,12 @@ impl<'i: 't, 't> Parser<'i, 't> {
             Token::QuotedString(ref value) => Ok(value),
             ref t => Err(BasicParseError::UnexpectedToken(t.clone()))
         }
+    }
+
+    /// expect_string, but clone the CowRcStr
+    #[inline]
+    pub fn expect_string_cloned(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
+        self.expect_string().map(|s| s.clone())
     }
 
     /// Parse either a <ident-token> or a <string-token>, and return the unescaped value.
