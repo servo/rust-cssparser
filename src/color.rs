@@ -141,6 +141,7 @@ impl Color {
     ///
     /// FIXME(#2) Deprecated CSS2 System Colors are not supported yet.
     pub fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Color, BasicParseError<'i>> {
+        // FIXME: remove clone() when lifetimes are non-lexical
         let token = input.next()?.clone();
         match token {
             Token::Hash(ref value) | Token::IDHash(ref value) => {
@@ -154,7 +155,7 @@ impl Color {
                 }).map_err(ParseError::<()>::basic);
             }
             _ => Err(())
-        }.map_err(|()| BasicParseError::UnexpectedToken(token.clone()))
+        }.map_err(|()| BasicParseError::UnexpectedToken(token))
     }
 
     /// Parse a color hash, without the leading '#' character.
