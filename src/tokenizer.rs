@@ -245,6 +245,15 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
+    pub fn see_function(&mut self, name: &str) {
+        if self.var_functions == SeenStatus::LookingForThem {
+            if name.eq_ignore_ascii_case("var") {
+                self.var_functions = SeenStatus::SeenAtLeastOne;
+            }
+        }
+    }
+
+    #[inline]
     pub fn look_for_viewport_percentages(&mut self) {
         self.viewport_percentages = SeenStatus::LookingForThem;
     }
@@ -254,6 +263,18 @@ impl<'a> Tokenizer<'a> {
         let seen = self.viewport_percentages == SeenStatus::SeenAtLeastOne;
         self.viewport_percentages = SeenStatus::DontCare;
         seen
+    }
+
+    #[inline]
+    pub fn see_dimension(&mut self, unit: &str) {
+        if self.viewport_percentages == SeenStatus::LookingForThem {
+            if unit.eq_ignore_ascii_case("vh") ||
+               unit.eq_ignore_ascii_case("vw") ||
+               unit.eq_ignore_ascii_case("vmin") ||
+               unit.eq_ignore_ascii_case("vmax") {
+                   self.viewport_percentages = SeenStatus::SeenAtLeastOne;
+            }
+        }
     }
 
     #[inline]
@@ -699,10 +720,7 @@ fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         if value.eq_ignore_ascii_case("url") {
             consume_unquoted_url(tokenizer).unwrap_or(Function(value))
         } else {
-            if tokenizer.var_functions == SeenStatus::LookingForThem &&
-                value.eq_ignore_ascii_case("var") {
-                tokenizer.var_functions = SeenStatus::SeenAtLeastOne;
-            }
+            tokenizer.see_function(&value);
             Function(value)
         }
     } else {
@@ -887,14 +905,7 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     let value = value as f32;
     if is_ident_start(tokenizer) {
         let unit = consume_name(tokenizer);
-        if tokenizer.viewport_percentages == SeenStatus::LookingForThem {
-            if unit.eq_ignore_ascii_case("vh") ||
-               unit.eq_ignore_ascii_case("vw") ||
-               unit.eq_ignore_ascii_case("vmin") ||
-               unit.eq_ignore_ascii_case("vmax") {
-                   tokenizer.viewport_percentages = SeenStatus::SeenAtLeastOne;
-           }
-        }
+        tokenizer.see_dimension(&unit);
         Dimension {
             value: value,
             int_value: int_value,

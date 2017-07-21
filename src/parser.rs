@@ -376,6 +376,11 @@ impl<'i: 't, 't> Parser<'i, 't> {
         match self.input.cached_token {
             Some(ref cached_token) if cached_token.start_position == token_start_position => {
                 self.input.tokenizer.reset(cached_token.end_position);
+                match cached_token.token {
+                    Token::Dimension { ref unit, .. } => self.input.tokenizer.see_dimension(unit),
+                    Token::Function(ref name) => self.input.tokenizer.see_function(name),
+                    _ => {}
+                }
                 token = &cached_token.token
             }
             _ => {
