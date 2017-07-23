@@ -395,7 +395,7 @@ pub struct SourcePosition(usize);
 
 
 /// The line and column number for a given position within the input.
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Default)]
 pub struct SourceLocation {
     /// The line number, starting at 0 for the first line.
     pub line: u32,
