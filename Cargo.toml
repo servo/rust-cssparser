@@ -20,6 +20,7 @@ encoding_rs = "0.5"
 
 [dependencies]
 cssparser-macros = {path = "./macros", version = "0.3"}
+dtoa-short = "0.1"
 heapsize = {version = ">= 0.3, < 0.5", optional = true}
 matches = "0.1"
 phf = "0.7"
