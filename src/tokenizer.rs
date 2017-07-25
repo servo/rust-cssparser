@@ -1048,7 +1048,9 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
             match_byte! { tokenizer.consume_byte(),
                 b')' => { break },
                 b'\\' => {
-                    tokenizer.advance(1); // Skip an escaped ')' or '\'
+                    if matches!(tokenizer.next_byte(), Some(b')') | Some(b'\\')) {
+                        tokenizer.advance(1); // Skip an escaped ')' or '\'
+                    }
                 }
                 _ => {},
             }
