@@ -489,12 +489,12 @@ fn line_numbers() {
     assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 2 });
     assert_eq!(input.next_including_whitespace(), Ok(&Token::Ident("baz".into())));
     assert_eq!(input.current_source_location(), SourceLocation { line: 2, column: 5 });
-    let position = input.position();
+    let state = input.state();
 
     assert_eq!(input.next_including_whitespace(), Ok(&Token::WhiteSpace("\r\n\n")));
     assert_eq!(input.current_source_location(), SourceLocation { line: 4, column: 0 });
 
-    assert_eq!(input.source_location(position), SourceLocation { line: 2, column: 5 });
+    assert_eq!(state.source_location(), SourceLocation { line: 2, column: 5 });
 
     assert_eq!(input.next_including_whitespace(), Ok(&Token::UnquotedUrl("u".into())));
     assert_eq!(input.current_source_location(), SourceLocation { line: 6, column: 1 });
@@ -713,21 +713,21 @@ impl<'i> DeclarationParser<'i> for JsonParser {
         let mut value = vec![];
         let mut important = false;
         loop {
-            let start_position = input.position();
+            let start = input.state();
             if let Ok(mut token) = input.next_including_whitespace().map(|t| t.clone()) {
                 // Hack to deal with css-parsing-tests assuming that
                 // `!important` in the middle of a declaration value is OK.
                 // This can never happen per spec
                 // (even CSS Variables forbid top-level `!`)
                 if token == Token::Delim('!') {
-                    input.reset(start_position);
+                    input.reset(&start);
                     if parse_important(input).is_ok() {
                         if input.is_exhausted() {
                             important = true;
                             break
                         }
                     }
-                    input.reset(start_position);
+                    input.reset(&start);
                     token = input.next_including_whitespace().unwrap().clone();
                 }
                 value.push(one_component_value_to_json(token, input));

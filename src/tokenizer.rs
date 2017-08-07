@@ -5,11 +5,11 @@
 // https://drafts.csswg.org/css-syntax/#tokenization
 
 use std::ops::Range;
-use std::cell::Cell;
 use std::char;
 use std::ascii::AsciiExt;
 use std::i32;
 
+use parser::ParserState;
 use cow_rc_str::CowRcStr;
 use self::Token::*;
 
@@ -205,8 +205,8 @@ pub struct Tokenizer<'a> {
     input: &'a str,
     /// Counted in bytes, not code points. From 0.
     position: usize,
-    /// Cache for `source_location()`
-    last_known_source_location: Cell<(SourcePosition, SourceLocation)>,
+    current_line_start_position: usize,
+    current_line_number: u32,
     var_functions: SeenStatus,
     viewport_percentages: SeenStatus,
 }
@@ -222,11 +222,16 @@ enum SeenStatus {
 impl<'a> Tokenizer<'a> {
     #[inline]
     pub fn new(input: &str) -> Tokenizer {
+        Tokenizer::with_first_line_number(input, 0)
+    }
+
+    #[inline]
+    pub fn with_first_line_number(input: &str, first_line_number: u32) -> Tokenizer {
         Tokenizer {
             input: input,
             position: 0,
-            last_known_source_location: Cell::new((SourcePosition(0),
-                                                   SourceLocation { line: 0, column: 0 })),
+            current_line_start_position: 0,
+            current_line_number: first_line_number,
             var_functions: SeenStatus::DontCare,
             viewport_percentages: SeenStatus::DontCare,
         }
@@ -288,8 +293,28 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn reset(&mut self, new_position: SourcePosition) {
-        self.position = new_position.0;
+    pub fn current_source_location(&self) -> SourceLocation {
+        SourceLocation {
+            line: self.current_line_number,
+            column: (self.position - self.current_line_start_position) as u32,
+        }
+    }
+
+    #[inline]
+    pub fn state(&self) -> ParserState {
+        ParserState {
+            position: self.position,
+            current_line_start_position: self.current_line_start_position,
+            current_line_number: self.current_line_number,
+            at_start_of: None,
+        }
+    }
+
+    #[inline]
+    pub fn reset(&mut self, state: &ParserState) {
+        self.position = state.position;
+        self.current_line_start_position = state.current_line_start_position;
+        self.current_line_number = state.current_line_number;
     }
 
     #[inline]
@@ -302,12 +327,6 @@ impl<'a> Tokenizer<'a> {
         &self.input[range.start.0..range.end.0]
     }
 
-    #[inline]
-    pub fn current_source_location(&self) -> SourceLocation {
-        let position = SourcePosition(self.position);
-        self.source_location(position)
-    }
-
     pub fn current_source_line(&self) -> &'a str {
         let current = self.position;
         let start = self.input[0..current]
@@ -317,37 +336,6 @@ impl<'a> Tokenizer<'a> {
             .find(|c| matches!(c, '\r' | '\n' | '\x0C'))
             .map_or(self.input.len(), |end| current + end);
         &self.input[start..end]
-    }
-
-    pub fn source_location(&self, position: SourcePosition) -> SourceLocation {
-        let target = position.0;
-        let mut location;
-        let mut position;
-        let (SourcePosition(last_known_position), last_known_location) =
-            self.last_known_source_location.get();
-        if target >= last_known_position {
-            position = last_known_position;
-            location = last_known_location;
-        } else {
-            // For now we’re only traversing the source *forwards* to count newlines.
-            // So if the requested position is before the last known one,
-            // start over from the beginning.
-            position = 0;
-            location = SourceLocation { line: 0, column: 0 };
-        }
-        let mut source = &self.input[position..target];
-        while let Some(newline_position) = source.find(|c| matches!(c, '\n' | '\r' | '\x0C')) {
-            let offset = newline_position +
-                if source[newline_position..].starts_with("\r\n") { 2 } else { 1 };
-            source = &source[offset..];
-            position += offset;
-            location.line += 1;
-            location.column = 0;
-        }
-        debug_assert!(position <= target);
-        location.column += (target - position) as u32;
-        self.last_known_source_location.set((SourcePosition(target), location));
-        location
     }
 
     #[inline]
@@ -410,15 +398,15 @@ impl<'a> Tokenizer<'a> {
     }
 }
 
-
+/// A position from the start of the input, counted in UTF-8 bytes.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
-pub struct SourcePosition(usize);
+pub struct SourcePosition(pub(crate) usize);
 
 
 /// The line and column number for a given position within the input.
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct SourceLocation {
-    /// The line number, starting at 0 for the first line.
+    /// The line number, starting at 0 for the first line, unless `with_first_line_number` was used.
     pub line: u32,
 
     /// The column number within a line, starting at 0 for first the character of the line.
