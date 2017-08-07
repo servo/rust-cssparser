@@ -83,7 +83,7 @@ pub use cssparser_macros::*;
 pub use tokenizer::{Token, SourceLocation};
 pub use rules_and_declarations::{parse_important};
 pub use rules_and_declarations::{DeclarationParser, DeclarationListParser, parse_one_declaration};
-pub use rules_and_declarations::{RuleListParser, parse_one_rule};
+pub use rules_and_declarations::{RuleListParser, parse_one_rule, PreciseParseError};
 pub use rules_and_declarations::{AtRuleType, QualifiedRuleParser, AtRuleParser};
 pub use from_bytes::{stylesheet_encoding, EncodingSupport};
 pub use color::{RGBA, Color, parse_color_keyword};

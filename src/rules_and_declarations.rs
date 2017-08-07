@@ -414,8 +414,12 @@ where P: QualifiedRuleParser<'i, QualifiedRule = R, Error = E> +
     })
 }
 
+/// A parse error with details of where it occured
 pub struct PreciseParseError<'i, E: 'i> {
+    /// Error details
     pub error: ParseError<'i, E>,
+
+    /// The start and end position
     pub span: Range<SourcePosition>,
 }
 
