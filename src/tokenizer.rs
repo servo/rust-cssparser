@@ -514,9 +514,7 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
         }
         b'/' => {
             if tokenizer.starts_with(b"/*") {
-                let contents = consume_comment(tokenizer);
-                check_for_source_map(tokenizer, contents);
-                Comment(contents)
+                Comment(consume_comment(tokenizer))
             } else {
                 tokenizer.advance(1);
                 Delim('/')
@@ -627,7 +625,9 @@ fn consume_comment<'a>(tokenizer: &mut Tokenizer<'a>) -> &'a str {
                 tokenizer.advance(1);
                 if tokenizer.next_byte() == Some(b'/') {
                     tokenizer.advance(1);
-                    return tokenizer.slice(start_position..end_position)
+                    let contents = tokenizer.slice(start_position..end_position);
+                    check_for_source_map(tokenizer, contents);
+                    return contents
                 }
             }
             b'\n' | b'\x0C' => {
@@ -643,7 +643,9 @@ fn consume_comment<'a>(tokenizer: &mut Tokenizer<'a>) -> &'a str {
             }
         }
     }
-    tokenizer.slice_from(start_position)
+    let contents = tokenizer.slice_from(start_position);
+    check_for_source_map(tokenizer, contents);
+    contents
 }
 
 fn consume_string<'a>(tokenizer: &mut Tokenizer<'a>, single_quote: bool) -> Token<'a> {
