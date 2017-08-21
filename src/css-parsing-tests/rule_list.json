@@ -7,18 +7,20 @@
 "@foo", [["at-rule", "foo", [], null]],
 
 "@charset; @foo", [
-    ["at-rule", "charset", [], null],
+    ["error", "invalid"],
     ["at-rule", "foo", [], null]
 ],
 
 "@foo bar; \t/* comment */", [["at-rule", "foo", [" ", ["ident", "bar"]], null]],
 
-" /**/ @foo bar{[(4", [["at-rule", "foo",
+" /**/ @foo-with-block bar{[(4", [["at-rule", "foo-with-block",
     [" ", ["ident", "bar"]],
     [["[]", ["()", ["number", "4", 4, "integer"]]]]
 ]],
 
-"@foo { bar", [["at-rule", "foo", [" "], [" ", ["ident", "bar"]]]],
+"@foo-with-block { bar", [["at-rule", "foo-with-block", [" "], [
+    " ", ["ident", "bar"]]]
+],
 "@foo [ bar", [["at-rule", "foo", [" ", ["[]", " ", ["ident", "bar"]]], null]],
 
 " /**/ div > p { color: #aaa;  } /**/ ", [["qualified rule",
