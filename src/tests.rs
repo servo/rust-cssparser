@@ -751,22 +751,25 @@ impl<'i> AtRuleParser<'i> for JsonParser {
 
     fn parse_prelude<'t>(&mut self, name: CowRcStr<'i>, input: &mut Parser<'i, 't>)
                          -> Result<AtRuleType<Vec<Json>, Json>, ParseError<'i, ()>> {
-        Ok(AtRuleType::OptionalBlock(vec![
+        let mut prelude = vec![
             "at-rule".to_json(),
             name.to_json(),
             Json::Array(component_values_to_json(input)),
-        ]))
+        ];
+        match_ignore_ascii_case! { &*name,
+            "media" | "foo-with-block" => Ok(AtRuleType::WithBlock(prelude)),
+            "charset" => Err(BasicParseError::AtRuleInvalid(name.clone()).into()),
+            _ => {
+                prelude.push(Json::Null);
+                Ok(AtRuleType::WithoutBlock(Json::Array(prelude)))
+            }
+        }
     }
 
     fn parse_block<'t>(&mut self, mut prelude: Vec<Json>, input: &mut Parser<'i, 't>)
                        -> Result<Json, ParseError<'i, ()>> {
         prelude.push(Json::Array(component_values_to_json(input)));
         Ok(Json::Array(prelude))
-    }
-
-    fn rule_without_block(&mut self, mut prelude: Vec<Json>) -> Json {
-        prelude.push(Json::Null);
-        Json::Array(prelude)
     }
 }
 

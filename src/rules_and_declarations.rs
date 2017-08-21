@@ -34,13 +34,6 @@ pub enum AtRuleType<P, R> {
     ///
     /// The value is the representation of the "prelude" part of the rule.
     WithBlock(P),
-
-    /// The at-rule may either have a block or end with a semicolon.
-    ///
-    /// This is mostly for testing. As of this writing no real CSS at-rule behaves like this.
-    ///
-    /// The value is the representation of the "prelude" part of the rule.
-    OptionalBlock(P),
 }
 
 /// A trait to provide various parsing of declaration values.
@@ -124,23 +117,13 @@ pub trait AtRuleParser<'i> {
     /// as returned by `RuleListParser::next` or `DeclarationListParser::next`,
     /// or `Err(())` to ignore the entire at-rule as invalid.
     ///
-    /// This is only called when `parse_prelude` returned `WithBlock` or `OptionalBlock`,
-    /// and a block was indeed found following the prelude.
+    /// This is only called when `parse_prelude` returned `WithBlock`, and a block
+    /// was indeed found following the prelude.
     fn parse_block<'t>(&mut self, prelude: Self::Prelude, input: &mut Parser<'i, 't>)
                        -> Result<Self::AtRule, ParseError<'i, Self::Error>> {
         let _ = prelude;
         let _ = input;
         Err(ParseError::Basic(BasicParseError::AtRuleBodyInvalid))
-    }
-
-    /// An `OptionalBlock` prelude was followed by `;`.
-    ///
-    /// Convert the prelude into the finished representation of the at-rule
-    /// as returned by `RuleListParser::next` or `DeclarationListParser::next`.
-    fn rule_without_block(&mut self, prelude: Self::Prelude) -> Self::AtRule {
-        let _ = prelude;
-        panic!("The `AtRuleParser::rule_without_block` method must be overriden \
-                if `AtRuleParser::parse_prelude` ever returns `AtRuleType::OptionalBlock`.")
     }
 }
 
@@ -493,21 +476,6 @@ fn parse_at_rule<'i: 't, 't, P, E>(start: &ParserState, name: CowRcStr<'i>,
                     location: start.source_location(),
                 }),
                 Ok(_) => unreachable!()
-            }
-        }
-        Ok(AtRuleType::OptionalBlock(prelude)) => {
-            match input.next() {
-                Ok(&Token::Semicolon) | Err(_) => Ok(parser.rule_without_block(prelude)),
-                Ok(&Token::CurlyBracketBlock) => {
-                    // FIXME: https://github.com/rust-lang/rust/issues/42508
-                    parse_nested_block::<'i, 't, _, _, _>(input, move |input| parser.parse_block(prelude, input))
-                        .map_err(|e| PreciseParseError {
-                            error: e,
-                            slice: input.slice_from(start.position()),
-                            location: start.source_location(),
-                        })
-                }
-                _ => unreachable!()
             }
         }
         Err(error) => {
