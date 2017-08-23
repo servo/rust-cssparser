@@ -57,6 +57,7 @@ pub enum BasicParseError<'a> {
 }
 
 impl<'a, T> From<BasicParseError<'a>> for ParseError<'a, T> {
+    #[inline]
     fn from(this: BasicParseError<'a>) -> ParseError<'a, T> {
         ParseError::Basic(this)
     }
