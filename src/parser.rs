@@ -291,10 +291,8 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// Advance the input until the next token that’s not whitespace or a comment.
     #[inline]
     pub fn skip_whitespace(&mut self) {
-        // If we just consumed `{`, `[`, `(`, or `function(`, leave whitespace
-        // or comments inside the block or function up to the nested parser.
-        if self.at_start_of.is_some() {
-            return
+        if let Some(block_type) = self.at_start_of.take() {
+            consume_until_end_of_block(block_type, &mut self.input.tokenizer);
         }
 
         self.input.tokenizer.skip_whitespace()
@@ -302,6 +300,10 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     #[inline]
     pub(crate) fn skip_cdc_and_cdo(&mut self) {
+        if let Some(block_type) = self.at_start_of.take() {
+            consume_until_end_of_block(block_type, &mut self.input.tokenizer);
+        }
+
         self.input.tokenizer.skip_cdc_and_cdo()
     }
 
