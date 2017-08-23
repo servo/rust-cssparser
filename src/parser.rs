@@ -200,16 +200,19 @@ mod ClosingDelimiter {
 impl BitOr<Delimiters> for Delimiters {
     type Output = Delimiters;
 
+    #[inline]
     fn bitor(self, other: Delimiters) -> Delimiters {
         Delimiters { bits: self.bits | other.bits }
     }
 }
 
 impl Delimiters {
+    #[inline]
     fn contains(self, other: Delimiters) -> bool {
         (self.bits & other.bits) != 0
     }
 
+    #[inline]
     fn from_byte(byte: Option<u8>) -> Delimiters {
         match byte {
             Some(b';') => Delimiter::Semicolon,
