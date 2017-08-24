@@ -811,6 +811,7 @@ pub fn parse_until_after<'i: 't, 't, F, T, E>(parser: &mut Parser<'i, 't>,
     let next_byte = (parser.input.tokenizer).next_byte();
     if next_byte.is_some() && !parser.stop_before.contains(Delimiters::from_byte(next_byte)) {
         debug_assert!(delimiters.contains(Delimiters::from_byte(next_byte)));
+        // We know this byte is ASCII.
         (parser.input.tokenizer).advance(1);
         if next_byte == Some(b'{') {
             consume_until_end_of_block(BlockType::CurlyBracket, &mut parser.input.tokenizer);
