@@ -101,6 +101,15 @@ impl<'i> ParserInput<'i> {
         }
     }
 
+    /// Create a new input for a parser.  Line numbers in locations
+    /// are offset by the given value.
+    pub fn new_with_line_number_offset(input: &'i str, first_line_number: u32) -> ParserInput<'i> {
+        ParserInput {
+            tokenizer: Tokenizer::with_first_line_number(input, first_line_number),
+            cached_token: None,
+        }
+    }
+
     #[inline]
     fn cached_token_ref(&self) -> &Token<'i> {
         &self.cached_token.as_ref().unwrap().token
