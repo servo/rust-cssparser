@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use cow_rc_str::CowRcStr;
+use smallvec::SmallVec;
 use std::ops::Range;
 use std::ascii::AsciiExt;
 use std::ops::BitOr;
@@ -858,7 +859,8 @@ pub fn parse_nested_block<'i: 't, 't, F, T, E>(parser: &mut Parser<'i, 't>, pars
 }
 
 fn consume_until_end_of_block(block_type: BlockType, tokenizer: &mut Tokenizer) {
-    let mut stack = vec![block_type];
+    let mut stack = SmallVec::<[BlockType; 16]>::new();
+    stack.push(block_type);
 
     // FIXME: have a special-purpose tokenizer method for this that does less work.
     while let Ok(ref token) = tokenizer.next() {
