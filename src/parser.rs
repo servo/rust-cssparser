@@ -864,6 +864,8 @@ pub fn parse_nested_block<'i: 't, 't, F, T, E>(parser: &mut Parser<'i, 't>, pars
     result
 }
 
+#[inline(never)]
+#[cold]
 fn consume_until_end_of_block(block_type: BlockType, tokenizer: &mut Tokenizer) {
     let mut stack = SmallVec::<[BlockType; 16]>::new();
     stack.push(block_type);
