@@ -57,6 +57,7 @@ pub enum BasicParseError<'a> {
 }
 
 impl<'a, T> From<BasicParseError<'a>> for ParseError<'a, T> {
+    #[inline]
     fn from(this: BasicParseError<'a>) -> ParseError<'a, T> {
         ParseError::Basic(this)
     }
@@ -200,16 +201,19 @@ mod ClosingDelimiter {
 impl BitOr<Delimiters> for Delimiters {
     type Output = Delimiters;
 
+    #[inline]
     fn bitor(self, other: Delimiters) -> Delimiters {
         Delimiters { bits: self.bits | other.bits }
     }
 }
 
 impl Delimiters {
+    #[inline]
     fn contains(self, other: Delimiters) -> bool {
         (self.bits & other.bits) != 0
     }
 
+    #[inline]
     fn from_byte(byte: Option<u8>) -> Delimiters {
         match byte {
             Some(b';') => Delimiter::Semicolon,
@@ -860,6 +864,8 @@ pub fn parse_nested_block<'i: 't, 't, F, T, E>(parser: &mut Parser<'i, 't>, pars
     result
 }
 
+#[inline(never)]
+#[cold]
 fn consume_until_end_of_block(block_type: BlockType, tokenizer: &mut Tokenizer) {
     let mut stack = SmallVec::<[BlockType; 16]>::new();
     stack.push(block_type);
