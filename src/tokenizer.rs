@@ -208,7 +208,6 @@ pub struct Tokenizer<'a> {
     current_line_start_position: usize,
     current_line_number: u32,
     var_functions: SeenStatus,
-    viewport_percentages: SeenStatus,
     source_map_url: Option<&'a str>,
 }
 
@@ -234,7 +233,6 @@ impl<'a> Tokenizer<'a> {
             current_line_start_position: 0,
             current_line_number: first_line_number,
             var_functions: SeenStatus::DontCare,
-            viewport_percentages: SeenStatus::DontCare,
             source_map_url: None,
         }
     }
@@ -256,30 +254,6 @@ impl<'a> Tokenizer<'a> {
         if self.var_functions == SeenStatus::LookingForThem {
             if name.eq_ignore_ascii_case("var") {
                 self.var_functions = SeenStatus::SeenAtLeastOne;
-            }
-        }
-    }
-
-    #[inline]
-    pub fn look_for_viewport_percentages(&mut self) {
-        self.viewport_percentages = SeenStatus::LookingForThem;
-    }
-
-    #[inline]
-    pub fn seen_viewport_percentages(&mut self) -> bool {
-        let seen = self.viewport_percentages == SeenStatus::SeenAtLeastOne;
-        self.viewport_percentages = SeenStatus::DontCare;
-        seen
-    }
-
-    #[inline]
-    pub fn see_dimension(&mut self, unit: &str) {
-        if self.viewport_percentages == SeenStatus::LookingForThem {
-            if unit.eq_ignore_ascii_case("vh") ||
-               unit.eq_ignore_ascii_case("vw") ||
-               unit.eq_ignore_ascii_case("vmin") ||
-               unit.eq_ignore_ascii_case("vmax") {
-                   self.viewport_percentages = SeenStatus::SeenAtLeastOne;
             }
         }
     }
@@ -1045,7 +1019,6 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     let value = value as f32;
     if is_ident_start(tokenizer) {
         let unit = consume_name(tokenizer);
-        tokenizer.see_dimension(&unit);
         Dimension {
             value: value,
             int_value: int_value,

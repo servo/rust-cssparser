@@ -353,20 +353,6 @@ impl<'i: 't, 't> Parser<'i, 't> {
         self.input.tokenizer.seen_var_functions()
     }
 
-    /// Start looking for viewport percentage lengths. (See the `seen_viewport_percentages`
-    /// method.)
-    #[inline]
-    pub fn look_for_viewport_percentages(&mut self) {
-        self.input.tokenizer.look_for_viewport_percentages()
-    }
-
-    /// Return whether a `vh`, `vw`, `vmin`, or `vmax` dimension has been seen by the tokenizer
-    /// since `look_for_viewport_percentages` was called, and stop looking.
-    #[inline]
-    pub fn seen_viewport_percentages(&mut self) -> bool {
-        self.input.tokenizer.seen_viewport_percentages()
-    }
-
     /// Execute the given closure, passing it the parser.
     /// If the result (returned unchanged) is `Err`,
     /// the internal state of the parser  (including position within the input)
@@ -445,7 +431,6 @@ impl<'i: 't, 't> Parser<'i, 't> {
             if cached_token.start_position == token_start_position => {
                 self.input.tokenizer.reset(&cached_token.end_state);
                 match cached_token.token {
-                    Token::Dimension { ref unit, .. } => self.input.tokenizer.see_dimension(unit),
                     Token::Function(ref name) => self.input.tokenizer.see_function(name),
                     _ => {}
                 }
