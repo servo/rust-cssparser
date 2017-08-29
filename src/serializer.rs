@@ -75,7 +75,7 @@ impl<'a> ToCss for Token<'a> {
                 serialize_unquoted_url(&**value, dest)?;
                 dest.write_str(")")?;
             },
-            Token::Delim(value) => write!(dest, "{}", value)?,
+            Token::Delim(value) => dest.write_char(value)?,
 
             Token::Number { value, int_value, has_sign } => {
                 write_numeric(value, int_value, has_sign, dest)?
@@ -97,7 +97,11 @@ impl<'a> ToCss for Token<'a> {
             },
 
             Token::WhiteSpace(content) => dest.write_str(content)?,
-            Token::Comment(content) => write!(dest, "/*{}*/", content)?,
+            Token::Comment(content) => {
+                dest.write_str("/*")?;
+                dest.write_str(content)?;
+                dest.write_str("*/")?
+            }
             Token::Colon => dest.write_str(":")?,
             Token::Semicolon => dest.write_str(";")?,
             Token::Comma => dest.write_str(",")?,
@@ -128,6 +132,32 @@ impl<'a> ToCss for Token<'a> {
     }
 }
 
+fn to_hex_byte(value: u8) -> u8 {
+    match value {
+        0...9 => value + b'0',
+        _ => value - 10 + b'a',
+    }
+}
+
+fn hex_escape<W>(ascii_byte: u8, dest: &mut W) -> fmt::Result where W:fmt::Write {
+    let high = ascii_byte >> 4;
+    let b3;
+    let b4;
+    let bytes = if high > 0 {
+        let low = ascii_byte & 0x0F;
+        b4 = [b'\\', to_hex_byte(high), to_hex_byte(low), b' '];
+        &b4[..]
+    } else {
+        b3 = [b'\\', to_hex_byte(ascii_byte), b' '];
+        &b3[..]
+    };
+    dest.write_str(unsafe { str::from_utf8_unchecked(&bytes) })
+}
+
+fn char_escape<W>(ascii_byte: u8, dest: &mut W) -> fmt::Result where W:fmt::Write {
+    let bytes = [b'\\', ascii_byte];
+    dest.write_str(unsafe { str::from_utf8_unchecked(&bytes) })
+}
 
 /// Write a CSS identifier, escaping characters as necessary.
 pub fn serialize_identifier<W>(mut value: &str, dest: &mut W) -> fmt::Result where W:fmt::Write {
@@ -146,7 +176,7 @@ pub fn serialize_identifier<W>(mut value: &str, dest: &mut W) -> fmt::Result whe
             value = &value[1..];
         }
         if let digit @ b'0'...b'9' = value.as_bytes()[0] {
-            write!(dest, "\\3{} ", digit as char)?;
+            hex_escape(digit, dest)?;
             value = &value[1..];
         }
         serialize_name(value, dest)
@@ -167,9 +197,9 @@ fn serialize_name<W>(value: &str, dest: &mut W) -> fmt::Result where W:fmt::Writ
         if let Some(escaped) = escaped {
             dest.write_str(escaped)?;
         } else if (b >= b'\x01' && b <= b'\x1F') || b == b'\x7F' {
-            write!(dest, "\\{:x} ", b)?;
+            hex_escape(b, dest)?;
         } else {
-            write!(dest, "\\{}", b as char)?;
+            char_escape(b, dest)?;
         }
         chunk_start = i + 1;
     }
@@ -187,9 +217,9 @@ fn serialize_unquoted_url<W>(value: &str, dest: &mut W) -> fmt::Result where W:f
         };
         dest.write_str(&value[chunk_start..i])?;
         if hex {
-            write!(dest, "\\{:X} ", b)?;
+            hex_escape(b, dest)?;
         } else {
-            write!(dest, "\\{}", b as char)?;
+            char_escape(b, dest)?;
         }
         chunk_start = i + 1;
     }
@@ -247,7 +277,7 @@ impl<'a, W> fmt::Write for CssStringWriter<'a, W> where W: fmt::Write {
             self.inner.write_str(&s[chunk_start..i])?;
             match escaped {
                 Some(x) => self.inner.write_str(x)?,
-                None => write!(self.inner, "\\{:x} ", b)?,
+                None => hex_escape(b, self.inner)?,
             };
             chunk_start = i + 1;
         }
@@ -265,7 +295,8 @@ macro_rules! impl_tocss_for_int {
                 impl<W: fmt::Write> io::Write for AssumeUtf8<W> {
                     #[inline]
                     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-                        // Safety: itoa only emits ASCII
+                        // Safety: itoa only emits ASCII, which is also well-formed UTF-8.
+                        debug_assert!(buf.is_ascii());
                         self.0.write_str(unsafe { str::from_utf8_unchecked(buf) })
                             .map_err(|_| io::ErrorKind::Other.into())
                     }

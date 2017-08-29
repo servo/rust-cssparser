@@ -300,10 +300,10 @@ fn unquoted_url_escaping() {
     let serialized = token.to_css_string();
     assert_eq!(serialized, "\
         url(\
-            \\1 \\2 \\3 \\4 \\5 \\6 \\7 \\8 \\9 \\A \\B \\C \\D \\E \\F \\10 \
-            \\11 \\12 \\13 \\14 \\15 \\16 \\17 \\18 \\19 \\1A \\1B \\1C \\1D \\1E \\1F \\20 \
+            \\1 \\2 \\3 \\4 \\5 \\6 \\7 \\8 \\9 \\a \\b \\c \\d \\e \\f \\10 \
+            \\11 \\12 \\13 \\14 \\15 \\16 \\17 \\18 \\19 \\1a \\1b \\1c \\1d \\1e \\1f \\20 \
             !\\\"#$%&\\'\\(\\)*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]\
-            ^_`abcdefghijklmnopqrstuvwxyz{|}~\\7F é\
+            ^_`abcdefghijklmnopqrstuvwxyz{|}~\\7f é\
         )\
         ");
     let mut input = ParserInput::new(&serialized);
