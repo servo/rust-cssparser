@@ -24,23 +24,6 @@ pub trait ToCss {
         self.to_css(&mut s).unwrap();
         s
     }
-
-    /// Serialize `self` in CSS syntax and return a result compatible with `std::fmt::Show`.
-    ///
-    /// Typical usage is, for a `Foo` that implements `ToCss`:
-    ///
-    /// ```{rust,ignore}
-    /// use std::fmt;
-    /// impl fmt::Show for Foo {
-    ///     #[inline] fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.fmt_to_css(f) }
-    /// }
-    /// ```
-    ///
-    /// (This is a convenience wrapper for `to_css` and probably should not be overridden.)
-    #[inline]
-    fn fmt_to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
-        self.to_css(dest).map_err(|_| fmt::Error)
-    }
 }
 
 #[inline]
