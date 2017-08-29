@@ -493,9 +493,9 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
             tokenizer.advance(1);
             if is_ident_start(tokenizer) { IDHash(consume_name(tokenizer)) }
             else if !tokenizer.is_eof() && match tokenizer.next_byte_unchecked() {
-                b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'-' | b'_' => true,
-                b'\\' => !tokenizer.has_newline_at(1),
-                _ => !b.is_ascii(),
+                // Any other valid case here already resulted in IDHash.
+                b'0'...b'9' | b'-' => true,
+                _ => false,
             } { Hash(consume_name(tokenizer)) }
             else { Delim('#') }
         },
