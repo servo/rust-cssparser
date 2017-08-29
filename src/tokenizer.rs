@@ -206,6 +206,9 @@ pub struct Tokenizer<'a> {
     input: &'a str,
     /// Counted in bytes, not code points. From 0.
     position: usize,
+    /// The position at the start of the current line; but adjusted to
+    /// ensure that computing the column will give the result in units
+    /// of UTF-16 characters.
     current_line_start_position: usize,
     current_line_number: u32,
     var_functions: SeenStatus,
@@ -370,6 +373,9 @@ impl<'a> Tokenizer<'a> {
     #[inline]
     fn consume_4byte_intro(&mut self) {
         debug_assert!(self.next_byte_unchecked() & 0xF0 == 0xF0);
+        // This takes two UTF-16 characters to represent, so we
+        // actually have an undercount.
+        self.current_line_start_position = self.current_line_start_position.wrapping_sub(1);
         self.position += 1;
     }
 
@@ -378,6 +384,10 @@ impl<'a> Tokenizer<'a> {
     #[inline]
     fn consume_continuation_byte(&mut self) {
         debug_assert!(self.next_byte_unchecked() & 0xC0 == 0x80);
+        // Continuation bytes contribute to column overcount.  Note
+        // that due to the special case for the 4-byte sequence intro,
+        // we must use wrapping add here.
+        self.current_line_start_position = self.current_line_start_position.wrapping_add(1);
         self.position += 1;
     }
 
@@ -386,6 +396,16 @@ impl<'a> Tokenizer<'a> {
     fn consume_known_byte(&mut self, byte: u8) {
         debug_assert!(byte != b'\r' && byte != b'\n' && byte != b'\x0C');
         self.position += 1;
+        // Continuation bytes contribute to column overcount.
+        if byte & 0xF0 == 0xF0 {
+            // This takes two UTF-16 characters to represent, so we
+            // actually have an undercount.
+            self.current_line_start_position = self.current_line_start_position.wrapping_sub(1);
+        } else if byte & 0xC0 == 0x80 {
+            // Note that due to the special case for the 4-byte
+            // sequence intro, we must use wrapping add here.
+            self.current_line_start_position = self.current_line_start_position.wrapping_add(1);
+        }
     }
 
     #[inline]
@@ -416,7 +436,11 @@ impl<'a> Tokenizer<'a> {
     #[inline]
     fn consume_char(&mut self) -> char {
         let c = self.next_char();
-        self.position += c.len_utf8();
+        let len_utf8 = c.len_utf8();
+        self.position += len_utf8;
+        // Note that due to the special case for the 4-byte sequence
+        // intro, we must use wrapping add here.
+        self.current_line_start_position = self.current_line_start_position.wrapping_add(len_utf8 - c.len_utf16());
         c
     }
 
@@ -498,6 +522,7 @@ pub struct SourceLocation {
     pub line: u32,
 
     /// The column number within a line, starting at 0 for first the character of the line.
+    /// Column numbers are in units of UTF-16 characters.
     pub column: u32,
 }
 
@@ -1126,6 +1151,8 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
 
     if newlines > 0 {
         tokenizer.current_line_number += newlines;
+        // No need for wrapping_add here, because there's no possible
+        // way to wrap.
         tokenizer.current_line_start_position = start_position + last_newline + 1;
     }
 
