@@ -3,8 +3,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use dtoa_short::{self, Notation};
+use itoa;
 use std::ascii::AsciiExt;
 use std::fmt::{self, Write};
+use std::io;
 use std::str;
 
 use super::Token;
@@ -258,7 +260,32 @@ macro_rules! impl_tocss_for_int {
     ($T: ty) => {
         impl<'a> ToCss for $T {
             fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
-                write!(dest, "{}", *self)
+                struct AssumeUtf8<W: fmt::Write>(W);
+
+                impl<W: fmt::Write> io::Write for AssumeUtf8<W> {
+                    #[inline]
+                    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+                        // Safety: itoa only emits ASCII
+                        self.0.write_str(unsafe { str::from_utf8_unchecked(buf) })
+                            .map_err(|_| io::ErrorKind::Other.into())
+                    }
+
+                    #[inline]
+                    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                        self.write_all(buf)?;
+                        Ok(buf.len())
+                    }
+
+                    #[inline]
+                    fn flush(&mut self) -> io::Result<()> {
+                        Ok(())
+                    }
+                }
+
+                match itoa::write(AssumeUtf8(dest), *self) {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(fmt::Error)
+                }
             }
         }
     }
