@@ -44,9 +44,10 @@ pub enum Token<'a> {
     /// The value does not include the quotes.
     QuotedString(CowRcStr<'a>),
 
-    /// A [`<url-token>`](https://drafts.csswg.org/css-syntax/#url-token-diagram) or `url( <string-token> )` function
+    /// A [`<url-token>`](https://drafts.csswg.org/css-syntax/#url-token-diagram)
     ///
-    /// The value does not include the `url(` `)` markers or the quotes.
+    /// The value does not include the `url(` `)` markers.  Note that `url( <string-token> )` is represented by a
+    /// `Function` token.
     UnquotedUrl(CowRcStr<'a>),
 
     /// A `<delim-token>`
