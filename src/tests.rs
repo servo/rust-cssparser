@@ -1049,3 +1049,53 @@ fn roundtrip_percentage_token() {
         }
     }
 }
+
+#[test]
+fn utf16_columns() {
+    // This particular test serves two purposes.  First, it checks
+    // that the column number computations are correct.  Second, it
+    // checks that tokenizer code paths correctly differentiate
+    // between the different UTF-8 encoding bytes.  In particular
+    // different leader bytes and continuation bytes are treated
+    // differently, so we make sure to include all lengths in the
+    // tests, using the string "QΡ✈🆒".  Also, remember that because
+    // the column is in units of UTF-16, the 4-byte sequence results
+    // in two columns.
+    let tests = vec![
+        ("", 0),
+        ("ascii", 5),
+        ("/*QΡ✈🆒*/", 9),
+        ("'QΡ✈🆒*'", 8),
+        ("\"\\\"'QΡ✈🆒*'", 11),
+        ("\\Q\\Ρ\\✈\\🆒", 9),
+        ("QΡ✈🆒", 5),
+        ("QΡ✈🆒\\Q\\Ρ\\✈\\🆒", 14),
+        ("newline\r\nQΡ✈🆒", 5),
+        ("url(QΡ✈🆒\\Q\\Ρ\\✈\\🆒)", 19),
+        ("url(QΡ✈🆒)", 10),
+        ("url(\r\nQΡ✈🆒\\Q\\Ρ\\✈\\🆒)", 15),
+        ("url(\r\nQΡ✈🆒\\Q\\Ρ\\✈\\🆒", 14),
+        ("url(\r\nQΡ✈🆒\\Q\\Ρ\\✈\\🆒 x", 16),
+        ("QΡ✈🆒()", 7),
+        // Test that under/over-flow of current_line_start_position is
+        // handled properly; see the special case in consume_4byte_intro.
+        ("🆒", 2),
+    ];
+
+    for test in tests {
+        let mut input = ParserInput::new(test.0);
+        let mut parser = Parser::new(&mut input);
+
+        // Read all tokens.
+        loop {
+            match parser.next() {
+                Err(BasicParseError::EndOfInput) => { break; }
+                Err(_) => { assert!(false); }
+                Ok(_) => {}
+            };
+        }
+
+        // Check the resulting column.
+        assert_eq!(parser.current_source_location().column, test.1);
+    }
+}
