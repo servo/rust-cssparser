@@ -132,23 +132,17 @@ impl<'a> ToCss for Token<'a> {
     }
 }
 
-fn to_hex_byte(value: u8) -> u8 {
-    match value {
-        0...9 => value + b'0',
-        _ => value - 10 + b'a',
-    }
-}
-
 fn hex_escape<W>(ascii_byte: u8, dest: &mut W) -> fmt::Result where W:fmt::Write {
-    let high = ascii_byte >> 4;
+    static HEX_DIGITS: &'static [u8; 16] = b"0123456789abcdef";
     let b3;
     let b4;
-    let bytes = if high > 0 {
-        let low = ascii_byte & 0x0F;
-        b4 = [b'\\', to_hex_byte(high), to_hex_byte(low), b' '];
+    let bytes = if ascii_byte > 0x0F {
+        let high = (ascii_byte >> 4) as usize;
+        let low = (ascii_byte & 0x0F) as usize;
+        b4 = [b'\\', HEX_DIGITS[high], HEX_DIGITS[low], b' '];
         &b4[..]
     } else {
-        b3 = [b'\\', to_hex_byte(ascii_byte), b' '];
+        b3 = [b'\\', HEX_DIGITS[ascii_byte as usize], b' '];
         &b3[..]
     };
     dest.write_str(unsafe { str::from_utf8_unchecked(&bytes) })
