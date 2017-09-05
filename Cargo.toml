@@ -1,6 +1,6 @@
 [package]
 name = "cssparser"
-version = "0.20.0"
+version = "0.20.1"
 authors = [ "Simon Sapin <simon.sapin@exyr.org>" ]
 
 description = "Rust implementation of CSS Syntax Level 3"
