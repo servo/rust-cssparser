@@ -42,7 +42,7 @@
 //! but it still needs to be re-exported to them
 //! (because of limitations in `macro_rules!`).
 //!
-//! To avoid name collisions, we and a long and explicit prefix in the function’s name.
+//! To avoid name collisions, we include a long and explicit prefix in the function’s name.
 //!
 //! The function takes a string containing arbitrary Rust tokens,
 //! and returns a string that is parsed as *items*.
@@ -73,7 +73,7 @@
 //! version = "1.0.0"
 //!
 //! [dependencies]
-//! cssparser-macros = {path = "./macros", version = "1.0"}
+//! libfoo-macros = {path = "./macros", version = "1.0"}
 //! ```
 //!
 //! ```rust
@@ -98,7 +98,7 @@
 //!
 //! Let’s go trough the numbered lines one by one:
 //!
-//! 1. `libfoo` depends on the other `libfoo-macros`, and imports its macros.
+//! 1. `libfoo` depends on `libfoo-macros`, and imports its macros.
 //! 2. Everything exported by `libfoo-macros` (which is one custom `derive`)
 //!    is re-exported to users of `libfoo`.
 //!    They’re not expected to use it directly,
@@ -152,9 +152,9 @@
 //! # More
 //!
 //! To see a more complex example, look at
-//! [`cssparser`’s `src/macros.rs](https://github.com/servo/rust-cssparser/blob/master/src/macros.rs)
+//! [`cssparser`’s `src/macros.rs`](https://github.com/servo/rust-cssparser/blob/master/src/macros.rs)
 //! and
-//! [`cssparser-macros`’s `macros/lib.rs](https://github.com/servo/rust-cssparser/blob/master/macros/lib.rs).
+//! [`cssparser-macros`’s `macros/lib.rs`](https://github.com/servo/rust-cssparser/blob/master/macros/lib.rs).
 
 /// This macro wraps `&str -> String` functions
 /// in custom `derive` implementations with `#[proc_macro_derive]`.
