@@ -250,9 +250,6 @@ Component values
 <substring-match>
     The string ``"*="``.
 
-<column>
-    The string ``"||"``.
-
 <whitespace>
     The string ``" "`` (a single space.)
 

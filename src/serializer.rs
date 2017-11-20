@@ -110,7 +110,6 @@ impl<'a> ToCss for Token<'a> {
             Token::PrefixMatch => dest.write_str("^=")?,
             Token::SuffixMatch => dest.write_str("$=")?,
             Token::SubstringMatch => dest.write_str("*=")?,
-            Token::Column => dest.write_str("||")?,
             Token::CDO => dest.write_str("<!--")?,
             Token::CDC => dest.write_str("-->")?,
 
@@ -455,7 +454,6 @@ impl<'a> Token<'a> {
             Token::Comment(_) => DelimSlash,
             Token::DashMatch => DashMatch,
             Token::SubstringMatch => SubstringMatch,
-            Token::Column => DelimBar,
             Token::CDC => CDC,
             Token::Function(_) => Function,
             Token::ParenthesisBlock => OpenParen,
