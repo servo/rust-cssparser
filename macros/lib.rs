@@ -8,7 +8,7 @@ extern crate proc_macro;
 #[macro_use] extern crate quote;
 extern crate syn;
 
-use std::ascii::AsciiExt;
+#[allow(unused_imports)] use std::ascii::AsciiExt;
 
 define_proc_macros! {
     /// Input: the arms of a `match` expression.
