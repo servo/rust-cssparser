@@ -6,7 +6,7 @@
 
 use std::ops::Range;
 use std::char;
-use std::ascii::AsciiExt;
+#[allow(unused_imports)] use std::ascii::AsciiExt;
 use std::i32;
 
 use parser::ParserState;
