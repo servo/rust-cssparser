@@ -15,7 +15,7 @@ exclude = ["src/css-parsing-tests/**", "src/big-data-url.css"]
 
 [dev-dependencies]
 rustc-serialize = "0.3"
-difference = "1.0"
+difference = "2.0"
 encoding_rs = "0.7"
 
 [dependencies]
