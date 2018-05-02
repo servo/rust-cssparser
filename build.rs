@@ -37,7 +37,7 @@ mod codegen {
         println!("cargo:rerun-if-changed={}", input.display());
 
         // We have stack overflows on Servo's CI.
-        let handle = Builder::new().stack_size(8 * 1024 * 1024).spawn(move || {
+        let handle = Builder::new().stack_size(128 * 1024 * 1024).spawn(move || {
             match_byte::expand(&input, &output);
         }).unwrap();
 
