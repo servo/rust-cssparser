@@ -177,8 +177,15 @@ macro_rules! define_proc_macros {
                 fn wrapped($input: &str) -> String {
                     $body
                 }
+
+                // syn uses a huge amount of stack in debug mode.
                 let derive_input_string = derive_input.to_string();
-                wrapped($crate::_extract_input(&derive_input_string)).parse().unwrap()
+                let handle =
+                    ::std::thread::Builder::new().stack_size(128 * 1024 * 1024).spawn(move || {
+                        wrapped($crate::_extract_input(&derive_input_string))
+                    }).unwrap();
+
+                handle.join().unwrap().parse().unwrap()
             }
         )+
     }
