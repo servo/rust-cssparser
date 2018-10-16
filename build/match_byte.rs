@@ -8,6 +8,8 @@ use std::io::{Read, Write};
 use std::path::Path;
 use syn;
 use syn::fold::Fold;
+use syn::punctuated::Punctuated;
+use syn::parse::{Parse, ParseStream, Result};
 
 use proc_macro2::{Span, TokenStream};
 
@@ -27,20 +29,18 @@ pub fn expand(from: &Path, to: &Path) {
 
 struct MatchByte {
     expr: syn::Expr,
-    arms: Vec<syn::Arm>,
+    _comma: Token![,],
+    arms: Punctuated<syn::Arm, Option<Token![,]>>,
 }
 
-impl syn::synom::Synom for MatchByte {
-    named!(parse -> Self, do_parse!(
-        expr: syn!(syn::Expr) >>
-        punct!(,) >>
-        arms: many0!(syn!(syn::Arm)) >> (
-            MatchByte {
-                expr,
-                arms
-            }
-        )
-    ));
+impl Parse for MatchByte {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(MatchByte {
+            expr: input.parse()?,
+            _comma: input.parse()?,
+            arms: Punctuated::parse_terminated(input)?,
+        })
+    }
 }
 
 fn get_byte_from_expr_lit(expr: &Box<syn::Expr>) -> u8 {
