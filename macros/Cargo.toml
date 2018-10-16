@@ -15,5 +15,5 @@ proc-macro = true
 procedural-masquerade = {path = "../procedural-masquerade", version = "0.1"}
 phf_codegen = "0.7"
 quote = "0.6"
-syn = {version = "0.14", features = ["full", "extra-traits"]}
+syn = {version = "0.15.12", features = ["full", "extra-traits"]}
 proc-macro2 = "0.4"
