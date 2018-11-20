@@ -354,9 +354,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
                 ..
             }) => Ok(()),
             Err(e) => unreachable!("Unexpected error encountered: {:?}", e),
-            Ok(t) => Err(start
-                .source_location()
-                .new_basic_unexpected_token_error(t.clone())),
+            Ok(t) => Err(start.source_location().new_basic_unexpected_token_error(t.clone())),
         };
         self.reset(&start);
         result
