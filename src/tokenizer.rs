@@ -765,7 +765,7 @@ fn consume_quoted_string<'a>(
     single_quote: bool,
 ) -> Result<CowRcStr<'a>, CowRcStr<'a>> {
     tokenizer.advance(1); // Skip the initial quote
-                          // start_pos is at code point boundary, after " or '
+    // start_pos is at code point boundary, after " or '
     let start_pos = tokenizer.position();
     let mut string_bytes;
     loop {
