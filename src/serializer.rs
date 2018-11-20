@@ -69,21 +69,21 @@ impl<'a> ToCss for Token<'a> {
             Token::AtKeyword(ref value) => {
                 dest.write_str("@")?;
                 serialize_identifier(&**value, dest)?;
-            }
+            },
             Token::Hash(ref value) => {
                 dest.write_str("#")?;
                 serialize_name(value, dest)?;
-            }
+            },
             Token::IDHash(ref value) => {
                 dest.write_str("#")?;
                 serialize_identifier(&**value, dest)?;
-            }
+            },
             Token::QuotedString(ref value) => serialize_string(&**value, dest)?,
             Token::UnquotedUrl(ref value) => {
                 dest.write_str("url(")?;
                 serialize_unquoted_url(&**value, dest)?;
                 dest.write_str(")")?;
-            }
+            },
             Token::Delim(value) => dest.write_char(value)?,
 
             Token::Number {
@@ -98,7 +98,7 @@ impl<'a> ToCss for Token<'a> {
             } => {
                 write_numeric(unit_value * 100., int_value, has_sign, dest)?;
                 dest.write_str("%")?;
-            }
+            },
             Token::Dimension {
                 value,
                 int_value,
@@ -114,14 +114,14 @@ impl<'a> ToCss for Token<'a> {
                 } else {
                     serialize_identifier(unit, dest)?;
                 }
-            }
+            },
 
             Token::WhiteSpace(content) => dest.write_str(content)?,
             Token::Comment(content) => {
                 dest.write_str("/*")?;
                 dest.write_str(content)?;
                 dest.write_str("*/")?
-            }
+            },
             Token::Colon => dest.write_str(":")?,
             Token::Semicolon => dest.write_str(";")?,
             Token::Comma => dest.write_str(",")?,
@@ -136,7 +136,7 @@ impl<'a> ToCss for Token<'a> {
             Token::Function(ref name) => {
                 serialize_identifier(&**name, dest)?;
                 dest.write_str("(")?;
-            }
+            },
             Token::ParenthesisBlock => dest.write_str("(")?,
             Token::SquareBracketBlock => dest.write_str("[")?,
             Token::CurlyBracketBlock => dest.write_str("{")?,
@@ -145,7 +145,7 @@ impl<'a> ToCss for Token<'a> {
                 dest.write_str("url(")?;
                 dest.write_str(contents)?;
                 dest.write_char(')')?;
-            }
+            },
             Token::BadString(ref value) => {
                 // During tokenization, an unescaped newline after a quote causes
                 // the token to be a BadString instead of a QuotedString.
@@ -154,7 +154,7 @@ impl<'a> ToCss for Token<'a> {
                 // and therefore does not have a closing quote.
                 dest.write_char('"')?;
                 CssStringWriter::new(dest).write_str(value)?;
-            }
+            },
             Token::CloseParenthesis => dest.write_str(")")?,
             Token::CloseSquareBracket => dest.write_str("]")?,
             Token::CloseCurlyBracket => dest.write_str("}")?,
@@ -430,15 +430,15 @@ impl TokenSerializationType {
         match self.0 {
             Ident => matches!(
                 other.0,
-                Ident
-                    | Function
-                    | UrlOrBadUrl
-                    | DelimMinus
-                    | Number
-                    | Percentage
-                    | Dimension
-                    | CDC
-                    | OpenParen
+                Ident |
+                    Function |
+                    UrlOrBadUrl |
+                    DelimMinus |
+                    Number |
+                    Percentage |
+                    Dimension |
+                    CDC |
+                    OpenParen
             ),
             AtKeywordOrHash | Dimension => matches!(
                 other.0,
@@ -453,8 +453,8 @@ impl TokenSerializationType {
             DelimAssorted | DelimAsterisk => matches!(other.0, DelimEquals),
             DelimBar => matches!(other.0, DelimEquals | DelimBar | DashMatch),
             DelimSlash => matches!(other.0, DelimAsterisk | SubstringMatch),
-            Nothing | WhiteSpace | Percentage | UrlOrBadUrl | Function | CDC | OpenParen
-            | DashMatch | SubstringMatch | DelimQuestion | DelimEquals | Other => false,
+            Nothing | WhiteSpace | Percentage | UrlOrBadUrl | Function | CDC | OpenParen |
+            DashMatch | SubstringMatch | DelimQuestion | DelimEquals | Other => false,
         }
     }
 }
@@ -518,21 +518,21 @@ impl<'a> Token<'a> {
             Token::CDC => CDC,
             Token::Function(_) => Function,
             Token::ParenthesisBlock => OpenParen,
-            Token::SquareBracketBlock
-            | Token::CurlyBracketBlock
-            | Token::CloseParenthesis
-            | Token::CloseSquareBracket
-            | Token::CloseCurlyBracket
-            | Token::QuotedString(_)
-            | Token::BadString(_)
-            | Token::Delim(_)
-            | Token::Colon
-            | Token::Semicolon
-            | Token::Comma
-            | Token::CDO
-            | Token::IncludeMatch
-            | Token::PrefixMatch
-            | Token::SuffixMatch => Other,
+            Token::SquareBracketBlock |
+            Token::CurlyBracketBlock |
+            Token::CloseParenthesis |
+            Token::CloseSquareBracket |
+            Token::CloseCurlyBracket |
+            Token::QuotedString(_) |
+            Token::BadString(_) |
+            Token::Delim(_) |
+            Token::Colon |
+            Token::Semicolon |
+            Token::Comma |
+            Token::CDO |
+            Token::IncludeMatch |
+            Token::PrefixMatch |
+            Token::SuffixMatch => Other,
         })
     }
 }

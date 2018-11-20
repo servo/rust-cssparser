@@ -107,7 +107,7 @@ impl<'a> Clone for CowRcStr<'a> {
                 let new_rc = rc.clone();
                 mem::forget(rc); // Don’t actually take ownership of this strong reference
                 CowRcStr::from_rc(new_rc)
-            }
+            },
             Ok(_) => CowRcStr { ..*self },
         }
     }

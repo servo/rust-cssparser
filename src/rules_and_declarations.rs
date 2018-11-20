@@ -272,7 +272,7 @@ where
             let ident = match self.input.next_including_whitespace_and_comments() {
                 Ok(&Token::WhiteSpace(_)) | Ok(&Token::Comment(_)) | Ok(&Token::Semicolon) => {
                     continue
-                }
+                },
                 Ok(&Token::Ident(ref name)) => Ok(Ok(name.clone())),
                 Ok(&Token::AtKeyword(ref name)) => Ok(Err(name.clone())),
                 Ok(token) => Err(token.clone()),
@@ -294,11 +294,11 @@ where
                         )
                     };
                     return Some(result.map_err(|e| (e, self.input.slice_from(start.position()))));
-                }
+                },
                 Ok(Err(name)) => {
                     // At-keyword
                     return Some(parse_at_rule(&start, name, self.input, &mut self.parser));
-                }
+                },
                 Err(token) => {
                     let result = self.input.parse_until_after(Delimiter::Semicolon, |_| {
                         Err(start
@@ -306,7 +306,7 @@ where
                             .new_unexpected_token_error(token.clone()))
                     });
                     return Some(result.map_err(|e| (e, self.input.slice_from(start.position()))));
-                }
+                },
             }
         }
     }
@@ -392,7 +392,7 @@ where
                     if at_keyword.is_none() {
                         self.input.reset(&start)
                     }
-                }
+                },
                 Some(_) => at_keyword = None,
                 None => return None,
             }
@@ -506,7 +506,7 @@ where
                         parser.parse_block(prelude, location, input)
                     })
                     .map_err(|e| (e, input.slice_from(start.position())))
-                }
+                },
                 Ok(&Token::Semicolon) => Err((
                     input.new_unexpected_token_error(Token::Semicolon),
                     input.slice_from(start.position()),
@@ -514,15 +514,15 @@ where
                 Err(e) => Err((e.into(), input.slice_from(start.position()))),
                 Ok(_) => unreachable!(),
             }
-        }
+        },
         Err(error) => {
             let end_position = input.position();
             match input.next() {
-                Ok(&Token::CurlyBracketBlock) | Ok(&Token::Semicolon) | Err(_) => {}
+                Ok(&Token::CurlyBracketBlock) | Ok(&Token::Semicolon) | Err(_) => {},
                 _ => unreachable!(),
             };
             Err((error, input.slice(start.position()..end_position)))
-        }
+        },
     }
 }
 
@@ -547,7 +547,7 @@ where
             parse_nested_block::<'i, 't, _, _, _>(input, move |input| {
                 parser.parse_block(prelude, location, input)
             })
-        }
+        },
         _ => unreachable!(),
     }
 }

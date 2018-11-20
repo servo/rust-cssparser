@@ -544,7 +544,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
         loop {
             match self.next_including_whitespace_and_comments() {
                 Err(e) => return Err(e),
-                Ok(&Token::Comment(_)) => {}
+                Ok(&Token::Comment(_)) => {},
                 _ => break,
             }
         }
@@ -576,10 +576,10 @@ impl<'i: 't, 't> Parser<'i, 't> {
                 self.input.tokenizer.reset(&cached_token.end_state);
                 match cached_token.token {
                     Token::Function(ref name) => self.input.tokenizer.see_function(name),
-                    _ => {}
+                    _ => {},
                 }
                 token = &cached_token.token
-            }
+            },
             _ => {
                 let new_token = self
                     .input
@@ -592,7 +592,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
                     end_state: self.input.tokenizer.state(),
                 });
                 token = self.input.cached_token_ref()
-            }
+            },
         }
 
         if let Some(block_type) = BlockType::opening(token) {
@@ -911,17 +911,17 @@ impl<'i: 't, 't> Parser<'i, 't> {
         let token;
         loop {
             match self.next_including_whitespace_and_comments() {
-                Ok(&Token::Function(_))
-                | Ok(&Token::ParenthesisBlock)
-                | Ok(&Token::SquareBracketBlock)
-                | Ok(&Token::CurlyBracketBlock) => {}
+                Ok(&Token::Function(_)) |
+                Ok(&Token::ParenthesisBlock) |
+                Ok(&Token::SquareBracketBlock) |
+                Ok(&Token::CurlyBracketBlock) => {},
                 Ok(t) => {
                     if t.is_parse_error() {
                         token = t.clone();
                         break;
                     }
                     continue;
-                }
+                },
                 Err(_) => return Ok(()),
             }
             let result = self.parse_nested_block(|input| {

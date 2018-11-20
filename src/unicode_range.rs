@@ -47,7 +47,7 @@ impl UnicodeRange {
             Err(()) => {
                 return Err(input
                     .new_basic_unexpected_token_error(Token::Ident(concatenated_tokens.into())))
-            }
+            },
         };
         if range.end > char::MAX as u32 || range.start > range.end {
             Err(input.new_basic_unexpected_token_error(Token::Ident(concatenated_tokens.into())))
@@ -62,22 +62,22 @@ fn parse_tokens<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(), BasicParseErro
         Token::Delim('+') => {
             // FIXME: remove .clone() when lifetimes are non-lexical.
             match input.next_including_whitespace()?.clone() {
-                Token::Ident(_) => {}
-                Token::Delim('?') => {}
+                Token::Ident(_) => {},
+                Token::Delim('?') => {},
                 t => return Err(input.new_basic_unexpected_token_error(t)),
             }
             parse_question_marks(input)
-        }
+        },
         Token::Dimension { .. } => parse_question_marks(input),
         Token::Number { .. } => {
             let after_number = input.state();
             match input.next_including_whitespace() {
                 Ok(&Token::Delim('?')) => parse_question_marks(input),
-                Ok(&Token::Dimension { .. }) => {}
-                Ok(&Token::Number { .. }) => {}
+                Ok(&Token::Dimension { .. }) => {},
+                Ok(&Token::Number { .. }) => {},
                 _ => input.reset(&after_number),
             }
-        }
+        },
         t => return Err(input.new_basic_unexpected_token_error(t)),
     }
     Ok(())
@@ -88,11 +88,11 @@ fn parse_question_marks(input: &mut Parser) {
     loop {
         let start = input.state();
         match input.next_including_whitespace() {
-            Ok(&Token::Delim('?')) => {}
+            Ok(&Token::Delim('?')) => {},
             _ => {
                 input.reset(&start);
                 return;
-            }
+            },
         }
     }
 }

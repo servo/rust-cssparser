@@ -435,8 +435,8 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn has_newline_at(&self, offset: usize) -> bool {
-        self.position + offset < self.input.len()
-            && matches!(self.byte_at(offset), b'\n' | b'\r' | b'\x0C')
+        self.position + offset < self.input.len() &&
+            matches!(self.byte_at(offset), b'\n' | b'\r' | b'\x0C')
     }
 
     #[inline]
@@ -1023,9 +1023,9 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     let mut is_integer = true;
 
     let mut fractional_part: f64 = 0.;
-    if tokenizer.has_at_least(1)
-        && tokenizer.next_byte_unchecked() == b'.'
-        && matches!(tokenizer.byte_at(1), b'0'...b'9')
+    if tokenizer.has_at_least(1) &&
+        tokenizer.next_byte_unchecked() == b'.' &&
+        matches!(tokenizer.byte_at(1), b'0'...b'9')
     {
         is_integer = false;
         tokenizer.advance(1); // Consume '.'
@@ -1043,10 +1043,10 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     let mut value = sign * (integral_part + fractional_part);
 
     if tokenizer.has_at_least(1) && matches!(tokenizer.next_byte_unchecked(), b'e' | b'E') {
-        if matches!(tokenizer.byte_at(1), b'0'...b'9')
-            || (tokenizer.has_at_least(2)
-                && matches!(tokenizer.byte_at(1), b'+' | b'-')
-                && matches!(tokenizer.byte_at(2), b'0'...b'9'))
+        if matches!(tokenizer.byte_at(1), b'0'...b'9') ||
+            (tokenizer.has_at_least(2) &&
+                matches!(tokenizer.byte_at(1), b'+' | b'-') &&
+                matches!(tokenizer.byte_at(2), b'0'...b'9'))
         {
             is_integer = false;
             tokenizer.advance(1);
@@ -1131,7 +1131,7 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
             None => {
                 tokenizer.position = tokenizer.input.len();
                 break;
-            }
+            },
         };
         match_byte! { b,
             b' ' | b'\t' => {},
@@ -1335,7 +1335,7 @@ fn consume_hex_digits<'a>(tokenizer: &mut Tokenizer<'a>) -> (u32, u32) {
                 value = value * 16 + digit;
                 digits += 1;
                 tokenizer.advance(1);
-            }
+            },
             None => break,
         }
     }

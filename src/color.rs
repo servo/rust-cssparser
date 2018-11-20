@@ -232,7 +232,7 @@ pub trait ColorComponentParser<'i> {
                 };
 
                 AngleOrNumber::Angle { degrees }
-            }
+            },
             ref t => return Err(location.new_unexpected_token_error(t.clone())),
         })
     }
@@ -291,13 +291,13 @@ impl Color {
         match token {
             Token::Hash(ref value) | Token::IDHash(ref value) => {
                 Color::parse_hash(value.as_bytes())
-            }
+            },
             Token::Ident(ref value) => parse_color_keyword(&*value),
             Token::Function(ref name) => {
                 return input.parse_nested_block(|arguments| {
                     parse_color_function(component_parser, &*name, arguments)
                 })
-            }
+            },
             _ => Err(()),
         }
         .map_err(|()| location.new_unexpected_token_error(token))

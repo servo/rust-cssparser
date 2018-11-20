@@ -67,7 +67,7 @@ fn get_byte_from_expr_lit(expr: &Box<syn::Expr>) -> u8 {
             } else {
                 panic!("Found a pattern that wasn't a byte")
             }
-        }
+        },
         _ => unreachable!(),
     }
 }
@@ -105,7 +105,7 @@ fn expand_match_byte(body: &TokenStream) -> syn::Expr {
                     if table[value as usize] == 0 {
                         table[value as usize] = case_id as u8;
                     }
-                }
+                },
                 &syn::Pat::Range(syn::PatRange { ref lo, ref hi, .. }) => {
                     let lo = get_byte_from_expr_lit(lo);
                     let hi = get_byte_from_expr_lit(hi);
@@ -117,14 +117,14 @@ fn expand_match_byte(body: &TokenStream) -> syn::Expr {
                     if table[hi as usize] == 0 {
                         table[hi as usize] = case_id as u8;
                     }
-                }
+                },
                 &syn::Pat::Wild(_) => {
                     for byte in table.iter_mut() {
                         if *byte == 0 {
                             *byte = case_id as u8;
                         }
                     }
-                }
+                },
                 &syn::Pat::Ident(syn::PatIdent { ref ident, .. }) => {
                     assert_eq!(wildcard, None);
                     wildcard = Some(ident);
@@ -133,10 +133,10 @@ fn expand_match_byte(body: &TokenStream) -> syn::Expr {
                             *byte = case_id as u8;
                         }
                     }
-                }
+                },
                 _ => {
                     panic!("Unexpected pattern: {:?}. Buggy code ?", pat);
-                }
+                },
             }
         }
         cases.push(quote!(#name = #index));
@@ -170,8 +170,8 @@ impl Fold for MatchByteParser {
                 if mac.path == parse_quote!(match_byte) {
                     return syn::fold::fold_stmt(self, syn::Stmt::Expr(expand_match_byte(&mac.tts)));
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         syn::fold::fold_stmt(self, stmt)
@@ -183,8 +183,8 @@ impl Fold for MatchByteParser {
                 if mac.path == parse_quote!(match_byte) {
                     return syn::fold::fold_expr(self, expand_match_byte(&mac.tts));
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         syn::fold::fold_expr(self, expr)

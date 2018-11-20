@@ -31,7 +31,7 @@ pub fn parse_nth<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(i32, i32), Basic
                     Err(()) => Err(input.new_basic_unexpected_token_error(Token::Ident(unit.clone())))
                 }
             }
-        }
+        },
         Token::Ident(value) => {
             match_ignore_ascii_case! { &value,
                 "even" => Ok((2, 0)),
@@ -52,7 +52,7 @@ pub fn parse_nth<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(i32, i32), Basic
                     }
                 }
             }
-        }
+        },
         // FIXME: remove .clone() when lifetimes are non-lexical.
         Token::Delim('+') => match input.next_including_whitespace()?.clone() {
             Token::Ident(value) => {
@@ -64,7 +64,7 @@ pub fn parse_nth<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(i32, i32), Basic
                         Err(()) => Err(input.new_basic_unexpected_token_error(Token::Ident(value.clone())))
                     }
                 }
-            }
+            },
             token => Err(input.new_basic_unexpected_token_error(token)),
         },
         token => Err(input.new_basic_unexpected_token_error(token)),
@@ -84,7 +84,7 @@ fn parse_b<'i, 't>(input: &mut Parser<'i, 't>, a: i32) -> Result<(i32, i32), Bas
         _ => {
             input.reset(&start);
             Ok((a, 0))
-        }
+        },
     }
 }
 
@@ -106,9 +106,9 @@ fn parse_signless_b<'i, 't>(
 
 fn parse_n_dash_digits(string: &str) -> Result<i32, ()> {
     let bytes = string.as_bytes();
-    if bytes.len() >= 3
-        && bytes[..2].eq_ignore_ascii_case(b"n-")
-        && bytes[2..].iter().all(|&c| matches!(c, b'0'...b'9'))
+    if bytes.len() >= 3 &&
+        bytes[..2].eq_ignore_ascii_case(b"n-") &&
+        bytes[2..].iter().all(|&c| matches!(c, b'0'...b'9'))
     {
         Ok(parse_number_saturate(&string[1..]).unwrap()) // Include the minus sign
     } else {

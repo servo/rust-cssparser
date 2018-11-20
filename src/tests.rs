@@ -40,7 +40,7 @@ fn almost_equals(a: &Json, b: &Json) -> bool {
                 .iter()
                 .zip(b.iter())
                 .all(|(ref a, ref b)| almost_equals(*a, *b))
-        }
+        },
         (&Json::Object(_), &Json::Object(_)) => panic!("Not implemented"),
         (&Json::Null, &Json::Null) => true,
         _ => false,
@@ -53,13 +53,13 @@ fn normalize(json: &mut Json) {
             for item in list.iter_mut() {
                 normalize(item)
             }
-        }
+        },
         Json::String(ref mut s) => {
             if *s == "extra-input" || *s == "empty" {
                 *s = "invalid".to_string()
             }
-        }
-        _ => {}
+        },
+        _ => {},
     }
 }
 
@@ -91,7 +91,7 @@ fn run_raw_json_tests<F: Fn(Json, Json) -> ()>(json_data: &str, run: F) {
             (&Some(_), expected) => {
                 let input = input.take().unwrap();
                 run(input, expected)
-            }
+            },
         };
     }
 }
@@ -102,7 +102,7 @@ fn run_json_tests<F: Fn(&mut Parser) -> Json>(json_data: &str, parse: F) {
             let mut parse_input = ParserInput::new(&input);
             let result = parse(&mut Parser::new(&mut parse_input));
             assert_json_eq(result, expected, &input);
-        }
+        },
         _ => panic!("Unexpected JSON"),
     });
 }
@@ -453,7 +453,7 @@ fn serializer(preserve_comments: bool) {
                     let closing_token = match token {
                         Token::Function(_) | Token::ParenthesisBlock => {
                             Some(Token::CloseParenthesis)
-                        }
+                        },
                         Token::SquareBracketBlock => Some(Token::CloseSquareBracket),
                         Token::CurlyBracketBlock => Some(Token::CloseCurlyBracket),
                         _ => None,
@@ -1357,11 +1357,11 @@ fn utf16_columns() {
                     ..
                 }) => {
                     break;
-                }
+                },
                 Err(_) => {
                     assert!(false);
-                }
-                Ok(_) => {}
+                },
+                Ok(_) => {},
             };
         }
 

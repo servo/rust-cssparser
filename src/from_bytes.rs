@@ -61,10 +61,10 @@ where
                             } else {
                                 return charset_encoding;
                             }
-                        }
+                        },
                     }
                 }
-            }
+            },
         }
     }
     environment_encoding.unwrap_or_else(E::utf8)
