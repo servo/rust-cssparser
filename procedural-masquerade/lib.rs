@@ -228,7 +228,7 @@ macro_rules! define_invoke_proc_macro {
         #[macro_export]
         macro_rules! $macro_name {
             ($proc_macro_name: ident ! $paren: tt) => {
-                #[derive($proc_macro_name)]
+                #[derive($crate::$proc_macro_name)]
                 #[allow(unused)]
                 enum ProceduralMasqueradeDummyType {
                     // The magic happens here.
