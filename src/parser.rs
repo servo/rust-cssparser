@@ -495,12 +495,19 @@ impl<'i: 't, 't> Parser<'i, 't> {
         self.input.tokenizer.seen_var_or_env_functions()
     }
 
+    /// The old name of `try_parse`, which requires raw identifiers in the Rust 2018 edition.
+    #[inline]
+    pub fn try<F, T, E>(&mut self, thing: F) -> Result<T, E>
+    where F: FnOnce(&mut Parser<'i, 't>) -> Result<T, E> {
+        self.try_parse(thing)
+    }
+
     /// Execute the given closure, passing it the parser.
     /// If the result (returned unchanged) is `Err`,
     /// the internal state of the parser  (including position within the input)
     /// is restored to what it was before the call.
     #[inline]
-    pub fn try<F, T, E>(&mut self, thing: F) -> Result<T, E>
+    pub fn try_parse<F, T, E>(&mut self, thing: F) -> Result<T, E>
     where F: FnOnce(&mut Parser<'i, 't>) -> Result<T, E> {
         let start = self.state();
         let result = thing(self);
