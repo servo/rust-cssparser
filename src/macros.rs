@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/// See docs of the `procedural-masquerade` crate.
+// See docs of the `procedural-masquerade` crate.
 define_invoke_proc_macro!(cssparser_internal__invoke_proc_macro);
 
 /// Expands to a `match` expression with string patterns,
