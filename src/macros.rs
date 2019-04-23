@@ -132,7 +132,7 @@ pub fn _internal__to_lowercase<'a>(buffer: &'a mut [u8], input: &'a str) -> Opti
     if let Some(buffer) = buffer.get_mut(..input.len()) {
         if let Some(first_uppercase) = input.bytes().position(|byte| matches!(byte, b'A'...b'Z')) {
             buffer.copy_from_slice(input.as_bytes());
-            ::std::ascii::AsciiExt::make_ascii_lowercase(&mut buffer[first_uppercase..]);
+            buffer[first_uppercase..].make_ascii_lowercase();
             // `buffer` was initialized to a copy of `input` (which is &str so well-formed UTF-8)
             // then lowercased (which preserves UTF-8 well-formedness)
             unsafe { Some(::std::str::from_utf8_unchecked(buffer)) }

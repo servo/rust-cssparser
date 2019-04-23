@@ -4,8 +4,6 @@
 
 // https://drafts.csswg.org/css-syntax/#tokenization
 
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 use std::char;
 use std::i32;
 use std::ops::Range;

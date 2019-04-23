@@ -8,8 +8,6 @@ use super::{BasicParseError, BasicParseErrorKind, Delimiter};
 use super::{ParseError, Parser, SourceLocation, Token};
 use cow_rc_str::CowRcStr;
 use parser::{parse_nested_block, parse_until_after, parse_until_before, ParserState};
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 
 /// Parse `!important`.
 ///

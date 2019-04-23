@@ -13,8 +13,6 @@ extern crate syn;
 
 use proc_macro2::{TokenStream, TokenTree};
 use quote::TokenStreamExt;
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 use std::iter;
 
 define_proc_macros! {
