@@ -4,8 +4,6 @@
 
 use dtoa_short::{self, Notation};
 use itoa;
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 use std::fmt::{self, Write};
 use std::io;
 use std::str;

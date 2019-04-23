@@ -4,8 +4,6 @@
 
 use cow_rc_str::CowRcStr;
 use smallvec::SmallVec;
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 use std::ops::BitOr;
 use std::ops::Range;
 use tokenizer::{SourceLocation, SourcePosition, Token, Tokenizer};
