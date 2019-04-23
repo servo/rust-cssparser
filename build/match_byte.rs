@@ -168,7 +168,10 @@ impl Fold for MatchByteParser {
         match stmt {
             syn::Stmt::Item(syn::Item::Macro(syn::ItemMacro { ref mac, .. })) => {
                 if mac.path == parse_quote!(match_byte) {
-                    return syn::fold::fold_stmt(self, syn::Stmt::Expr(expand_match_byte(&mac.tts)));
+                    return syn::fold::fold_stmt(
+                        self,
+                        syn::Stmt::Expr(expand_match_byte(&mac.tts)),
+                    );
                 }
             }
             _ => {}

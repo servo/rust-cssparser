@@ -244,33 +244,33 @@ macro_rules! define_invoke_proc_macro {
         #[doc(hidden)]
         #[macro_export]
         macro_rules! $macro_name {
-                    ($proc_macro_name: ident ! $paren: tt) => {
-                        #[derive($proc_macro_name)]
-                        #[allow(unused)]
-                        enum ProceduralMasqueradeDummyType {
-                            // The magic happens here.
-                            //
-                            // We use an `enum` with an explicit discriminant
-                            // because that is the only case where a type definition
-                            // can contain a (const) expression.
-                            //
-                            // `(0, "foo").0` evalutes to 0, with the `"foo"` part ignored.
-                            //
-                            // By the time the `#[proc_macro_derive]` function
-                            // implementing `#[derive($proc_macro_name)]` is called,
-                            // `$paren` has already been replaced with the input of this inner macro,
-                            // but `stringify!` has not been expanded yet.
-                            //
-                            // This how arbitrary tokens can be inserted
-                            // in the input to the `#[proc_macro_derive]` function.
-                            //
-                            // Later, `stringify!(...)` is expanded into a string literal
-                            // which is then ignored.
-                            // Using `stringify!` enables passing arbitrary tokens
-                            // rather than only what can be parsed as a const expression.
-                            Input = (0, stringify! $paren ).0
+                            ($proc_macro_name: ident ! $paren: tt) => {
+                                #[derive($proc_macro_name)]
+                                #[allow(unused)]
+                                enum ProceduralMasqueradeDummyType {
+                                    // The magic happens here.
+                                    //
+                                    // We use an `enum` with an explicit discriminant
+                                    // because that is the only case where a type definition
+                                    // can contain a (const) expression.
+                                    //
+                                    // `(0, "foo").0` evalutes to 0, with the `"foo"` part ignored.
+                                    //
+                                    // By the time the `#[proc_macro_derive]` function
+                                    // implementing `#[derive($proc_macro_name)]` is called,
+                                    // `$paren` has already been replaced with the input of this inner macro,
+                                    // but `stringify!` has not been expanded yet.
+                                    //
+                                    // This how arbitrary tokens can be inserted
+                                    // in the input to the `#[proc_macro_derive]` function.
+                                    //
+                                    // Later, `stringify!(...)` is expanded into a string literal
+                                    // which is then ignored.
+                                    // Using `stringify!` enables passing arbitrary tokens
+                                    // rather than only what can be parsed as a const expression.
+                                    Input = (0, stringify! $paren ).0
+                                }
+                            }
                         }
-                    }
-                }
     };
 }
