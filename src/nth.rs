@@ -21,8 +21,8 @@ pub fn parse_nth<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(i32, i32), Basic
         } => {
             match_ignore_ascii_case! {
                 &unit,
-                "n" => Ok(try!(parse_b(input, a))),
-                "n-" => Ok(try!(parse_signless_b(input, a, -1))),
+                "n" => Ok(parse_b(input, a)?),
+                "n-" => Ok(parse_signless_b(input, a, -1)?),
                 _ => match parse_n_dash_digits(&*unit) {
                     Ok(b) => Ok((a, b)),
                     Err(()) => Err(input.new_basic_unexpected_token_error(Token::Ident(unit.clone())))
@@ -33,10 +33,10 @@ pub fn parse_nth<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(i32, i32), Basic
             match_ignore_ascii_case! { &value,
                 "even" => Ok((2, 0)),
                 "odd" => Ok((2, 1)),
-                "n" => Ok(try!(parse_b(input, 1))),
-                "-n" => Ok(try!(parse_b(input, -1))),
-                "n-" => Ok(try!(parse_signless_b(input, 1, -1))),
-                "-n-" => Ok(try!(parse_signless_b(input, -1, -1))),
+                "n" => Ok(parse_b(input, 1)?),
+                "-n" => Ok(parse_b(input, -1)?),
+                "n-" => Ok(parse_signless_b(input, 1, -1)?),
+                "-n-" => Ok(parse_signless_b(input, -1, -1)?),
                 _ => {
                     let (slice, a) = if value.starts_with("-") {
                         (&value[1..], -1)

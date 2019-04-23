@@ -340,7 +340,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     }
 
     /// Check whether the input is exhausted. That is, if `.next()` would return a token.
-    /// Return a `Result` so that the `try!` macro can be used: `try!(input.expect_exhausted())`
+    /// Return a `Result` so that the `?` operator can be used: `input.expect_exhausted()?`
     ///
     /// This ignores whitespace and comments.
     #[inline]
