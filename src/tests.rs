@@ -815,7 +815,7 @@ fn unquoted_url(b: &mut Bencher) {
         let mut input = Parser::new(&mut input);
         input.look_for_var_or_env_functions();
 
-        let result = input.try(|input| input.expect_url());
+        let result = input.try_parse(|input| input.expect_url());
 
         assert!(result.is_ok());
 

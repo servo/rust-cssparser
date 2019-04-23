@@ -608,7 +608,7 @@ where
         NumberOrPercentage::Percentage { unit_value } => (clamp_unit_f32(unit_value), false),
     };
 
-    let uses_commas = arguments.try(|i| i.expect_comma()).is_ok();
+    let uses_commas = arguments.try_parse(|i| i.expect_comma()).is_ok();
 
     let green;
     let blue;
@@ -647,7 +647,7 @@ where
 
     // Saturation and lightness are clamped to 0% ... 100%
     // https://drafts.csswg.org/css-color/#the-hsl-notation
-    let uses_commas = arguments.try(|i| i.expect_comma()).is_ok();
+    let uses_commas = arguments.try_parse(|i| i.expect_comma()).is_ok();
 
     let saturation = component_parser.parse_percentage(arguments)?;
     let saturation = saturation.max(0.).min(1.);

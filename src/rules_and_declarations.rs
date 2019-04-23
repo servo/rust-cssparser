@@ -11,7 +11,7 @@ use parser::{parse_nested_block, parse_until_after, parse_until_before, ParserSt
 
 /// Parse `!important`.
 ///
-/// Typical usage is `input.try(parse_important).is_ok()`
+/// Typical usage is `input.try_parse(parse_important).is_ok()`
 /// at the end of a `DeclarationParser::parse_value` implementation.
 pub fn parse_important<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(), BasicParseError<'i>> {
     input.expect_delim('!')?;
@@ -60,7 +60,7 @@ pub trait DeclarationParser<'i> {
     /// (In declaration lists, before the next semicolon or end of the current block.)
     ///
     /// If `!important` can be used in a given context,
-    /// `input.try(parse_important).is_ok()` should be used at the end
+    /// `input.try_parse(parse_important).is_ok()` should be used at the end
     /// of the implementation of this method and the result should be part of the return value.
     fn parse_value<'t>(
         &mut self,
