@@ -114,12 +114,10 @@ macro_rules! cssparser_internal__to_lowercase {
         // which initializes with `copy_from_slice` the part of the buffer it uses,
         // before it uses it.
         #[allow(unsafe_code)]
-        let mut buffer: [u8; $BUFFER_SIZE] = unsafe {
-            ::std::mem::uninitialized()
-        };
+        let mut buffer: [u8; $BUFFER_SIZE] = unsafe { ::std::mem::uninitialized() };
         let input: &str = $input;
         let $output = $crate::_internal__to_lowercase(&mut buffer, input);
-    }
+    };
 }
 
 /// Implementation detail of match_ignore_ascii_case! and ascii_case_insensitive_phf_map! macros.
@@ -137,9 +135,7 @@ pub fn _internal__to_lowercase<'a>(buffer: &'a mut [u8], input: &'a str) -> Opti
             ::std::ascii::AsciiExt::make_ascii_lowercase(&mut buffer[first_uppercase..]);
             // `buffer` was initialized to a copy of `input` (which is &str so well-formed UTF-8)
             // then lowercased (which preserves UTF-8 well-formedness)
-            unsafe {
-                Some(::std::str::from_utf8_unchecked(buffer))
-            }
+            unsafe { Some(::std::str::from_utf8_unchecked(buffer)) }
         } else {
             // Input is already lower-case
             Some(input)
