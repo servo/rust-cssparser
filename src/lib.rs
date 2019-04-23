@@ -31,7 +31,7 @@ As a consequence, when calling another parsing function, either:
 
 * Any `Err(())` return value must be propagated.
   This happens by definition for tail calls,
-  and can otherwise be done with the `try!` macro.
+  and can otherwise be done with the `?` operator.
 * Or the call must be wrapped in a `Parser::try` call.
   `try` takes a closure that takes a `Parser` and returns a `Result`,
   calls it once,
@@ -57,7 +57,7 @@ fn parse_background_image(context: &ParserContext, input: &mut Parser)
 // [ <length> | <percentage> ] [ <length> | <percentage> ]?
 fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
                           -> Result<(LengthOrPercentage, LengthOrPercentage), ()> {
-    let first = try!(LengthOrPercentage::parse);
+    let first = LengthOrPercentage::parse?;
     let second = input.try(LengthOrPercentage::parse).unwrap_or(first);
     (first, second)
 }

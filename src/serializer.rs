@@ -284,12 +284,12 @@ where
 ///
 /// ```{rust,ignore}
 /// fn write_foo<W>(foo: &Foo, dest: &mut W) -> fmt::Result where W: fmt::Write {
-///     try!(dest.write_str("\""));
+///     dest.write_str("\"")?;
 ///     {
 ///         let mut string_dest = CssStringWriter::new(dest);
 ///         // Write into string_dest...
 ///     }
-///     try!(dest.write_str("\""));
+///     dest.write_str("\"")?;
 ///     Ok(())
 /// }
 /// ```
