@@ -45,7 +45,7 @@ Examples:
 // 'none' | <image>
 fn parse_background_image(context: &ParserContext, input: &mut Parser)
                                     -> Result<Option<Image>, ()> {
-    if input.try(|input| input.expect_ident_matching("none")).is_ok() {
+    if input.try_parse(|input| input.expect_ident_matching("none")).is_ok() {
         Ok(None)
     } else {
         Image::parse(context, input).map(Some)  // tail call
@@ -58,7 +58,7 @@ fn parse_background_image(context: &ParserContext, input: &mut Parser)
 fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
                           -> Result<(LengthOrPercentage, LengthOrPercentage), ()> {
     let first = LengthOrPercentage::parse?;
-    let second = input.try(LengthOrPercentage::parse).unwrap_or(first);
+    let second = input.try_parse(LengthOrPercentage::parse).unwrap_or(first);
     (first, second)
 }
 ```
