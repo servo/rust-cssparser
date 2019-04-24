@@ -36,10 +36,10 @@ fn almost_equals(a: &Json, b: &Json) -> bool {
         (&Json::Boolean(a), &Json::Boolean(b)) => a == b,
         (&Json::String(ref a), &Json::String(ref b)) => a == b,
         (&Json::Array(ref a), &Json::Array(ref b)) => {
-            a.len() == b.len() && a
-                .iter()
-                .zip(b.iter())
-                .all(|(ref a, ref b)| almost_equals(*a, *b))
+            a.len() == b.len()
+                && a.iter()
+                    .zip(b.iter())
+                    .all(|(ref a, ref b)| almost_equals(*a, *b))
         }
         (&Json::Object(_), &Json::Object(_)) => panic!("Not implemented"),
         (&Json::Null, &Json::Null) => true,
@@ -277,13 +277,11 @@ fn outer_block_end_consumed() {
     let mut input = ParserInput::new("(calc(true))");
     let mut input = Parser::new(&mut input);
     assert!(input.expect_parenthesis_block().is_ok());
-    assert!(
-        input
-            .parse_nested_block(|input| input
-                .expect_function_matching("calc")
-                .map_err(Into::<ParseError<()>>::into))
-            .is_ok()
-    );
+    assert!(input
+        .parse_nested_block(|input| input
+            .expect_function_matching("calc")
+            .map_err(Into::<ParseError<()>>::into))
+        .is_ok());
     println!("{:?}", input.position());
     assert!(input.next().is_err());
 }
@@ -682,14 +680,12 @@ fn line_delimited() {
     let mut input = ParserInput::new(" { foo ; bar } baz;,");
     let mut input = Parser::new(&mut input);
     assert_eq!(input.next(), Ok(&Token::CurlyBracketBlock));
-    assert!(
-        {
-            let result: Result<_, ParseError<()>> =
-                input.parse_until_after(Delimiter::Semicolon, |_| Ok(42));
-            result
-        }
-        .is_err()
-    );
+    assert!({
+        let result: Result<_, ParseError<()>> =
+            input.parse_until_after(Delimiter::Semicolon, |_| Ok(42));
+        result
+    }
+    .is_err());
     assert_eq!(input.next(), Ok(&Token::Comma));
     assert!(input.next().is_err());
 }

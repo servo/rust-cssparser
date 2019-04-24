@@ -765,7 +765,7 @@ fn consume_quoted_string<'a>(
     single_quote: bool,
 ) -> Result<CowRcStr<'a>, CowRcStr<'a>> {
     tokenizer.advance(1); // Skip the initial quote
-    // start_pos is at code point boundary, after " or '
+                          // start_pos is at code point boundary, after " or '
     let start_pos = tokenizer.position();
     let mut string_bytes;
     loop {
@@ -874,20 +874,21 @@ fn consume_quoted_string<'a>(
 
 #[inline]
 fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
-    !tokenizer.is_eof() && match_byte! { tokenizer.next_byte_unchecked(),
-        b'a'...b'z' | b'A'...b'Z' | b'_' | b'\0' => { true },
-        b'-' => {
-            tokenizer.has_at_least(1) && match_byte! { tokenizer.byte_at(1),
-                b'a'...b'z' | b'A'...b'Z' | b'-' | b'_' | b'\0' => {
-                    true
+    !tokenizer.is_eof()
+        && match_byte! { tokenizer.next_byte_unchecked(),
+            b'a'...b'z' | b'A'...b'Z' | b'_' | b'\0' => { true },
+            b'-' => {
+                tokenizer.has_at_least(1) && match_byte! { tokenizer.byte_at(1),
+                    b'a'...b'z' | b'A'...b'Z' | b'-' | b'_' | b'\0' => {
+                        true
+                    }
+                    b'\\' => { !tokenizer.has_newline_at(1) }
+                    b => { !b.is_ascii() },
                 }
-                b'\\' => { !tokenizer.has_newline_at(1) }
-                b => { !b.is_ascii() },
-            }
-        },
-        b'\\' => { !tokenizer.has_newline_at(1) },
-        b => { !b.is_ascii() },
-    }
+            },
+            b'\\' => { !tokenizer.has_newline_at(1) },
+            b => { !b.is_ascii() },
+        }
 }
 
 fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {

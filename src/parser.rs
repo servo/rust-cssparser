@@ -354,7 +354,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
                 ..
             }) => Ok(()),
             Err(e) => unreachable!("Unexpected error encountered: {:?}", e),
-            Ok(t) => Err(start.source_location().new_basic_unexpected_token_error(t.clone())),
+            Ok(t) => Err(start
+                .source_location()
+                .new_basic_unexpected_token_error(t.clone())),
         };
         self.reset(&start);
         result
@@ -433,7 +435,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     pub fn new_error_for_next_token<E>(&mut self) -> ParseError<'i, E> {
         let token = match self.next() {
             Ok(token) => token.clone(),
-            Err(e) => return e.into()
+            Err(e) => return e.into(),
         };
         self.new_error(BasicParseErrorKind::UnexpectedToken(token))
     }
@@ -505,7 +507,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// The old name of `try_parse`, which requires raw identifiers in the Rust 2018 edition.
     #[inline]
     pub fn try<F, T, E>(&mut self, thing: F) -> Result<T, E>
-    where F: FnOnce(&mut Parser<'i, 't>) -> Result<T, E> {
+    where
+        F: FnOnce(&mut Parser<'i, 't>) -> Result<T, E>,
+    {
         self.try_parse(thing)
     }
 
@@ -997,9 +1001,10 @@ where
 {
     let result = parser.parse_until_before(delimiters, parse);
     let next_byte = parser.input.tokenizer.next_byte();
-    if next_byte.is_some() && !parser
-        .stop_before
-        .contains(Delimiters::from_byte(next_byte))
+    if next_byte.is_some()
+        && !parser
+            .stop_before
+            .contains(Delimiters::from_byte(next_byte))
     {
         debug_assert!(delimiters.contains(Delimiters::from_byte(next_byte)));
         // We know this byte is ASCII.
