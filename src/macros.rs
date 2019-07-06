@@ -130,7 +130,7 @@ macro_rules! cssparser_internal__to_lowercase {
 #[allow(non_snake_case)]
 pub fn _internal__to_lowercase<'a>(buffer: &'a mut [u8], input: &'a str) -> Option<&'a str> {
     if let Some(buffer) = buffer.get_mut(..input.len()) {
-        if let Some(first_uppercase) = input.bytes().position(|byte| matches!(byte, b'A'...b'Z')) {
+        if let Some(first_uppercase) = input.bytes().position(|byte| matches!(byte, b'A'..=b'Z')) {
             buffer.copy_from_slice(input.as_bytes());
             buffer[first_uppercase..].make_ascii_lowercase();
             // `buffer` was initialized to a copy of `input` (which is &str so well-formed UTF-8)

@@ -10,7 +10,6 @@ extern crate proc_macro2;
 
 #[cfg(feature = "dummy_match_byte")]
 mod codegen {
-    use std::path::Path;
     pub fn main() {}
 }
 
