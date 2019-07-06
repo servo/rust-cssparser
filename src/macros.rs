@@ -115,22 +115,35 @@ macro_rules! cssparser_internal__to_lowercase {
         // which initializes with `copy_from_slice` the part of the buffer it uses,
         // before it uses it.
         #[allow(unsafe_code)]
-        let buffer = unsafe {
-            // FIXME: remove this when we require Rust 1.36
-            #[cfg(not(has_std__mem__MaybeUninit))]
-            {
-                buffer = ::std::mem::uninitialized::<[u8; $BUFFER_SIZE]>();
-                &mut buffer
-            }
-            #[cfg(has_std__mem__MaybeUninit)]
-            {
-                buffer = ::std::mem::MaybeUninit::<[u8; $BUFFER_SIZE]>::uninit();
-                &mut *(buffer.as_mut_ptr())
-            }
-        };
+        let buffer = unsafe { cssparser_internal__uninit!(buffer, $BUFFER_SIZE) };
         let input: &str = $input;
         let $output = $crate::_internal__to_lowercase(buffer, input);
     };
+}
+
+#[cfg(has_std__mem__MaybeUninit)]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! cssparser_internal__uninit {
+    ($buffer: ident, $BUFFER_SIZE: expr) => {
+        {
+            $buffer = ::std::mem::MaybeUninit::<[u8; $BUFFER_SIZE]>::uninit();
+            &mut *($buffer.as_mut_ptr())
+        }
+    }
+}
+
+// FIXME: remove this when we require Rust 1.36
+#[cfg(not(has_std__mem__MaybeUninit))]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! cssparser_internal__uninit {
+    ($buffer: ident, $BUFFER_SIZE: expr) => {
+        {
+            $buffer = ::std::mem::uninitialized::<[u8; $BUFFER_SIZE]>();
+            &mut $buffer
+        }
+    }
 }
 
 /// Implementation detail of match_ignore_ascii_case! and ascii_case_insensitive_phf_map! macros.
