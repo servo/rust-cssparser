@@ -1,6 +1,6 @@
 [package]
 name = "cssparser"
-version = "0.25.7"
+version = "0.25.8"
 authors = [ "Simon Sapin <simon.sapin@exyr.org>" ]
 
 description = "Rust implementation of CSS Syntax Level 3"
@@ -30,6 +30,7 @@ serde = {version = "1.0", optional = true}
 smallvec = "0.6"
 
 [build-dependencies]
+autocfg = "0.1.4"
 syn = { version = "0.15.12", features = ["extra-traits", "fold", "full"] }
 quote = "0.6"
 proc-macro2 = "0.4"
