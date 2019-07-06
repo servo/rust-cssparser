@@ -110,13 +110,26 @@ macro_rules! ascii_case_insensitive_phf_map {
 #[doc(hidden)]
 macro_rules! cssparser_internal__to_lowercase {
     ($input: expr, $BUFFER_SIZE: expr => $output: ident) => {
-        // mem::uninitialized() is ok because `buffer` is only used in `_internal__to_lowercase`,
+        let mut buffer;
+        // Safety: `buffer` is only used in `_internal__to_lowercase`,
         // which initializes with `copy_from_slice` the part of the buffer it uses,
         // before it uses it.
         #[allow(unsafe_code)]
-        let mut buffer: [u8; $BUFFER_SIZE] = unsafe { ::std::mem::uninitialized() };
+        let buffer = unsafe {
+            // FIXME: remove this when we require Rust 1.36
+            #[cfg(not(has_std__mem__MaybeUninit))]
+            {
+                buffer = ::std::mem::uninitialized::<[u8; $BUFFER_SIZE]>();
+                &mut buffer
+            }
+            #[cfg(has_std__mem__MaybeUninit)]
+            {
+                buffer = ::std::mem::MaybeUninit::<[u8; $BUFFER_SIZE]>::uninit();
+                &mut *(buffer.as_mut_ptr())
+            }
+        };
         let input: &str = $input;
-        let $output = $crate::_internal__to_lowercase(&mut buffer, input);
+        let $output = $crate::_internal__to_lowercase(buffer, input);
     };
 }
 
@@ -130,7 +143,7 @@ macro_rules! cssparser_internal__to_lowercase {
 #[allow(non_snake_case)]
 pub fn _internal__to_lowercase<'a>(buffer: &'a mut [u8], input: &'a str) -> Option<&'a str> {
     if let Some(buffer) = buffer.get_mut(..input.len()) {
-        if let Some(first_uppercase) = input.bytes().position(|byte| matches!(byte, b'A'...b'Z')) {
+        if let Some(first_uppercase) = input.bytes().position(|byte| matches!(byte, b'A'..=b'Z')) {
             buffer.copy_from_slice(input.as_bytes());
             buffer[first_uppercase..].make_ascii_lowercase();
             // `buffer` was initialized to a copy of `input` (which is &str so well-formed UTF-8)
