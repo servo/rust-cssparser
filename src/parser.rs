@@ -4,6 +4,8 @@
 
 use cow_rc_str::CowRcStr;
 use smallvec::SmallVec;
+use std::error::Error;
+use std::fmt;
 use std::ops::BitOr;
 use std::ops::Range;
 use tokenizer::{SourceLocation, SourcePosition, Token, Tokenizer};
@@ -53,6 +55,18 @@ pub enum BasicParseErrorKind<'i> {
     QualifiedRuleInvalid,
 }
 
+impl<'i> BasicParseErrorKind<'i> {
+    fn description(&self) -> &'static str {
+        match self {
+            BasicParseErrorKind::UnexpectedToken(_) => "Unexpected token",
+            BasicParseErrorKind::EndOfInput => "End of input",
+            BasicParseErrorKind::AtRuleInvalid(_) => "Invalid @ rule",
+            BasicParseErrorKind::AtRuleBodyInvalid => "Invalid @ rule body",
+            BasicParseErrorKind::QualifiedRuleInvalid => "Invalid qualified rule",
+        }
+    }
+}
+
 /// The funamental parsing errors that can be triggered by built-in parsing routines.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BasicParseError<'i> {
@@ -61,6 +75,14 @@ pub struct BasicParseError<'i> {
     /// Location where this error occurred
     pub location: SourceLocation,
 }
+
+impl<'i> fmt::Display for BasicParseError<'i> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.kind.description())
+    }
+}
+
+impl<'i> Error for BasicParseError<'i> {}
 
 impl<'i, T> From<BasicParseError<'i>> for ParseError<'i, T> {
     #[inline]
@@ -155,6 +177,17 @@ impl<'i, T> ParseError<'i, T> {
         }
     }
 }
+
+impl<'i, T> fmt::Display for ParseError<'i, T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", match &self.kind {
+            ParseErrorKind::Basic(basic_kind) => basic_kind.description(),
+            ParseErrorKind::Custom(_) => "Custom error",
+        })
+    }
+}
+
+impl<'i, T> Error for ParseError<'i, T> where T: fmt::Debug {}
 
 /// The owned input for a parser.
 pub struct ParserInput<'i> {
