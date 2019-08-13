@@ -29,7 +29,12 @@ define_proc_macros! {
             syn::Expr::Match(syn::ExprMatch { arms, .. }) => arms,
             _ => panic!("expected a match expression, got {:?}", expr)
         };
-        max_len(arms.into_iter().flat_map(|arm| arm.pats).filter_map(|pattern| {
+        max_len(arms.into_iter().flat_map(|ref arm| {
+            match arm.pat {
+                syn::Pat::Or(ref p) => p.cases.iter().cloned().collect(),
+                ref p => vec![p.clone()]
+            }
+        }).filter_map(|pattern| {
             let expr = match pattern {
                 syn::Pat::Lit(expr) => expr,
                 syn::Pat::Wild(_) => return None,
