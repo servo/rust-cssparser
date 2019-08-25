@@ -384,11 +384,10 @@ where
                 Some(b'@') => {
                     match self.input.next_including_whitespace_and_comments() {
                         Ok(&Token::AtKeyword(ref name)) => at_keyword = Some(name.clone()),
-                        _ => at_keyword = None,
-                    }
-                    // FIXME: move this back inside `match` when lifetimes are non-lexical
-                    if at_keyword.is_none() {
-                        self.input.reset(&start)
+                        _ => {
+                            at_keyword = None;
+                            self.input.reset(&start)
+                        },
                     }
                 }
                 Some(_) => at_keyword = None,
@@ -454,11 +453,10 @@ where
         if input.next_byte() == Some(b'@') {
             match *input.next_including_whitespace_and_comments()? {
                 Token::AtKeyword(ref name) => at_keyword = Some(name.clone()),
-                _ => at_keyword = None,
-            }
-            // FIXME: move this back inside `match` when lifetimes are non-lexical
-            if at_keyword.is_none() {
-                input.reset(&start)
+                _ => {
+                    at_keyword = None;
+                    input.reset(&start)
+                },
             }
         } else {
             at_keyword = None
