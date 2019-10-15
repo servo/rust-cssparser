@@ -281,15 +281,12 @@ where
                     // Ident
                     let result = {
                         let parser = &mut self.parser;
-                        // FIXME: https://github.com/rust-lang/rust/issues/42508
-                        parse_until_after::<'i, 't, _, _, _>(
-                            self.input,
-                            Delimiter::Semicolon,
-                            |input| {
-                                input.expect_colon()?;
-                                parser.parse_value(name, input)
-                            },
-                        )
+                        // FIXME: https://github.com/servo/rust-cssparser/issues/254
+                        let callback = |input: &mut Parser<'i, '_>| {
+                            input.expect_colon()?;
+                            parser.parse_value(name, input)
+                        };
+                        parse_until_after(self.input, Delimiter::Semicolon, callback)
                     };
                     return Some(result.map_err(|e| (e, self.input.slice_from(start.position()))));
                 }
@@ -483,10 +480,9 @@ where
 {
     let location = input.current_source_location();
     let delimiters = Delimiter::Semicolon | Delimiter::CurlyBracketBlock;
-    // FIXME: https://github.com/rust-lang/rust/issues/42508
-    let result = parse_until_before::<'i, 't, _, _, _>(input, delimiters, |input| {
-        parser.parse_prelude(name, input)
-    });
+    // FIXME: https://github.com/servo/rust-cssparser/issues/254
+    let callback = |input: &mut Parser<'i, '_>| parser.parse_prelude(name, input);
+    let result = parse_until_before(input, delimiters, callback);
     match result {
         Ok(AtRuleType::WithoutBlock(prelude)) => match input.next() {
             Ok(&Token::Semicolon) | Err(_) => Ok(parser.rule_without_block(prelude, location)),
@@ -499,11 +495,11 @@ where
         Ok(AtRuleType::WithBlock(prelude)) => {
             match input.next() {
                 Ok(&Token::CurlyBracketBlock) => {
-                    // FIXME: https://github.com/rust-lang/rust/issues/42508
-                    parse_nested_block::<'i, 't, _, _, _>(input, move |input| {
-                        parser.parse_block(prelude, location, input)
-                    })
-                    .map_err(|e| (e, input.slice_from(start.position())))
+                    // FIXME: https://github.com/servo/rust-cssparser/issues/254
+                    let callback =
+                        |input: &mut Parser<'i, '_>| parser.parse_block(prelude, location, input);
+                    parse_nested_block(input, callback)
+                        .map_err(|e| (e, input.slice_from(start.position())))
                 }
                 Ok(&Token::Semicolon) => Err((
                     input.new_unexpected_token_error(Token::Semicolon),
@@ -532,19 +528,17 @@ where
     P: QualifiedRuleParser<'i, Error = E>,
 {
     let location = input.current_source_location();
-    // FIXME: https://github.com/rust-lang/rust/issues/42508
-    let prelude =
-        parse_until_before::<'i, 't, _, _, _>(input, Delimiter::CurlyBracketBlock, |input| {
-            parser.parse_prelude(input)
-        });
+    // FIXME: https://github.com/servo/rust-cssparser/issues/254
+    let callback = |input: &mut Parser<'i, '_>| parser.parse_prelude(input);
+    let prelude = parse_until_before(input, Delimiter::CurlyBracketBlock, callback);
     match *input.next()? {
         Token::CurlyBracketBlock => {
             // Do this here so that we consume the `{` even if the prelude is `Err`.
             let prelude = prelude?;
-            // FIXME: https://github.com/rust-lang/rust/issues/42508
-            parse_nested_block::<'i, 't, _, _, _>(input, move |input| {
-                parser.parse_block(prelude, location, input)
-            })
+            // FIXME: https://github.com/servo/rust-cssparser/issues/254
+            let callback =
+                |input: &mut Parser<'i, '_>| parser.parse_block(prelude, location, input);
+            parse_nested_block(input, callback)
         }
         _ => unreachable!(),
     }
