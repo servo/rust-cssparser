@@ -56,13 +56,15 @@ pub enum BasicParseErrorKind<'i> {
 }
 
 impl<'i> BasicParseErrorKind<'i> {
-    fn description(&self) -> &'static str {
+    fn description(&self) -> String {
         match self {
-            BasicParseErrorKind::UnexpectedToken(_) => "Unexpected token",
-            BasicParseErrorKind::EndOfInput => "End of input",
-            BasicParseErrorKind::AtRuleInvalid(_) => "Invalid @ rule",
-            BasicParseErrorKind::AtRuleBodyInvalid => "Invalid @ rule body",
-            BasicParseErrorKind::QualifiedRuleInvalid => "Invalid qualified rule",
+            BasicParseErrorKind::UnexpectedToken(token) => {
+                format!("Unexpected token: '{}'", token.description())
+            }
+            BasicParseErrorKind::EndOfInput => "End of input".to_owned(),
+            BasicParseErrorKind::AtRuleInvalid(message) => format!("Invalid @ rule: {}", message),
+            BasicParseErrorKind::AtRuleBodyInvalid => "Invalid @ rule body".to_owned(),
+            BasicParseErrorKind::QualifiedRuleInvalid => "Invalid qualified rule".to_owned(),
         }
     }
 }
@@ -78,7 +80,7 @@ pub struct BasicParseError<'i> {
 
 impl<'i> fmt::Display for BasicParseError<'i> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.kind.description())
+        formatter.write_str(self.kind.description().as_str())
     }
 }
 
@@ -178,16 +180,19 @@ impl<'i, T> ParseError<'i, T> {
     }
 }
 
-impl<'i, T> fmt::Display for ParseError<'i, T> {
+impl<'i, T> fmt::Display for ParseError<'i, T>
+where
+    T: fmt::Display,
+{
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", match &self.kind {
-            ParseErrorKind::Basic(basic_kind) => basic_kind.description(),
-            ParseErrorKind::Custom(_) => "Custom error",
-        })
+        match &self.kind {
+            ParseErrorKind::Basic(basic_kind) => formatter.write_str(&basic_kind.description()),
+            ParseErrorKind::Custom(custom_type) => custom_type.fmt(formatter),
+        }
     }
 }
 
-impl<'i, T> Error for ParseError<'i, T> where T: fmt::Debug {}
+impl<'i, T> Error for ParseError<'i, T> where T: Error {}
 
 /// The owned input for a parser.
 pub struct ParserInput<'i> {

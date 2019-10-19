@@ -191,6 +191,68 @@ impl<'a> Token<'a> {
             BadUrl(_) | BadString(_) | CloseParenthesis | CloseSquareBracket | CloseCurlyBracket
         )
     }
+
+    pub(crate) fn description(&self) -> String {
+        match self {
+            Ident(name) => format!("A ident token '{}'", name),
+            AtKeyword(value) => format!("The value '{}' does not include the `@` marker", value),
+            Hash(value) => format!("The value '{}' does not include the `#` marker", value),
+            IDHash(value) => format!(
+                "The value '{}' does not include the `#` marker, but has a valid ID selector",
+                value
+            ),
+            QuotedString(value) => format!("The value '{}' does not include the quotes", value),
+            UnquotedUrl(value) => format!(
+                "The value '{}' does not include the `url(` `)` markers.",
+                value
+            ),
+            Delim(character) => format!("'{}'", character),
+            Number {
+                has_sign, value, ..
+            } => {
+                let sign = if has_sign.clone() { '-' } else { '+' };
+                format!("{}{}", sign, value.to_string())
+            }
+            Percentage {
+                has_sign,
+                unit_value,
+                ..
+            } => {
+                let sign = if has_sign.clone() { '-' } else { '+' };
+                format!("{}{}%", sign, unit_value.to_string())
+            }
+            Dimension {
+                has_sign,
+                value,
+                unit,
+                ..
+            } => {
+                let sign = if has_sign.clone() { '-' } else { '+' };
+                format!("{}{} {}", sign, value.to_string(), unit)
+            }
+            WhiteSpace(whitespace) => format!("whitespace: '{}'", whitespace),
+            Comment(comment) => format!("The comment: '{}'", comment),
+            Colon => String::from(":"),
+            Semicolon => String::from(";"),
+            Comma => String::from(","),
+            IncludeMatch => String::from("~="),
+            DashMatch => String::from("|="),
+            PrefixMatch => String::from("^="),
+            SuffixMatch => String::from("$="),
+            SubstringMatch => String::from("*="),
+            CDO => String::from("<!--"),
+            CDC => String::from("-->"),
+            Function(name) => format!("The value ({}) does not include the `(` marker", name),
+            ParenthesisBlock => String::from("("),
+            SquareBracketBlock => String::from("["),
+            CurlyBracketBlock => String::from("{"),
+            BadUrl(url) => format!("Bad url: '{}'", url),
+            BadString(string) => format!("Bad string: '{}'", string),
+            CloseParenthesis => "Unclosed parenthesis".to_owned(),
+            CloseSquareBracket => "Unclosed square bracket".to_owned(),
+            CloseCurlyBracket => "Unclosed curly bracket".to_owned(),
+        }
+    }
 }
 
 #[derive(Clone)]

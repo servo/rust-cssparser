@@ -451,7 +451,14 @@ impl TokenSerializationType {
             ),
             Number => matches!(
                 other.0,
-                Ident | Function | UrlOrBadUrl | DelimMinus | Number | Percentage | DelimPercent | Dimension
+                Ident
+                    | Function
+                    | UrlOrBadUrl
+                    | DelimMinus
+                    | Number
+                    | Percentage
+                    | DelimPercent
+                    | Dimension
             ),
             DelimAt => matches!(other.0, Ident | Function | UrlOrBadUrl | DelimMinus),
             DelimDotOrPlus => matches!(other.0, Number | Percentage | Dimension),
@@ -459,7 +466,9 @@ impl TokenSerializationType {
             DelimBar => matches!(other.0, DelimEquals | DelimBar | DashMatch),
             DelimSlash => matches!(other.0, DelimAsterisk | SubstringMatch),
             Nothing | WhiteSpace | Percentage | UrlOrBadUrl | Function | CDC | OpenParen
-            | DashMatch | SubstringMatch | DelimQuestion | DelimEquals | DelimPercent | Other => false,
+            | DashMatch | SubstringMatch | DelimQuestion | DelimEquals | DelimPercent | Other => {
+                false
+            }
         }
     }
 }
