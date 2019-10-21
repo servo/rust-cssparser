@@ -84,7 +84,11 @@ impl<'i> fmt::Display for BasicParseError<'i> {
     }
 }
 
-impl<'i> Error for BasicParseError<'i> {}
+impl<'i> Error for BasicParseError<'i> {
+    fn description(&self) -> &str {
+        "A BasicParseError has occurred, please use the Display trait to determine it's kind"
+    }
+}
 
 impl<'i, T> From<BasicParseError<'i>> for ParseError<'i, T> {
     #[inline]
@@ -192,7 +196,14 @@ where
     }
 }
 
-impl<'i, T> Error for ParseError<'i, T> where T: Error {}
+impl<'i, T> Error for ParseError<'i, T>
+where
+    T: Error,
+{
+    fn description(&self) -> &str {
+        "A ParseError has occurred, please use the Display trait to determine it's kind"
+    }
+}
 
 /// The owned input for a parser.
 pub struct ParserInput<'i> {
