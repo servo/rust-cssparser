@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use std::mem::MaybeUninit;
+
 // See docs of the `procedural-masquerade` crate.
 define_invoke_proc_macro!(cssparser_internal__invoke_proc_macro);
 
@@ -110,40 +112,14 @@ macro_rules! ascii_case_insensitive_phf_map {
 #[doc(hidden)]
 macro_rules! cssparser_internal__to_lowercase {
     ($input: expr, $BUFFER_SIZE: expr => $output: ident) => {
-        let mut buffer;
-        // Safety: `buffer` is only used in `_internal__to_lowercase`,
-        // which initializes with `copy_from_slice` the part of the buffer it uses,
-        // before it uses it.
         #[allow(unsafe_code)]
-        let buffer = unsafe { cssparser_internal__uninit!(buffer, $BUFFER_SIZE) };
+        let mut buffer = unsafe {
+            ::std::mem::MaybeUninit::<[::std::mem::MaybeUninit<u8>; $BUFFER_SIZE]>::uninit()
+                .assume_init()
+        };
         let input: &str = $input;
-        let $output = $crate::_internal__to_lowercase(buffer, input);
+        let $output = $crate::_internal__to_lowercase(&mut buffer, input);
     };
-}
-
-#[cfg(has_std__mem__MaybeUninit)]
-#[macro_export]
-#[doc(hidden)]
-macro_rules! cssparser_internal__uninit {
-    ($buffer: ident, $BUFFER_SIZE: expr) => {
-        {
-            $buffer = ::std::mem::MaybeUninit::<[u8; $BUFFER_SIZE]>::uninit();
-            &mut *($buffer.as_mut_ptr())
-        }
-    }
-}
-
-// FIXME: remove this when we require Rust 1.36
-#[cfg(not(has_std__mem__MaybeUninit))]
-#[macro_export]
-#[doc(hidden)]
-macro_rules! cssparser_internal__uninit {
-    ($buffer: ident, $BUFFER_SIZE: expr) => {
-        {
-            $buffer = ::std::mem::uninitialized::<[u8; $BUFFER_SIZE]>();
-            &mut $buffer
-        }
-    }
 }
 
 /// Implementation detail of match_ignore_ascii_case! and ascii_case_insensitive_phf_map! macros.
@@ -154,14 +130,28 @@ macro_rules! cssparser_internal__uninit {
 /// Otherwise, return `input` ASCII-lowercased, using `buffer` as temporary space if necessary.
 #[doc(hidden)]
 #[allow(non_snake_case)]
-pub fn _internal__to_lowercase<'a>(buffer: &'a mut [u8], input: &'a str) -> Option<&'a str> {
+pub fn _internal__to_lowercase<'a>(
+    buffer: &'a mut [MaybeUninit<u8>],
+    input: &'a str,
+) -> Option<&'a str> {
     if let Some(buffer) = buffer.get_mut(..input.len()) {
         if let Some(first_uppercase) = input.bytes().position(|byte| matches!(byte, b'A'..=b'Z')) {
-            buffer.copy_from_slice(input.as_bytes());
-            buffer[first_uppercase..].make_ascii_lowercase();
-            // `buffer` was initialized to a copy of `input` (which is &str so well-formed UTF-8)
-            // then lowercased (which preserves UTF-8 well-formedness)
-            unsafe { Some(::std::str::from_utf8_unchecked(buffer)) }
+            unsafe {
+                // This cast doesn’t change the pointer’s validity
+                // since `u8` has the same layout as `MaybeUninit<u8>`:
+                let input_bytes = &*(input.as_bytes() as *const [u8] as *const [MaybeUninit<u8>]);
+
+                buffer.copy_from_slice(&*input_bytes);
+
+                // Same as above re layout, plus these bytes have been initialized:
+                let buffer = &mut *(buffer as *mut [MaybeUninit<u8>] as *mut [u8]);
+
+                buffer[first_uppercase..].make_ascii_lowercase();
+                // `buffer` was initialized to a copy of `input`
+                // (which is `&str` so well-formed UTF-8)
+                // then ASCII-lowercased (which preserves UTF-8 well-formedness):
+                Some(::std::str::from_utf8_unchecked(buffer))
+            }
         } else {
             // Input is already lower-case
             Some(input)
