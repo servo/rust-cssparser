@@ -73,18 +73,16 @@ extern crate itoa;
 extern crate cssparser_macros;
 #[macro_use]
 extern crate matches;
-#[macro_use]
-extern crate procedural_masquerade;
 #[cfg(test)]
 extern crate difference;
 #[cfg(test)]
 extern crate encoding_rs;
 #[doc(hidden)]
 pub extern crate phf as _internal__phf;
-#[cfg(test)]
-extern crate serde_json;
 #[cfg(feature = "serde")]
 extern crate serde;
+#[cfg(test)]
+extern crate serde_json;
 #[cfg(feature = "heapsize")]
 #[macro_use]
 extern crate heapsize;
