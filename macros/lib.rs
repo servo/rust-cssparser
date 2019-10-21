@@ -86,9 +86,7 @@ define_proc_macros! {
         let mut tokens = quote! {
             static MAP: ::cssparser::_internal__phf::Map<&'static str, #value_type> =
         };
-        let mut initializer_bytes = Vec::new();
-        map.build(&mut initializer_bytes).unwrap();
-        tokens.append_all(syn::parse_str::<syn::Expr>(::std::str::from_utf8(&initializer_bytes).unwrap()));
+        tokens.append_all(syn::parse_str::<proc_macro2::TokenStream>(&map.build().to_string()));
         tokens.append_all(quote!(;));
         tokens.to_string()
     }
