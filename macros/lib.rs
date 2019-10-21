@@ -2,100 +2,128 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#[macro_use]
-extern crate procedural_masquerade;
-extern crate phf_codegen;
 extern crate proc_macro;
-extern crate proc_macro2;
-#[macro_use]
-extern crate quote;
-extern crate syn;
 
-use proc_macro2::{TokenStream, TokenTree};
-use quote::TokenStreamExt;
-use std::iter;
+use proc_macro::TokenStream;
 
-define_proc_macros! {
-    /// Input: the arms of a `match` expression.
-    ///
-    /// Output: a `MAX_LENGTH` constant with the length of the longest string pattern.
-    ///
-    /// Panic if the arms contain non-string patterns,
-    /// or string patterns that contains ASCII uppercase letters.
-    #[allow(non_snake_case)]
-    pub fn cssparser_internal__assert_ascii_lowercase__max_len(input: &str) -> String {
-        let expr = syn::parse_str(&format!("match x {{ {} }}", input)).unwrap();
-        let arms = match expr {
-            syn::Expr::Match(syn::ExprMatch { arms, .. }) => arms,
-            _ => panic!("expected a match expression, got {:?}", expr)
-        };
-        max_len(arms.into_iter().flat_map(|arm| arm.pats).filter_map(|pattern| {
+/// Input: a `match` expression.
+///
+/// Output: a `MAX_LENGTH` constant with the length of the longest string pattern.
+///
+/// Panic if the arms contain non-string patterns,
+/// or string patterns that contains ASCII uppercase letters.
+#[allow(non_snake_case)]
+#[proc_macro]
+pub fn cssparser_internal__assert_ascii_lowercase__max_len(input: TokenStream) -> TokenStream {
+    let expr: syn::ExprMatch = syn::parse_macro_input!(input);
+    let strings = expr
+        .arms
+        .iter()
+        .flat_map(|arm| match arm.pat {
+            syn::Pat::Or(ref p) => p.cases.iter().collect(),
+            ref p => vec![p],
+        })
+        .filter_map(|pattern| {
             let expr = match pattern {
                 syn::Pat::Lit(expr) => expr,
                 syn::Pat::Wild(_) => return None,
-                _ => panic!("expected string or wildcard pattern, got {:?}", pattern)
+                _ => panic!("expected string or wildcard pattern, got {:?}", pattern),
             };
             match *expr.expr {
-                syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(ref lit), .. }) => {
-                    assert_eq!(lit.value(), lit.value().to_ascii_lowercase(),
-                               "string patterns must be given in ASCII lowercase");
-                    Some(lit.value().len())
+                syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(ref lit),
+                    ..
+                }) => {
+                    assert_eq!(
+                        lit.value(),
+                        lit.value().to_ascii_lowercase(),
+                        "string patterns must be given in ASCII lowercase"
+                    );
+                    Some(lit)
                 }
-                _ => panic!("expected string pattern, got {:?}", expr)
+                _ => panic!("expected string pattern, got {:?}", expr),
             }
-        }))
-    }
+        });
+    max_len(strings)
+}
 
-    /// Input: string literals with no separator
-    ///
-    /// Output: a `MAX_LENGTH` constant with the length of the longest string.
-    #[allow(non_snake_case)]
-    pub fn cssparser_internal__max_len(input: &str) -> String {
-        max_len(syn::parse_str::<TokenStream>(input).unwrap().into_iter().map(|tt| string_literal(&tt).len()))
-    }
+/// Input: string literals with no separator
+///
+/// Output: a `MAX_LENGTH` constant with the length of the longest string.
+#[allow(non_snake_case)]
+#[proc_macro]
+pub fn cssparser_internal__max_len(input: TokenStream) -> TokenStream {
+    struct Input(Vec<syn::LitStr>);
 
-    /// Input: parsed as token trees. The first TT is a type. (Can be wrapped in parens.)
-    /// following TTs are grouped in pairs, each pair being a key as a string literal
-    /// and the corresponding value as a const expression.
-    ///
-    /// Output: a rust-phf map, with keys ASCII-lowercased:
-    /// ```text
-    /// static MAP: &'static ::cssparser::phf::Map<&'static str, $ValueType> = …;
-    /// ```
-    #[allow(non_snake_case)]
-    pub fn cssparser_internal__phf_map(input: &str) -> String {
-        let token_trees: Vec<TokenTree> = syn::parse_str::<TokenStream>(input).unwrap().into_iter().collect();
-        let value_type = &token_trees[0];
-        let pairs: Vec<_> = token_trees[1..].chunks(2).map(|chunk| {
-            let key = string_literal(&chunk[0]);
-            let value = &chunk[1];
-            (key.to_ascii_lowercase(), quote!(#value).to_string())
-        }).collect();
-
-        let mut map = phf_codegen::Map::new();
-        map.phf_path("::cssparser::_internal__phf");
-        for &(ref key, ref value) in &pairs {
-            map.entry(&**key, &**value);
+    impl syn::parse::Parse for Input {
+        fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
+            let mut strings = Vec::new();
+            while !input.is_empty() {
+                strings.push(input.parse()?)
+            }
+            Ok(Self(strings))
         }
-
-        let mut tokens = quote! {
-            static MAP: ::cssparser::_internal__phf::Map<&'static str, #value_type> =
-        };
-        let mut initializer_bytes = Vec::new();
-        map.build(&mut initializer_bytes).unwrap();
-        tokens.append_all(syn::parse_str::<syn::Expr>(::std::str::from_utf8(&initializer_bytes).unwrap()));
-        tokens.append_all(quote!(;));
-        tokens.to_string()
     }
+
+    let strings: Input = syn::parse_macro_input!(input);
+    max_len(strings.0.iter())
 }
 
-fn max_len<I: Iterator<Item = usize>>(lengths: I) -> String {
-    let max_length = lengths.max().expect("expected at least one string");
-    quote!( const MAX_LENGTH: usize = #max_length; ).to_string()
+fn max_len<'a, I: Iterator<Item = &'a syn::LitStr>>(strings: I) -> TokenStream {
+    let max_length = strings
+        .map(|s| s.value().len())
+        .max()
+        .expect("expected at least one string");
+    quote::quote!( pub(super) const MAX_LENGTH: usize = #max_length; ).into()
 }
 
-fn string_literal(token: &TokenTree) -> String {
-    let lit: syn::LitStr = syn::parse2(iter::once(token.clone()).collect())
-        .expect(&format!("expected string literal, got {:?}", token));
-    lit.value()
+/// Input: A type, followed by pairs of string literal keys and expression values. No separator.
+///
+/// Output: a rust-phf map, with keys ASCII-lowercased:
+/// ```text
+/// static MAP: &'static ::cssparser::phf::Map<&'static str, $ValueType> = …;
+/// ```
+#[allow(non_snake_case)]
+#[proc_macro]
+pub fn cssparser_internal__phf_map(input: TokenStream) -> TokenStream {
+    struct Input {
+        value_type: syn::Type,
+        keys: Vec<syn::LitStr>,
+        values: Vec<syn::Expr>,
+    }
+
+    impl syn::parse::Parse for Input {
+        fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
+            let mut keys = Vec::new();
+            let mut values = Vec::new();
+            let value_type = input.parse()?;
+            while !input.is_empty() {
+                keys.push(input.parse()?);
+                values.push(input.parse()?);
+            }
+            Ok(Input {
+                value_type,
+                keys,
+                values,
+            })
+        }
+    }
+
+    let Input {
+        value_type,
+        keys,
+        values,
+    } = syn::parse_macro_input!(input);
+    let keys = keys
+        .iter()
+        .map(|s| syn::LitStr::new(&s.value().to_ascii_lowercase(), s.span()));
+
+    quote::quote!(
+        pub(super) static MAP: Map<&'static str, #value_type> = phf_map! {
+            #(
+                #keys => #values,
+            )*
+        };
+    )
+    .into()
 }
