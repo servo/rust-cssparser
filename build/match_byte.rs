@@ -2,13 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use quote::ToTokens;
+use quote::{quote, ToTokens};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 use syn;
 use syn::fold::Fold;
 use syn::parse::{Parse, ParseStream, Result};
+use syn::{parse_quote, Token};
 
 use proc_macro2::{Span, TokenStream};
 

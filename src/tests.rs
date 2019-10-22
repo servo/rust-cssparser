@@ -6,6 +6,7 @@
 extern crate test;
 
 use encoding_rs;
+use matches::matches;
 use serde_json::{self, json, Map, Value};
 
 #[cfg(feature = "bench")]
@@ -468,10 +469,11 @@ fn serializer(preserve_comments: bool) {
                         _ => None,
                     };
                     if let Some(closing_token) = closing_token {
-                        let result: Result<_, ParseError<()>> = input.parse_nested_block(|input| {
-                            write_to(previous_token, input, string, preserve_comments);
-                            Ok(())
-                        });
+                        let result: Result<_, ParseError<()>> =
+                            input.parse_nested_block(|input| {
+                                write_to(previous_token, input, string, preserve_comments);
+                                Ok(())
+                            });
                         result.unwrap();
                         closing_token.to_css(string).unwrap();
                     }

@@ -4,6 +4,7 @@
 
 use dtoa_short::{self, Notation};
 use itoa;
+use matches::matches;
 use std::fmt::{self, Write};
 use std::io;
 use std::str;
@@ -293,7 +294,7 @@ where
 ///     Ok(())
 /// }
 /// ```
-pub struct CssStringWriter<'a, W: 'a> {
+pub struct CssStringWriter<'a, W> {
     inner: &'a mut W,
 }
 

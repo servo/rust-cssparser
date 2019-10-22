@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use matches::matches;
 use std::mem::MaybeUninit;
 
 /// Expands to a `match` expression with string patterns,
@@ -40,7 +41,7 @@ macro_rules! match_ignore_ascii_case {
             // rather than expression/statement context,
             // even though the macro only expands to items.
             mod cssparser_internal {
-                cssparser_internal__assert_ascii_lowercase__max_len! {
+                $crate::cssparser_internal__assert_ascii_lowercase__max_len! {
                     match x { $( $match_body )* }
                 }
             }
@@ -90,8 +91,8 @@ macro_rules! ascii_case_insensitive_phf_map {
             mod cssparser_internal {
                 use $crate::_internal__phf::{Map, phf_map};
                 #[allow(unused)] use super::*;
-                cssparser_internal__max_len!( $( $key )+ );
-                cssparser_internal__phf_map!( $ValueType $( $key $value )+ );
+                $crate::cssparser_internal__max_len!( $( $key )+ );
+                $crate::cssparser_internal__phf_map!( $ValueType $( $key $value )+ );
             }
             cssparser_internal__to_lowercase!(input, cssparser_internal::MAX_LENGTH => lowercase);
             lowercase.and_then(|s| cssparser_internal::MAP.get(s))
