@@ -402,9 +402,6 @@ impl_tocss_for_float!(f64);
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct TokenSerializationType(TokenSerializationTypeVariants);
 
-#[cfg(feature = "heapsize")]
-known_heap_size!(0, TokenSerializationType);
-
 impl TokenSerializationType {
     /// Return a value that represents the absence of a token, e.g. before the start of the input.
     pub fn nothing() -> TokenSerializationType {

@@ -22,7 +22,6 @@ encoding_rs = "0.8"
 [dependencies]
 cssparser-macros = {path = "./macros", version = "0.5"}
 dtoa-short = "0.3"
-heapsize = {version = ">= 0.3, < 0.5", optional = true}
 itoa = "0.4"
 matches = "0.1"
 phf = {version = "0.8", features = ["macros"]}
