@@ -6,7 +6,7 @@
 extern crate test;
 
 use encoding_rs;
-use serde_json::{self, Value, json, Map};
+use serde_json::{self, json, Map, Value};
 
 #[cfg(feature = "bench")]
 use self::test::Bencher;
@@ -30,7 +30,7 @@ fn almost_equals(a: &Value, b: &Value) -> bool {
             let a = a.as_f64().unwrap();
             let b = b.as_f64().unwrap();
             (a - b).abs() <= a.abs() * 1e-6
-        },
+        }
 
         (&Value::Bool(a), &Value::Bool(b)) => a == b,
         (&Value::String(ref a), &Value::String(ref b)) => a == b,
@@ -410,15 +410,16 @@ fn unicode_range() {
                 Ok(None)
             }
         });
-        result.unwrap()
+        result
+            .unwrap()
             .iter()
-            .map(|v|
-                if let Some((v0, v1)) = v{
+            .map(|v| {
+                if let Some((v0, v1)) = v {
                     json!([v0, v1])
                 } else {
                     Value::Null
                 }
-            )
+            })
             .collect::<Vec<_>>()
             .to_json()
     });
@@ -809,7 +810,11 @@ trait ToJson {
     fn to_json(&self) -> Value;
 }
 
-impl<T> ToJson for T where T: Clone, Value: From<T> {
+impl<T> ToJson for T
+where
+    T: Clone,
+    Value: From<T>,
+{
     fn to_json(&self) -> Value {
         Value::from(self.clone())
     }

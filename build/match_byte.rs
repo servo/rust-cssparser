@@ -73,7 +73,12 @@ fn get_byte_from_expr_lit(expr: &Box<syn::Expr>) -> u8 {
 }
 
 /// Parse a pattern and fill the table accordingly
-fn parse_pat_to_table<'a>(pat: &'a syn::Pat, case_id: u8, wildcard: &mut Option<&'a syn::Ident>, table: &mut [u8; 256]) {
+fn parse_pat_to_table<'a>(
+    pat: &'a syn::Pat,
+    case_id: u8,
+    wildcard: &mut Option<&'a syn::Ident>,
+    table: &mut [u8; 256],
+) {
     match pat {
         &syn::Pat::Lit(syn::PatLit { ref expr, .. }) => {
             let value = get_byte_from_expr_lit(expr);
@@ -108,7 +113,7 @@ fn parse_pat_to_table<'a>(pat: &'a syn::Pat, case_id: u8, wildcard: &mut Option<
                     *byte = case_id;
                 }
             }
-        },
+        }
         &syn::Pat::Or(syn::PatOr { ref cases, .. }) => {
             for case in cases {
                 parse_pat_to_table(case, case_id, wildcard, table);

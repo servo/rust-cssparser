@@ -268,9 +268,7 @@ where
             let start = self.input.state();
             // FIXME: remove intermediate variable when lifetimes are non-lexical
             let ident = match self.input.next_including_whitespace_and_comments() {
-                Ok(&Token::WhiteSpace(_)) | Ok(&Token::Comment(_)) | Ok(&Token::Semicolon) => {
-                    continue
-                }
+                Ok(&Token::WhiteSpace(_)) | Ok(&Token::Comment(_)) | Ok(&Token::Semicolon) => continue,
                 Ok(&Token::Ident(ref name)) => Ok(Ok(name.clone())),
                 Ok(&Token::AtKeyword(ref name)) => Ok(Err(name.clone())),
                 Ok(token) => Err(token.clone()),
