@@ -19,6 +19,7 @@ use std::mem::MaybeUninit;
 /// # fn dummy(function_name: &String) { let _ =
 /// match_ignore_ascii_case! { &function_name,
 ///     "rgb" => parse_rgb(..),
+/// #   #[cfg(not(something))]
 ///     "rgba" => parse_rgba(..),
 ///     "hsl" => parse_hsl(..),
 ///     "hsla" => parse_hsla(..),
@@ -35,6 +36,7 @@ use std::mem::MaybeUninit;
 macro_rules! match_ignore_ascii_case {
     ( $input:expr,
         $(
+            $( #[$meta: meta] )*
             $( $pattern: pat )|+ $( if $guard: expr )? => $then: expr
         ),+
         $(,)?
@@ -55,6 +57,7 @@ macro_rules! match_ignore_ascii_case {
             // since we’ve verified that none of them include ASCII upper case letters.
             match lowercase.unwrap_or("A") {
                 $(
+                    $( #[$meta] )*
                     $( $pattern )|+ $( if $guard )? => $then,
                 )+
             }
