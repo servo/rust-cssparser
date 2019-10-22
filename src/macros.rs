@@ -33,7 +33,12 @@ use std::mem::MaybeUninit;
 /// ```
 #[macro_export]
 macro_rules! match_ignore_ascii_case {
-    ( $input:expr, $( $match_body:tt )* ) => {
+    ( $input:expr,
+        $(
+            $( $pattern: pat )|+ $( if $guard: expr )? => $then: expr
+        ),+
+        $(,)?
+    ) => {
         {
             // This dummy module works around the feature gate
             // `error[E0658]: procedural macros cannot be expanded to statements`
@@ -41,15 +46,17 @@ macro_rules! match_ignore_ascii_case {
             // rather than expression/statement context,
             // even though the macro only expands to items.
             mod cssparser_internal {
-                $crate::cssparser_internal__assert_ascii_lowercase__max_len! {
-                    match x { $( $match_body )* }
+                $crate::cssparser_internal__match_ignore_ascii_case__support! {
+                    $( $( $pattern )+ )+
                 }
             }
             cssparser_internal__to_lowercase!($input, cssparser_internal::MAX_LENGTH => lowercase);
             // "A" is a short string that we know is different for every string pattern,
             // since we’ve verified that none of them include ASCII upper case letters.
             match lowercase.unwrap_or("A") {
-                $( $match_body )*
+                $(
+                    $( $pattern )|+ $( if $guard )? => $then,
+                )+
             }
         }
     };
@@ -91,8 +98,9 @@ macro_rules! ascii_case_insensitive_phf_map {
             mod cssparser_internal {
                 use $crate::_internal__phf::{Map, phf_map};
                 #[allow(unused)] use super::*;
-                $crate::cssparser_internal__max_len!( $( $key )+ );
-                $crate::cssparser_internal__phf_map!( $ValueType $( $key $value )+ );
+                $crate::cssparser_internal__ascii_case_insensitive_phf_map__support! {
+                    $ValueType $( $key $value )+
+                }
             }
             cssparser_internal__to_lowercase!(input, cssparser_internal::MAX_LENGTH => lowercase);
             lowercase.and_then(|s| cssparser_internal::MAP.get(s))

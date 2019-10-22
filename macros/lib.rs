@@ -6,103 +6,72 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 
-/// Input: a `match` expression.
-///
-/// Output: a `MAX_LENGTH` constant with the length of the longest string pattern.
-///
-/// Panic if the arms contain non-string patterns,
-/// or string patterns that contains ASCII uppercase letters.
+/// Implementation detail of the `match_ignore_ascii_case!` macro
 #[allow(non_snake_case)]
 #[proc_macro]
-pub fn cssparser_internal__assert_ascii_lowercase__max_len(input: TokenStream) -> TokenStream {
-    let expr: syn::ExprMatch = syn::parse_macro_input!(input);
-    let strings = expr
-        .arms
-        .iter()
-        .flat_map(|arm| match arm.pat {
-            syn::Pat::Or(ref p) => p.cases.iter().collect(),
-            ref p => vec![p],
-        })
-        .filter_map(|pattern| {
-            let expr = match pattern {
-                syn::Pat::Lit(expr) => expr,
-                syn::Pat::Wild(_) => return None,
-                _ => panic!("expected string or wildcard pattern, got {:?}", pattern),
-            };
-            match *expr.expr {
-                syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Str(ref lit),
-                    ..
-                }) => {
-                    assert_eq!(
-                        lit.value(),
-                        lit.value().to_ascii_lowercase(),
-                        "string patterns must be given in ASCII lowercase"
-                    );
-                    Some(lit)
-                }
-                _ => panic!("expected string pattern, got {:?}", expr),
-            }
-        });
-    max_len(strings)
-}
-
-/// Input: string literals with no separator
-///
-/// Output: a `MAX_LENGTH` constant with the length of the longest string.
-#[allow(non_snake_case)]
-#[proc_macro]
-pub fn cssparser_internal__max_len(input: TokenStream) -> TokenStream {
-    struct Input(Vec<syn::LitStr>);
+pub fn cssparser_internal__match_ignore_ascii_case__support(input: TokenStream) -> TokenStream {
+    struct Input {
+        max_length: usize,
+    }
 
     impl syn::parse::Parse for Input {
         fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
-            let mut strings = Vec::new();
+            let mut max_length = 0;
             while !input.is_empty() {
-                strings.push(input.parse()?)
+                if input.peek(syn::Token![_]) {
+                    input.parse::<syn::Token![_]>().unwrap();
+                    continue;
+                }
+                let lit: syn::LitStr = input.parse()?;
+                let value = lit.value();
+                if value.to_ascii_lowercase() != value {
+                    return Err(syn::Error::new(lit.span(), "must be ASCII-lowercase"));
+                }
+                max_length = max_length.max(value.len());
             }
-            Ok(Self(strings))
+            Ok(Input { max_length })
         }
     }
 
-    let strings: Input = syn::parse_macro_input!(input);
-    max_len(strings.0.iter())
+    let Input { max_length } = syn::parse_macro_input!(input);
+    quote::quote!(
+        pub(super) const MAX_LENGTH: usize = #max_length;
+    )
+    .into()
 }
 
-fn max_len<'a, I: Iterator<Item = &'a syn::LitStr>>(strings: I) -> TokenStream {
-    let max_length = strings
-        .map(|s| s.value().len())
-        .max()
-        .expect("expected at least one string");
-    quote::quote!( pub(super) const MAX_LENGTH: usize = #max_length; ).into()
-}
-
-/// Input: A type, followed by pairs of string literal keys and expression values. No separator.
-///
-/// Output: a rust-phf map, with keys ASCII-lowercased:
-/// ```text
-/// static MAP: &'static ::cssparser::phf::Map<&'static str, $ValueType> = …;
-/// ```
+/// Implementation detail of the `ascii_case_insensitive_phf_map!` macro
 #[allow(non_snake_case)]
 #[proc_macro]
-pub fn cssparser_internal__phf_map(input: TokenStream) -> TokenStream {
+pub fn cssparser_internal__ascii_case_insensitive_phf_map__support(
+    input: TokenStream,
+) -> TokenStream {
     struct Input {
         value_type: syn::Type,
+        max_key_length: usize,
         keys: Vec<syn::LitStr>,
         values: Vec<syn::Expr>,
     }
 
     impl syn::parse::Parse for Input {
         fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
+            let value_type = input.parse()?;
+            let mut max_key_length = 0;
             let mut keys = Vec::new();
             let mut values = Vec::new();
-            let value_type = input.parse()?;
             while !input.is_empty() {
-                keys.push(input.parse()?);
+                let key: syn::LitStr = input.parse()?;
+                let key_value = key.value();
+                max_key_length = max_key_length.max(key_value.len());
+                keys.push(syn::LitStr::new(
+                    &key_value.to_ascii_lowercase(),
+                    key.span(),
+                ));
                 values.push(input.parse()?);
             }
             Ok(Input {
                 value_type,
+                max_key_length,
                 keys,
                 values,
             })
@@ -111,14 +80,12 @@ pub fn cssparser_internal__phf_map(input: TokenStream) -> TokenStream {
 
     let Input {
         value_type,
+        max_key_length,
         keys,
         values,
     } = syn::parse_macro_input!(input);
-    let keys = keys
-        .iter()
-        .map(|s| syn::LitStr::new(&s.value().to_ascii_lowercase(), s.span()));
-
     quote::quote!(
+        pub(super) const MAX_LENGTH: usize = #max_key_length;
         pub(super) static MAP: Map<&'static str, #value_type> = phf_map! {
             #(
                 #keys => #values,

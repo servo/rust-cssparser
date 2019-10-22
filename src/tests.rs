@@ -942,7 +942,7 @@ impl<'i> AtRuleParser<'i> for JsonParser {
             "media" | "foo-with-block" => Ok(AtRuleType::WithBlock(prelude)),
             "charset" => {
                 Err(input.new_error(BasicParseErrorKind::AtRuleInvalid(name.clone()).into()))
-            }
+            },
             _ => Ok(AtRuleType::WithoutBlock(prelude)),
         }
     }
@@ -1398,4 +1398,33 @@ fn utf16_columns() {
         // Check the resulting column.
         assert_eq!(parser.current_source_location().column, test.1);
     }
+}
+
+#[test]
+fn servo_define_css_keyword_enum() {
+    macro_rules! define_css_keyword_enum {
+        (pub enum $name:ident { $($variant:ident = $css:expr,)+ }) => {
+            #[derive(PartialEq, Debug)]
+            pub enum $name {
+                $($variant),+
+            }
+
+            impl $name {
+                pub fn from_ident(ident: &str) -> Result<$name, ()> {
+                    match_ignore_ascii_case! { ident,
+                        $($css => Ok($name::$variant),)+
+                        _ => Err(())
+                    }
+                }
+            }
+        }
+    }
+    define_css_keyword_enum! {
+        pub enum UserZoom {
+            Zoom = "zoom",
+            Fixed = "fixed",
+        }
+    }
+
+    assert_eq!(UserZoom::from_ident("fixed"), Ok(UserZoom::Fixed));
 }
