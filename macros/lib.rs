@@ -6,10 +6,8 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 
-/// Implementation detail of the `match_ignore_ascii_case!` macro
-#[allow(non_snake_case)]
 #[proc_macro]
-pub fn cssparser_internal__match_ignore_ascii_case__support(input: TokenStream) -> TokenStream {
+pub fn _cssparser_internal_max_len(input: TokenStream) -> TokenStream {
     struct Input {
         max_length: usize,
     }
@@ -36,61 +34,6 @@ pub fn cssparser_internal__match_ignore_ascii_case__support(input: TokenStream) 
     let Input { max_length } = syn::parse_macro_input!(input);
     quote::quote!(
         pub(super) const MAX_LENGTH: usize = #max_length;
-    )
-    .into()
-}
-
-/// Implementation detail of the `ascii_case_insensitive_phf_map!` macro
-#[allow(non_snake_case)]
-#[proc_macro]
-pub fn cssparser_internal__ascii_case_insensitive_phf_map__support(
-    input: TokenStream,
-) -> TokenStream {
-    struct Input {
-        value_type: syn::Type,
-        max_key_length: usize,
-        keys: Vec<syn::LitStr>,
-        values: Vec<syn::Expr>,
-    }
-
-    impl syn::parse::Parse for Input {
-        fn parse(input: syn::parse::ParseStream) -> syn::parse::Result<Self> {
-            let value_type = input.parse()?;
-            let mut max_key_length = 0;
-            let mut keys = Vec::new();
-            let mut values = Vec::new();
-            while !input.is_empty() {
-                let key: syn::LitStr = input.parse()?;
-                let key_value = key.value();
-                max_key_length = max_key_length.max(key_value.len());
-                keys.push(syn::LitStr::new(
-                    &key_value.to_ascii_lowercase(),
-                    key.span(),
-                ));
-                values.push(input.parse()?);
-            }
-            Ok(Input {
-                value_type,
-                max_key_length,
-                keys,
-                values,
-            })
-        }
-    }
-
-    let Input {
-        value_type,
-        max_key_length,
-        keys,
-        values,
-    } = syn::parse_macro_input!(input);
-    quote::quote!(
-        pub(super) const MAX_LENGTH: usize = #max_key_length;
-        pub(super) static MAP: Map<&'static str, #value_type> = phf_map! {
-            #(
-                #keys => #values,
-            )*
-        };
     )
     .into()
 }

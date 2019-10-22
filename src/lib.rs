@@ -73,7 +73,7 @@ pub use crate::color::{
 pub use crate::cow_rc_str::CowRcStr;
 pub use crate::from_bytes::{stylesheet_encoding, EncodingSupport};
 #[doc(hidden)]
-pub use crate::macros::_internal__to_lowercase;
+pub use crate::macros::_cssparser_internal_to_lowercase;
 pub use crate::nth::parse_nth;
 pub use crate::parser::{BasicParseError, BasicParseErrorKind, ParseError, ParseErrorKind};
 pub use crate::parser::{Delimiter, Delimiters, Parser, ParserInput, ParserState};
@@ -87,7 +87,7 @@ pub use crate::tokenizer::{SourceLocation, SourcePosition, Token};
 pub use crate::unicode_range::UnicodeRange;
 pub use cssparser_macros::*;
 #[doc(hidden)]
-pub use phf as _internal__phf;
+pub use phf as _cssparser_internal_phf;
 
 #[macro_use]
 mod macros;

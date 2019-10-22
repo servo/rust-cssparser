@@ -19,6 +19,7 @@ use std::mem::MaybeUninit;
 /// # fn dummy(function_name: &String) { let _ =
 /// match_ignore_ascii_case! { &function_name,
 ///     "rgb" => parse_rgb(..),
+/// #   #[cfg(not(something))]
 ///     "rgba" => parse_rgba(..),
 ///     "hsl" => parse_hsl(..),
 ///     "hsla" => parse_hsla(..),
@@ -35,6 +36,7 @@ use std::mem::MaybeUninit;
 macro_rules! match_ignore_ascii_case {
     ( $input:expr,
         $(
+            $( #[$meta: meta] )*
             $( $pattern: pat )|+ $( if $guard: expr )? => $then: expr
         ),+
         $(,)?
@@ -46,15 +48,16 @@ macro_rules! match_ignore_ascii_case {
             // rather than expression/statement context,
             // even though the macro only expands to items.
             mod cssparser_internal {
-                $crate::cssparser_internal__match_ignore_ascii_case__support! {
+                $crate::_cssparser_internal_max_len! {
                     $( $( $pattern )+ )+
                 }
             }
-            cssparser_internal__to_lowercase!($input, cssparser_internal::MAX_LENGTH => lowercase);
+            _cssparser_internal_to_lowercase!($input, cssparser_internal::MAX_LENGTH => lowercase);
             // "A" is a short string that we know is different for every string pattern,
             // since we’ve verified that none of them include ASCII upper case letters.
             match lowercase.unwrap_or("A") {
                 $(
+                    $( #[$meta] )*
                     $( $pattern )|+ $( if $guard )? => $then,
                 )+
             }
@@ -95,15 +98,19 @@ macro_rules! ascii_case_insensitive_phf_map {
         pub fn $name(input: &str) -> Option<&'static $ValueType> {
             // This dummy module works around a feature gate,
             // see comment on the similar module in `match_ignore_ascii_case!` above.
-            mod cssparser_internal {
-                use $crate::_internal__phf::{Map, phf_map};
-                #[allow(unused)] use super::*;
-                $crate::cssparser_internal__ascii_case_insensitive_phf_map__support! {
-                    $ValueType $( $key $value )+
+            mod _cssparser_internal {
+                $crate::_cssparser_internal_max_len! {
+                    $( $key )+
                 }
             }
-            cssparser_internal__to_lowercase!(input, cssparser_internal::MAX_LENGTH => lowercase);
-            lowercase.and_then(|s| cssparser_internal::MAP.get(s))
+            use $crate::_cssparser_internal_phf as phf;
+            static MAP: phf::Map<&'static str, $ValueType> = phf::phf_map! {
+                $(
+                    $key => $value,
+                )*
+            };
+            _cssparser_internal_to_lowercase!(input, _cssparser_internal::MAX_LENGTH => lowercase);
+            lowercase.and_then(|s| MAP.get(s))
         }
     }
 }
@@ -113,11 +120,11 @@ macro_rules! ascii_case_insensitive_phf_map {
 /// **This macro is not part of the public API. It can change or be removed between any versions.**
 ///
 /// Define a local variable named `$output`
-/// and assign it the result of calling `_internal__to_lowercase`
+/// and assign it the result of calling `_cssparser_internal_to_lowercase`
 /// with a stack-allocated buffer of length `$BUFFER_SIZE`.
 #[macro_export]
 #[doc(hidden)]
-macro_rules! cssparser_internal__to_lowercase {
+macro_rules! _cssparser_internal_to_lowercase {
     ($input: expr, $BUFFER_SIZE: expr => $output: ident) => {
         #[allow(unsafe_code)]
         let mut buffer = unsafe {
@@ -125,7 +132,7 @@ macro_rules! cssparser_internal__to_lowercase {
                 .assume_init()
         };
         let input: &str = $input;
-        let $output = $crate::_internal__to_lowercase(&mut buffer, input);
+        let $output = $crate::_cssparser_internal_to_lowercase(&mut buffer, input);
     };
 }
 
@@ -137,7 +144,7 @@ macro_rules! cssparser_internal__to_lowercase {
 /// Otherwise, return `input` ASCII-lowercased, using `buffer` as temporary space if necessary.
 #[doc(hidden)]
 #[allow(non_snake_case)]
-pub fn _internal__to_lowercase<'a>(
+pub fn _cssparser_internal_to_lowercase<'a>(
     buffer: &'a mut [MaybeUninit<u8>],
     input: &'a str,
 ) -> Option<&'a str> {
