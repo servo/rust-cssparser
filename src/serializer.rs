@@ -4,6 +4,7 @@
 
 use dtoa_short::{self, Notation};
 use itoa;
+use matches::matches;
 use std::fmt::{self, Write};
 use std::io;
 use std::str;
@@ -293,7 +294,7 @@ where
 ///     Ok(())
 /// }
 /// ```
-pub struct CssStringWriter<'a, W: 'a> {
+pub struct CssStringWriter<'a, W> {
     inner: &'a mut W,
 }
 
@@ -400,9 +401,6 @@ impl_tocss_for_float!(f64);
 /// A category of token. See the `needs_separator_when_before` method.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct TokenSerializationType(TokenSerializationTypeVariants);
-
-#[cfg(feature = "heapsize")]
-known_heap_size!(0, TokenSerializationType);
 
 impl TokenSerializationType {
     /// Return a value that represents the absence of a token, e.g. before the start of the input.

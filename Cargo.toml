@@ -1,6 +1,6 @@
 [package]
 name = "cssparser"
-version = "0.26.0"
+version = "0.27.1"
 authors = [ "Simon Sapin <simon.sapin@exyr.org>" ]
 
 description = "Rust implementation of CSS Syntax Level 3"
@@ -10,6 +10,7 @@ readme = "README.md"
 keywords = ["css", "syntax", "parser"]
 license = "MPL-2.0"
 build = "build.rs"
+edition = "2018"
 
 exclude = ["src/css-parsing-tests/**", "src/big-data-url.css"]
 
@@ -19,9 +20,8 @@ difference = "2.0"
 encoding_rs = "0.8"
 
 [dependencies]
-cssparser-macros = {path = "./macros", version = "0.4"}
+cssparser-macros = {path = "./macros", version = "0.6"}
 dtoa-short = "0.3"
-heapsize = {version = ">= 0.3, < 0.5", optional = true}
 itoa = "0.4"
 matches = "0.1"
 phf = {version = "0.8", features = ["macros"]}

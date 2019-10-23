@@ -6,8 +6,8 @@
 
 use super::{BasicParseError, BasicParseErrorKind, Delimiter};
 use super::{ParseError, Parser, SourceLocation, Token};
-use cow_rc_str::CowRcStr;
-use parser::{parse_nested_block, parse_until_after, parse_until_before, ParserState};
+use crate::cow_rc_str::CowRcStr;
+use crate::parser::{parse_nested_block, parse_until_after, parse_until_before, ParserState};
 
 /// Parse `!important`.
 ///
@@ -221,7 +221,7 @@ pub trait QualifiedRuleParser<'i> {
 }
 
 /// Provides an iterator for declaration list parsing.
-pub struct DeclarationListParser<'i: 't, 't: 'a, 'a, P> {
+pub struct DeclarationListParser<'i, 't, 'a, P> {
     /// The input given to `DeclarationListParser::new`
     pub input: &'a mut Parser<'i, 't>,
 
@@ -229,7 +229,7 @@ pub struct DeclarationListParser<'i: 't, 't: 'a, 'a, P> {
     pub parser: P,
 }
 
-impl<'i: 't, 't: 'a, 'a, I, P, E: 'i> DeclarationListParser<'i, 't, 'a, P>
+impl<'i, 't, 'a, I, P, E: 'i> DeclarationListParser<'i, 't, 'a, P>
 where
     P: DeclarationParser<'i, Declaration = I, Error = E> + AtRuleParser<'i, AtRule = I, Error = E>,
 {
@@ -257,7 +257,7 @@ where
 
 /// `DeclarationListParser` is an iterator that yields `Ok(_)` for a valid declaration or at-rule
 /// or `Err(())` for an invalid one.
-impl<'i: 't, 't: 'a, 'a, I, P, E: 'i> Iterator for DeclarationListParser<'i, 't, 'a, P>
+impl<'i, 't, 'a, I, P, E: 'i> Iterator for DeclarationListParser<'i, 't, 'a, P>
 where
     P: DeclarationParser<'i, Declaration = I, Error = E> + AtRuleParser<'i, AtRule = I, Error = E>,
 {
@@ -268,9 +268,7 @@ where
             let start = self.input.state();
             // FIXME: remove intermediate variable when lifetimes are non-lexical
             let ident = match self.input.next_including_whitespace_and_comments() {
-                Ok(&Token::WhiteSpace(_)) | Ok(&Token::Comment(_)) | Ok(&Token::Semicolon) => {
-                    continue
-                }
+                Ok(&Token::WhiteSpace(_)) | Ok(&Token::Comment(_)) | Ok(&Token::Semicolon) => continue,
                 Ok(&Token::Ident(ref name)) => Ok(Ok(name.clone())),
                 Ok(&Token::AtKeyword(ref name)) => Ok(Err(name.clone())),
                 Ok(token) => Err(token.clone()),
@@ -308,7 +306,7 @@ where
 }
 
 /// Provides an iterator for rule list parsing.
-pub struct RuleListParser<'i: 't, 't: 'a, 'a, P> {
+pub struct RuleListParser<'i, 't, 'a, P> {
     /// The input given to `RuleListParser::new`
     pub input: &'a mut Parser<'i, 't>,
 
@@ -319,7 +317,7 @@ pub struct RuleListParser<'i: 't, 't: 'a, 'a, P> {
     any_rule_so_far: bool,
 }
 
-impl<'i: 't, 't: 'a, 'a, R, P, E: 'i> RuleListParser<'i, 't, 'a, P>
+impl<'i, 't, 'a, R, P, E: 'i> RuleListParser<'i, 't, 'a, P>
 where
     P: QualifiedRuleParser<'i, QualifiedRule = R, Error = E>
         + AtRuleParser<'i, AtRule = R, Error = E>,
@@ -360,7 +358,7 @@ where
 }
 
 /// `RuleListParser` is an iterator that yields `Ok(_)` for a rule or `Err(())` for an invalid one.
-impl<'i: 't, 't: 'a, 'a, R, P, E: 'i> Iterator for RuleListParser<'i, 't, 'a, P>
+impl<'i, 't, 'a, R, P, E: 'i> Iterator for RuleListParser<'i, 't, 'a, P>
 where
     P: QualifiedRuleParser<'i, QualifiedRule = R, Error = E>
         + AtRuleParser<'i, AtRule = R, Error = E>,
@@ -469,7 +467,7 @@ where
     })
 }
 
-fn parse_at_rule<'i: 't, 't, P, E>(
+fn parse_at_rule<'i, 't, P, E>(
     start: &ParserState,
     name: CowRcStr<'i>,
     input: &mut Parser<'i, 't>,

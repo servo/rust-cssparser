@@ -2,13 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use cow_rc_str::CowRcStr;
+use crate::cow_rc_str::CowRcStr;
+use crate::tokenizer::{SourceLocation, SourcePosition, Token, Tokenizer};
 use smallvec::SmallVec;
 use std::error::Error;
 use std::fmt;
 use std::ops::BitOr;
 use std::ops::Range;
-use tokenizer::{SourceLocation, SourcePosition, Token, Tokenizer};
 
 /// A capture of the internal state of a `Parser` (including the position within the input),
 /// obtained from the `Parser::position` method.
@@ -153,7 +153,7 @@ impl<'i, T> ParseErrorKind<'i, T> {
 
 /// Extensible parse errors that can be encountered by client parsing implementations.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ParseError<'i, E: 'i> {
+pub struct ParseError<'i, E> {
     /// Details of this error
     pub kind: ParseErrorKind<'i, E>,
     /// Location where this error occurred
@@ -244,7 +244,7 @@ impl<'i> ParserInput<'i> {
 /// A CSS parser that borrows its `&str` input,
 /// yields `Token`s,
 /// and keeps track of nested blocks and functions.
-pub struct Parser<'i: 't, 't> {
+pub struct Parser<'i, 't> {
     input: &'t mut ParserInput<'i>,
     /// If `Some(_)`, .parse_nested_block() can be called.
     at_start_of: Option<BlockType>,
@@ -553,7 +553,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// The old name of `try_parse`, which requires raw identifiers in the Rust 2018 edition.
     #[inline]
-    pub fn try<F, T, E>(&mut self, thing: F) -> Result<T, E>
+    pub fn r#try<F, T, E>(&mut self, thing: F) -> Result<T, E>
     where
         F: FnOnce(&mut Parser<'i, 't>) -> Result<T, E>,
     {
