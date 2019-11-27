@@ -3,6 +3,7 @@ name = "cssparser"
 version = "0.27.2"
 authors = [ "Simon Sapin <simon.sapin@exyr.org>" ]
 
+
 description = "Rust implementation of CSS Syntax Level 3"
 documentation = "https://docs.rs/cssparser/"
 repository = "https://github.com/servo/rust-cssparser"
