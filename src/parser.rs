@@ -59,7 +59,7 @@ impl<'i> BasicParseErrorKind<'i> {
     fn description(&self) -> String {
         match self {
             BasicParseErrorKind::UnexpectedToken(token) => {
-                format!("Unexpected token: '{}'", token.description())
+                format!("Unexpected token: {:?}", token)
             }
             BasicParseErrorKind::EndOfInput => "End of input".to_owned(),
             BasicParseErrorKind::AtRuleInvalid(message) => format!("Invalid @ rule: {}", message),
