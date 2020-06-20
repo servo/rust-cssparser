@@ -199,14 +199,23 @@ pub fn _extract_input(derive_input: &str) -> &str {
     let mut input = derive_input;
 
     for expected in &[
-        "#[allow(unused)]",
+        "#",
+        "[",
+        "allow",
+        "(",
+        "unused",
+        ")",
+        "]",
         "enum",
         "ProceduralMasqueradeDummyType",
         "{",
         "Input",
         "=",
-        "(0,",
-        "stringify!",
+        "(",
+        "0",
+        ",",
+        "stringify",
+        "!",
         "(",
     ] {
         input = input.trim_start();
@@ -219,7 +228,7 @@ pub fn _extract_input(derive_input: &str) -> &str {
         input = &input[expected.len()..];
     }
 
-    for expected in [")", ").0,", "}"].iter().rev() {
+    for expected in [")", ")", ".", "0", ",", "}"].iter().rev() {
         input = input.trim_end();
         assert!(
             input.ends_with(expected),
@@ -268,7 +277,7 @@ macro_rules! define_invoke_proc_macro {
                                             // which is then ignored.
                                             // Using `stringify!` enables passing arbitrary tokens
                                             // rather than only what can be parsed as a const expression.
-                                            Input = (0, stringify! $paren ).0
+                                            Input = (0, stringify! $paren ).0,
                                         }
                                     }
                                 }
