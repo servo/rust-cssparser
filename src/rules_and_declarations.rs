@@ -267,7 +267,9 @@ where
         loop {
             let start = self.input.state();
             match self.input.next_including_whitespace_and_comments() {
-                Ok(&Token::WhiteSpace(_)) | Ok(&Token::Comment(_)) | Ok(&Token::Semicolon) => continue,
+                Ok(&Token::WhiteSpace(_)) | Ok(&Token::Comment(_)) | Ok(&Token::Semicolon) => {
+                    continue
+                }
                 Ok(&Token::Ident(ref name)) => {
                     let name = name.clone();
                     let result = {
@@ -288,9 +290,7 @@ where
                 Ok(token) => {
                     let token = token.clone();
                     let result = self.input.parse_until_after(Delimiter::Semicolon, |_| {
-                        Err(start
-                            .source_location()
-                            .new_unexpected_token_error(token))
+                        Err(start.source_location().new_unexpected_token_error(token))
                     });
                     return Some(result.map_err(|e| (e, self.input.slice_from(start.position()))));
                 }
@@ -370,15 +370,13 @@ where
             let start = self.input.state();
 
             let at_keyword = match self.input.next_byte()? {
-                b'@' => {
-                    match self.input.next_including_whitespace_and_comments() {
-                        Ok(&Token::AtKeyword(ref name)) => Some(name.clone()),
-                        _ => {
-                            self.input.reset(&start);
-                            None
-                        },
+                b'@' => match self.input.next_including_whitespace_and_comments() {
+                    Ok(&Token::AtKeyword(ref name)) => Some(name.clone()),
+                    _ => {
+                        self.input.reset(&start);
+                        None
                     }
-                }
+                },
                 _ => None,
             };
 
