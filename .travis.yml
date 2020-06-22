@@ -6,6 +6,12 @@ rust:
   - 1.36.0
 
 script:
+  - |
+    if [[ $TRAVIS_RUST_VERSION == "stable" ]]
+    then
+      rustup component add rustfmt
+      cargo fmt --all -- --check || (echo "Please reformat your code with 'cargo fmt'"; false)
+    fi
   - cargo build --verbose
   - cargo test --verbose
   - cargo doc --verbose
