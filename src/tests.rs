@@ -16,8 +16,8 @@ use super::{
     parse_important, parse_nth, parse_one_declaration, parse_one_rule, stylesheet_encoding,
     AtRuleParser, AtRuleType, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
     DeclarationListParser, DeclarationParser, Delimiter, EncodingSupport, ParseError,
-    ParseErrorKind, Parser, ParserInput, QualifiedRuleParser, RuleListParser, SourceLocation,
-    ToCss, Token, TokenSerializationType, UnicodeRange, RGBA,
+    ParseErrorKind, Parser, ParserInput, ParserState, QualifiedRuleParser, RuleListParser,
+    SourceLocation, ToCss, Token, TokenSerializationType, UnicodeRange, RGBA,
 };
 
 macro_rules! JArray {
@@ -946,7 +946,7 @@ impl<'i> AtRuleParser<'i> for JsonParser {
         }
     }
 
-    fn rule_without_block(&mut self, mut prelude: Vec<Value>, _location: SourceLocation) -> Value {
+    fn rule_without_block(&mut self, mut prelude: Vec<Value>, _: &ParserState) -> Value {
         prelude.push(Value::Null);
         Value::Array(prelude)
     }
@@ -954,7 +954,7 @@ impl<'i> AtRuleParser<'i> for JsonParser {
     fn parse_block<'t>(
         &mut self,
         mut prelude: Vec<Value>,
-        _location: SourceLocation,
+        _: &ParserState,
         input: &mut Parser<'i, 't>,
     ) -> Result<Value, ParseError<'i, ()>> {
         prelude.push(Value::Array(component_values_to_json(input)));
@@ -977,7 +977,7 @@ impl<'i> QualifiedRuleParser<'i> for JsonParser {
     fn parse_block<'t>(
         &mut self,
         prelude: Vec<Value>,
-        _location: SourceLocation,
+        _: &ParserState,
         input: &mut Parser<'i, 't>,
     ) -> Result<Value, ParseError<'i, ()>> {
         Ok(JArray![
