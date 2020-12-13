@@ -38,4 +38,4 @@ bench = []
 dummy_match_byte = []
 
 [workspace]
-members = [".", "./macros", "./procedural-masquerade"]
+members = [".", "./macros"]
