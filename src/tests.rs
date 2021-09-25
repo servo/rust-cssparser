@@ -631,7 +631,6 @@ fn line_numbers() {
 
 #[test]
 fn overflow() {
-    use std::f32;
     use std::iter::repeat;
 
     let css = r"
