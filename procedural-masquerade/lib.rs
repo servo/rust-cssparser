@@ -137,7 +137,7 @@
 //! ## For users
 //!
 //! Users of `libfoo` don’t need to worry about any of these implementation details.
-//! They can use the `foo_stringify` macro as if it were a simle `macro_rules` macro:
+//! They can use the `foo_stringify` macro as if it were a simple `macro_rules` macro:
 //!
 //! ```rust
 //! #[macro_use] extern crate libfoo;
@@ -264,7 +264,7 @@ macro_rules! define_invoke_proc_macro {
                     // because that is the only case where a type definition
                     // can contain a (const) expression.
                     //
-                    // `(0, "foo").0` evalutes to 0, with the `"foo"` part ignored.
+                    // `(0, "foo").0` evaluates to 0, with the `"foo"` part ignored.
                     //
                     // By the time the `#[proc_macro_derive]` function
                     // implementing `#[derive($proc_macro_name)]` is called,

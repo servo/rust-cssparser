@@ -96,7 +96,7 @@
 
 {"css_bytes": "@charset \"ISO-8859-5\"; @\u00E9",
  "protocol_encoding": "kamoulox",
- "comment": "Unknow protocol encoding falls back to @charset"},
+ "comment": "Unknown protocol encoding falls back to @charset"},
 [[["at-rule", "щ", [], null]],
  "iso-8859-5"],
 
