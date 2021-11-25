@@ -565,6 +565,7 @@ where
     let (red, green, blue, uses_commas) = match_ignore_ascii_case! { name,
         "rgb" | "rgba" => parse_rgb_components_rgb(component_parser, arguments)?,
         "hsl" | "hsla" => parse_rgb_components_hsl(component_parser, arguments)?,
+        "hwb" => parse_rgb_components_hwb(component_parser, arguments)?,
         _ => return Err(arguments.new_unexpected_token_error(Token::Ident(name.to_owned().into()))),
     };
 
@@ -653,6 +654,65 @@ where
     let lightness = component_parser.parse_percentage(arguments)?;
     let lightness = lightness.max(0.).min(1.);
 
+    let (red, green, blue) = hsl_to_rgb(hue, saturation, lightness);
+    let red = clamp_unit_f32(red);
+    let green = clamp_unit_f32(green);
+    let blue = clamp_unit_f32(blue);
+    Ok((red, green, blue, uses_commas))
+}
+
+#[inline]
+fn parse_rgb_components_hwb<'i, 't, ComponentParser>(
+    component_parser: &ComponentParser,
+    arguments: &mut Parser<'i, 't>,
+) -> Result<(u8, u8, u8, bool), ParseError<'i, ComponentParser::Error>>
+where
+    ComponentParser: ColorComponentParser<'i>,
+{
+    let hue_degrees = component_parser.parse_angle_or_number(arguments)?.degrees();
+
+    // Subtract an integer before rounding, to avoid some rounding errors:
+    let hue_normalized_degrees = hue_degrees - 360. * (hue_degrees / 360.).floor();
+    let hue = hue_normalized_degrees / 360.;
+
+    let uses_commas = arguments.try_parse(|i| i.expect_comma()).is_ok();
+
+    let whiteness = component_parser.parse_percentage(arguments)?;
+    let whiteness = whiteness.max(0.).min(1.);
+
+    if uses_commas {
+        arguments.expect_comma()?;
+    }
+
+    let blackness = component_parser.parse_percentage(arguments)?;
+    let blackness = blackness.max(0.).min(1.);
+
+    let (red, green, blue) = hwb_to_rgb(hue, whiteness, blackness);
+
+    let red = clamp_unit_f32(red);
+    let green = clamp_unit_f32(green);
+    let blue = clamp_unit_f32(blue);
+    Ok((red, green, blue, uses_commas))
+}
+
+/// https://drafts.csswg.org/css-color-4/#hwb-to-rgb
+#[inline]
+fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
+    if w + b >= 1.0 {
+        let gray = w / (w + b);
+        return (gray, gray, gray);
+    }
+
+    let (mut red, mut green, mut blue) = hsl_to_rgb(h, 1.0, 0.5);
+    let x = 1.0 - w - b;
+    red = red * x + w;
+    green = green * x + w;
+    blue = blue * x + w;
+    (red, green, blue)
+}
+
+#[inline]
+fn hsl_to_rgb(hue: f32, saturation: f32, lightness: f32) -> (f32, f32, f32) {
     // https://drafts.csswg.org/css-color/#hsl-color
     // except with h pre-multiplied by 3, to avoid some rounding errors.
     fn hue_to_rgb(m1: f32, m2: f32, mut h3: f32) -> f32 {
@@ -680,8 +740,8 @@ where
     };
     let m1 = lightness * 2. - m2;
     let hue_times_3 = hue * 3.;
-    let red = clamp_unit_f32(hue_to_rgb(m1, m2, hue_times_3 + 1.));
-    let green = clamp_unit_f32(hue_to_rgb(m1, m2, hue_times_3));
-    let blue = clamp_unit_f32(hue_to_rgb(m1, m2, hue_times_3 - 1.));
-    return Ok((red, green, blue, uses_commas));
+    let red = hue_to_rgb(m1, m2, hue_times_3 + 1.);
+    let green = hue_to_rgb(m1, m2, hue_times_3);
+    let blue = hue_to_rgb(m1, m2, hue_times_3 - 1.);
+    (red, green, blue)
 }
