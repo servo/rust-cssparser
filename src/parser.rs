@@ -55,16 +55,16 @@ pub enum BasicParseErrorKind<'i> {
     QualifiedRuleInvalid,
 }
 
-impl<'i> BasicParseErrorKind<'i> {
-    fn description(&self) -> String {
+impl<'i> fmt::Display for BasicParseErrorKind<'i> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
             BasicParseErrorKind::UnexpectedToken(token) => {
-                format!("Unexpected token: {:?}", token)
+                write!(formatter, "Unexpected token: {:?}", token)
             }
-            BasicParseErrorKind::EndOfInput => "End of input".to_owned(),
-            BasicParseErrorKind::AtRuleInvalid(message) => format!("Invalid @ rule: {}", message),
-            BasicParseErrorKind::AtRuleBodyInvalid => "Invalid @ rule body".to_owned(),
-            BasicParseErrorKind::QualifiedRuleInvalid => "Invalid qualified rule".to_owned(),
+            BasicParseErrorKind::EndOfInput => formatter.write_str("End of input"),
+            BasicParseErrorKind::AtRuleInvalid(message) => write!(formatter, "Invalid @ rule: {}", message),
+            BasicParseErrorKind::AtRuleBodyInvalid => formatter.write_str("Invalid @ rule body"),
+            BasicParseErrorKind::QualifiedRuleInvalid => formatter.write_str("Invalid qualified rule"),
         }
     }
 }
@@ -79,7 +79,7 @@ pub struct BasicParseError<'i> {
 
 impl<'i> fmt::Display for BasicParseError<'i> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str(self.kind.description().as_str())
+        self.kind.fmt(formatter)
     }
 }
 
@@ -189,7 +189,7 @@ where
 {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match &self.kind {
-            ParseErrorKind::Basic(basic_kind) => formatter.write_str(&basic_kind.description()),
+            ParseErrorKind::Basic(basic_kind) => basic_kind.fmt(formatter),
             ParseErrorKind::Custom(custom_type) => custom_type.fmt(formatter),
         }
     }
