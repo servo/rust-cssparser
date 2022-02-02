@@ -14,10 +14,10 @@ use self::test::Bencher;
 
 use super::{
     parse_important, parse_nth, parse_one_declaration, parse_one_rule, stylesheet_encoding,
-    AtRuleParser, AtRuleType, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
+    AtRuleParser, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
     DeclarationListParser, DeclarationParser, Delimiter, EncodingSupport, ParseError,
-    ParseErrorKind, Parser, ParserInput, QualifiedRuleParser, RuleListParser, SourceLocation,
-    ToCss, Token, TokenSerializationType, UnicodeRange, RGBA,
+    ParseErrorKind, Parser, ParserInput, ParserState, QualifiedRuleParser, RuleListParser,
+    SourceLocation, ToCss, Token, TokenSerializationType, UnicodeRange, RGBA,
 };
 
 macro_rules! JArray {
@@ -386,6 +386,13 @@ fn color3_keywords() {
 }
 
 #[test]
+fn color4_hwb() {
+    run_color_tests(include_str!("css-parsing-tests/color4_hwb.json"), |c| {
+        c.ok().map(|v| v.to_json()).unwrap_or(Value::Null)
+    })
+}
+
+#[test]
 fn nth() {
     run_json_tests(include_str!("css-parsing-tests/An+B.json"), |input| {
         input
@@ -469,11 +476,10 @@ fn serializer(preserve_comments: bool) {
                         _ => None,
                     };
                     if let Some(closing_token) = closing_token {
-                        let result: Result<_, ParseError<()>> =
-                            input.parse_nested_block(|input| {
-                                write_to(previous_token, input, string, preserve_comments);
-                                Ok(())
-                            });
+                        let result: Result<_, ParseError<()>> = input.parse_nested_block(|input| {
+                            write_to(previous_token, input, string, preserve_comments);
+                            Ok(())
+                        });
                         result.unwrap();
                         closing_token.to_css(string).unwrap();
                     }
@@ -923,8 +929,7 @@ impl<'i> DeclarationParser<'i> for JsonParser {
 }
 
 impl<'i> AtRuleParser<'i> for JsonParser {
-    type PreludeNoBlock = Vec<Value>;
-    type PreludeBlock = Vec<Value>;
+    type Prelude = Vec<Value>;
     type AtRule = Value;
     type Error = ();
 
@@ -932,30 +937,29 @@ impl<'i> AtRuleParser<'i> for JsonParser {
         &mut self,
         name: CowRcStr<'i>,
         input: &mut Parser<'i, 't>,
-    ) -> Result<AtRuleType<Vec<Value>, Vec<Value>>, ParseError<'i, ()>> {
+    ) -> Result<Vec<Value>, ParseError<'i, ()>> {
         let prelude = vec![
             "at-rule".to_json(),
             name.to_json(),
             Value::Array(component_values_to_json(input)),
         ];
         match_ignore_ascii_case! { &*name,
-            "media" | "foo-with-block" => Ok(AtRuleType::WithBlock(prelude)),
             "charset" => {
                 Err(input.new_error(BasicParseErrorKind::AtRuleInvalid(name.clone()).into()))
             },
-            _ => Ok(AtRuleType::WithoutBlock(prelude)),
+            _ => Ok(prelude),
         }
     }
 
-    fn rule_without_block(&mut self, mut prelude: Vec<Value>, _location: SourceLocation) -> Value {
+    fn rule_without_block(&mut self, mut prelude: Vec<Value>, _: &ParserState) -> Result<Value, ()> {
         prelude.push(Value::Null);
-        Value::Array(prelude)
+        Ok(Value::Array(prelude))
     }
 
     fn parse_block<'t>(
         &mut self,
         mut prelude: Vec<Value>,
-        _location: SourceLocation,
+        _: &ParserState,
         input: &mut Parser<'i, 't>,
     ) -> Result<Value, ParseError<'i, ()>> {
         prelude.push(Value::Array(component_values_to_json(input)));
@@ -978,7 +982,7 @@ impl<'i> QualifiedRuleParser<'i> for JsonParser {
     fn parse_block<'t>(
         &mut self,
         prelude: Vec<Value>,
-        _location: SourceLocation,
+        _: &ParserState,
         input: &mut Parser<'i, 't>,
     ) -> Result<Value, ParseError<'i, ()>> {
         Ok(JArray![

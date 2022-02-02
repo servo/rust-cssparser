@@ -68,8 +68,7 @@ impl<'i> BasicParseErrorKind<'i> {
         }
     }
 }
-
-/// The funamental parsing errors that can be triggered by built-in parsing routines.
+/// The fundamental parsing errors that can be triggered by built-in parsing routines.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BasicParseError<'i> {
     /// Details of this error
@@ -693,7 +692,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     ///
     /// Successful results are accumulated in a vector.
     ///
-    /// This method retuns `Err(())` the first time that a closure call does,
+    /// This method returns `Err(())` the first time that a closure call does,
     /// or if a closure call leaves some input before the next comma or the end of the input.
     #[inline]
     pub fn parse_comma_separated<F, T, E>(
@@ -982,17 +981,15 @@ impl<'i: 't, 't> Parser<'i, 't> {
                 Ok(&Token::Function(_))
                 | Ok(&Token::ParenthesisBlock)
                 | Ok(&Token::SquareBracketBlock)
-                | Ok(&Token::CurlyBracketBlock) => {
-                    self.parse_nested_block(|input| {
-                        input.expect_no_error_token().map_err(Into::into)
-                    }).map_err(ParseError::<()>::basic)?
-                }
+                | Ok(&Token::CurlyBracketBlock) => self
+                    .parse_nested_block(|input| input.expect_no_error_token().map_err(Into::into))
+                    .map_err(ParseError::<()>::basic)?,
                 Ok(t) => {
                     // FIXME: maybe these should be separate variants of
                     // BasicParseError instead?
                     if t.is_parse_error() {
                         let token = t.clone();
-                        return Err(self.new_basic_unexpected_token_error(token))
+                        return Err(self.new_basic_unexpected_token_error(token));
                     }
                 }
                 Err(_) => return Ok(()),
