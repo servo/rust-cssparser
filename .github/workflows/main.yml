@@ -16,7 +16,7 @@ jobs:
           - nightly
           - beta
           - stable
-          - 1.36.0
+          - 1.40.0
         features:
           -
           - --features dummy_match_byte
