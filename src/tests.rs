@@ -9,15 +9,17 @@ use encoding_rs;
 use matches::matches;
 use serde_json::{self, json, Map, Value};
 
+use crate::{AbsoluteColor, RGBA};
+
 #[cfg(feature = "bench")]
 use self::test::Bencher;
 
 use super::{
-    parse_important, parse_nth, parse_one_declaration, parse_one_rule, stylesheet_encoding,
-    AtRuleParser, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
+    color::rgba, parse_important, parse_nth, parse_one_declaration, parse_one_rule,
+    stylesheet_encoding, AtRuleParser, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
     DeclarationListParser, DeclarationParser, Delimiter, EncodingSupport, ParseError,
     ParseErrorKind, Parser, ParserInput, ParserState, QualifiedRuleParser, RuleListParser,
-    SourceLocation, ToCss, Token, TokenSerializationType, UnicodeRange, RGBA,
+    SourceLocation, ToCss, Token, TokenSerializationType, UnicodeRange,
 };
 
 macro_rules! JArray {
@@ -393,6 +395,21 @@ fn color4_hwb() {
 }
 
 #[test]
+fn color4_lab_lch_oklab_oklch() {
+    run_color_tests(
+        include_str!("css-parsing-tests/color4_lab_lch_oklab_oklch.json"),
+        |c| match c {
+            Ok(color) => {
+                let mut s = String::new();
+                color.to_css(&mut s).unwrap();
+                Value::Array(vec![color.to_json(), s.to_json()])
+            }
+            Err(_) => Value::Null,
+        },
+    )
+}
+
+#[test]
 fn nth() {
     run_json_tests(include_str!("css-parsing-tests/An+B.json"), |input| {
         input
@@ -527,19 +544,19 @@ fn serialize_current_color() {
 
 #[test]
 fn serialize_rgb_full_alpha() {
-    let c = Color::RGBA(RGBA::new(255, 230, 204, 255));
+    let c = rgba(255, 230, 204, 255);
     assert_eq!(c.to_css_string(), "rgb(255, 230, 204)");
 }
 
 #[test]
 fn serialize_rgba() {
-    let c = Color::RGBA(RGBA::new(26, 51, 77, 32));
+    let c = rgba(26, 51, 77, 32);
     assert_eq!(c.to_css_string(), "rgba(26, 51, 77, 0.125)");
 }
 
 #[test]
 fn serialize_rgba_two_digit_float_if_roundtrips() {
-    let c = Color::RGBA(RGBA::from_floats(0., 0., 0., 0.5));
+    let c = Color::Absolute(AbsoluteColor::RGBA(RGBA::from_floats(0., 0., 0., 0.5)));
     assert_eq!(c.to_css_string(), "rgba(0, 0, 0, 0.5)");
 }
 
@@ -831,8 +848,16 @@ where
 impl ToJson for Color {
     fn to_json(&self) -> Value {
         match *self {
-            Color::RGBA(ref rgba) => json!([rgba.red, rgba.green, rgba.blue, rgba.alpha]),
             Color::CurrentColor => "currentcolor".to_json(),
+            Color::Absolute(absolute) => match absolute {
+                AbsoluteColor::RGBA(ref rgba) => {
+                    json!([rgba.red, rgba.green, rgba.blue, rgba.alpha])
+                }
+                AbsoluteColor::LAB(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
+                AbsoluteColor::LCH(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
+                AbsoluteColor::OKLAB(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
+                AbsoluteColor::OKLCH(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
+            },
         }
     }
 }
@@ -951,7 +976,11 @@ impl<'i> AtRuleParser<'i> for JsonParser {
         }
     }
 
-    fn rule_without_block(&mut self, mut prelude: Vec<Value>, _: &ParserState) -> Result<Value, ()> {
+    fn rule_without_block(
+        &mut self,
+        mut prelude: Vec<Value>,
+        _: &ParserState,
+    ) -> Result<Value, ()> {
         prelude.push(Value::Null);
         Ok(Value::Array(prelude))
     }
