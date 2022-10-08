@@ -11,6 +11,7 @@ use super::{BasicParseError, ParseError, Parser, ToCss, Token};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// A color with red, green, blue, and alpha components, in a byte each.
+/// https://w3c.github.io/csswg-drafts/css-color-4/#resolving-sRGB-values
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
 pub struct RGBA {
@@ -130,6 +131,7 @@ impl ToCss for RGBA {
 }
 
 /// A <color> value.
+/// https://w3c.github.io/csswg-drafts/css-color-4/#color-syntax
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Color {
     /// The 'currentcolor' keyword
@@ -165,15 +167,6 @@ pub enum NumberOrPercentage {
     },
 }
 
-impl NumberOrPercentage {
-    fn unit_value(&self) -> f32 {
-        match *self {
-            NumberOrPercentage::Number { value } => value,
-            NumberOrPercentage::Percentage { unit_value } => unit_value,
-        }
-    }
-}
-
 /// Either an angle or a number.
 pub enum AngleOrNumber {
     /// `<number>`.
@@ -188,13 +181,16 @@ pub enum AngleOrNumber {
     },
 }
 
-impl AngleOrNumber {
-    fn degrees(&self) -> f32 {
-        match *self {
-            AngleOrNumber::Number { value } => value,
-            AngleOrNumber::Angle { degrees } => degrees,
-        }
-    }
+/// https://w3c.github.io/csswg-drafts/css-color-4/#hue-syntax
+pub struct Hue {
+    /// The value as a number of degrees.
+    degrees: f32,
+}
+
+/// https://w3c.github.io/csswg-drafts/css-color-4/#alpha-syntax
+pub struct AlphaValue {
+    /// The value as a number in the range of 0 to 1.
+    number: f32,
 }
 
 /// A trait that can be used to hook into how `cssparser` parses color
@@ -259,6 +255,48 @@ pub trait ColorComponentParser<'i> {
         Ok(match *input.next()? {
             Token::Number { value, .. } => NumberOrPercentage::Number { value },
             Token::Percentage { unit_value, .. } => NumberOrPercentage::Percentage { unit_value },
+            ref t => return Err(location.new_unexpected_token_error(t.clone())),
+        })
+    }
+
+    /// Parse a `<hue>` value.
+    /// https://w3c.github.io/csswg-drafts/css-color-4/#typedef-hue
+    fn parse_hue<'t>(
+        &self,
+        input: &mut Parser<'i, 't>,
+    ) -> Result<Hue, ParseError<'i, Self::Error>> {
+        let location = input.current_source_location();
+        Ok(match *input.next()? {
+            Token::Number { value: degrees, .. } => Hue { degrees },
+            Token::Dimension {
+                value: v, ref unit, ..
+            } => {
+                let degrees = match_ignore_ascii_case! { &*unit,
+                    "deg" => v,
+                    "grad" => (v / 400.) * 360.,
+                    "rad" => (v / (2. * PI)) * 360.,
+                    "turn" => v * 360.,
+                    _ => return Err(location.new_unexpected_token_error(Token::Ident(unit.clone()))),
+                };
+
+                Hue { degrees }
+            }
+            ref t => return Err(location.new_unexpected_token_error(t.clone())),
+        })
+    }
+
+    /// Parse a `<alpha-value>` value.
+    /// https://w3c.github.io/csswg-drafts/css-color-4/#typedef-alpha-value
+    fn parse_alpha_value<'t>(
+        &self,
+        input: &mut Parser<'i, 't>,
+    ) -> Result<AlphaValue, ParseError<'i, Self::Error>> {
+        let location = input.current_source_location();
+        Ok(match *input.next()? {
+            Token::Number { value: number, .. } => AlphaValue { number },
+            Token::Percentage {
+                unit_value: number, ..
+            } => AlphaValue { number },
             ref t => return Err(location.new_unexpected_token_error(t.clone())),
         })
     }
@@ -350,6 +388,8 @@ fn rgba(red: u8, green: u8, blue: u8, alpha: u8) -> Color {
 /// Matching is case-insensitive in the ASCII range.
 /// CSS escaping (if relevant) should be resolved before calling this function.
 /// (For example, the value of an `Ident` token is fine.)
+///
+/// https://w3c.github.io/csswg-drafts/css-color-4/#color-keywords
 #[inline]
 pub fn parse_color_keyword(ident: &str) -> Result<Color, ()> {
     macro_rules! rgb {
@@ -562,26 +602,11 @@ fn parse_color_function<'i, 't, ComponentParser>(
 where
     ComponentParser: ColorComponentParser<'i>,
 {
-    let (red, green, blue, uses_commas) = match_ignore_ascii_case! { name,
+    let (red, green, blue, alpha) = match_ignore_ascii_case! { name,
         "rgb" | "rgba" => parse_rgb_components_rgb(component_parser, arguments)?,
-        "hsl" | "hsla" => parse_hsl_hwb(component_parser, arguments, hsl_to_rgb, /* allow_comma = */ true)?,
-        "hwb" => parse_hsl_hwb(component_parser, arguments, hwb_to_rgb, /* allow_comma = */ false)?,
+        "hsl" | "hsla" => parse_rgb_components_hsl(component_parser, arguments)?,
+        "hwb" => parse_rgb_components_hwb(component_parser, arguments)?,
         _ => return Err(arguments.new_unexpected_token_error(Token::Ident(name.to_owned().into()))),
-    };
-
-    let alpha = if !arguments.is_exhausted() {
-        if uses_commas {
-            arguments.expect_comma()?;
-        } else {
-            arguments.expect_delim('/')?;
-        };
-        clamp_unit_f32(
-            component_parser
-                .parse_number_or_percentage(arguments)?
-                .unit_value(),
-        )
-    } else {
-        255
     };
 
     arguments.expect_exhausted()?;
@@ -589,82 +614,220 @@ where
 }
 
 #[inline]
+fn parse_alpha_component<'i, 't, ComponentParser>(
+    component_parser: &ComponentParser,
+    arguments: &mut Parser<'i, 't>,
+) -> Result<f32, ParseError<'i, ComponentParser::Error>>
+where
+    ComponentParser: ColorComponentParser<'i>,
+{
+    Ok(if !arguments.is_exhausted() {
+        arguments.expect_delim('/')?;
+
+        component_parser.parse_alpha_value(arguments)?.number
+    } else {
+        1.
+    })
+}
+
+/// https://w3c.github.io/csswg-drafts/css-color-4/#rgb-functions
+#[inline]
 fn parse_rgb_components_rgb<'i, 't, ComponentParser>(
     component_parser: &ComponentParser,
     arguments: &mut Parser<'i, 't>,
-) -> Result<(u8, u8, u8, bool), ParseError<'i, ComponentParser::Error>>
+) -> Result<(u8, u8, u8, u8), ParseError<'i, ComponentParser::Error>>
 where
     ComponentParser: ColorComponentParser<'i>,
 {
-    // Either integers or percentages, but all the same type.
-    // https://drafts.csswg.org/css-color/#rgb-functions
-    let (red, is_number) = match component_parser.parse_number_or_percentage(arguments)? {
-        NumberOrPercentage::Number { value } => (clamp_floor_256_f32(value), true),
-        NumberOrPercentage::Percentage { unit_value } => (clamp_unit_f32(unit_value), false),
-    };
+    // Try to parse legacy syntax first.
+    let legacy_syntax_result = arguments.try_parse(|input| {
+        input.parse_entirely(|input| {
+            // Determine whether this is the number syntax or the percentage syntax.
+            let red_number = input.try_parse(|input| input.expect_number());
 
-    let uses_commas = arguments.try_parse(|i| i.expect_comma()).is_ok();
+            let red;
+            let green;
+            let blue;
+            if red_number.is_ok() {
+                red = clamp_floor_256_f32(red_number?);
 
-    let green;
-    let blue;
-    if is_number {
-        green = clamp_floor_256_f32(component_parser.parse_number(arguments)?);
-        if uses_commas {
-            arguments.expect_comma()?;
-        }
-        blue = clamp_floor_256_f32(component_parser.parse_number(arguments)?);
-    } else {
-        green = clamp_unit_f32(component_parser.parse_percentage(arguments)?);
-        if uses_commas {
-            arguments.expect_comma()?;
-        }
-        blue = clamp_unit_f32(component_parser.parse_percentage(arguments)?);
+                input.expect_comma()?;
+
+                green = clamp_floor_256_f32(input.expect_number()?);
+
+                input.expect_comma()?;
+
+                blue = clamp_floor_256_f32(input.expect_number()?);
+            } else {
+                red = clamp_unit_f32(input.expect_percentage()?);
+
+                input.expect_comma()?;
+
+                green = clamp_unit_f32(input.expect_percentage()?);
+
+                input.expect_comma()?;
+
+                blue = clamp_unit_f32(input.expect_percentage()?);
+            }
+
+            let alpha;
+            if !input.is_exhausted() {
+                input.expect_comma()?;
+
+                alpha = clamp_unit_f32(component_parser.parse_alpha_value(input)?.number);
+            } else {
+                alpha = clamp_unit_f32(1.);
+            }
+
+            Ok((red, green, blue, alpha))
+        })
+    });
+
+    if legacy_syntax_result.is_ok() {
+        return legacy_syntax_result;
     }
 
-    Ok((red, green, blue, uses_commas))
+    // Determine whether this is the number syntax or the percentage syntax.
+    let number_result: Result<
+        (f32, f32, f32),
+        ParseError<<ComponentParser as ColorComponentParser>::Error>,
+    > = arguments.try_parse(|input| {
+        let red_number = component_parser.parse_number(input)?;
+        let green_number = component_parser.parse_number(input)?;
+        let blue_number = component_parser.parse_number(input)?;
+
+        Ok((red_number, green_number, blue_number))
+    });
+
+    let computed_red;
+    let computed_green;
+    let computed_blue;
+    if number_result.is_ok() {
+        let (red_number, green_number, blue_number) = number_result?;
+
+        computed_red = clamp_floor_256_f32(red_number);
+        computed_green = clamp_floor_256_f32(green_number);
+        computed_blue = clamp_floor_256_f32(blue_number);
+    } else {
+        let red_percentage = component_parser.parse_percentage(arguments)?;
+        let green_percentage = component_parser.parse_percentage(arguments)?;
+        let blue_percentage = component_parser.parse_percentage(arguments)?;
+
+        computed_red = clamp_unit_f32(red_percentage);
+        computed_green = clamp_unit_f32(green_percentage);
+        computed_blue = clamp_unit_f32(blue_percentage);
+    }
+
+    let computed_alpha = clamp_unit_f32(parse_alpha_component(component_parser, arguments)?);
+
+    Ok((computed_red, computed_green, computed_blue, computed_alpha))
 }
 
-/// Parses hsl and hbw syntax, which happens to be identical.
-///
-/// https://drafts.csswg.org/css-color/#the-hsl-notation
-/// https://drafts.csswg.org/css-color/#the-hbw-notation
 #[inline]
-fn parse_hsl_hwb<'i, 't, ComponentParser>(
+fn fix_hue_rounding_errors(value: f32) -> f32 {
+    // Subtract an integer before rounding, to avoid some rounding errors.
+    (value - 360. * (value / 360.).floor()) / 360.
+}
+
+/// https://w3c.github.io/csswg-drafts/css-color-4/#the-hsl-notation
+#[inline]
+fn parse_rgb_components_hsl<'i, 't, ComponentParser>(
     component_parser: &ComponentParser,
     arguments: &mut Parser<'i, 't>,
-    to_rgb: impl FnOnce(f32, f32, f32) -> (f32, f32, f32),
-    allow_comma: bool,
-) -> Result<(u8, u8, u8, bool), ParseError<'i, ComponentParser::Error>>
+) -> Result<(u8, u8, u8, u8), ParseError<'i, ComponentParser::Error>>
 where
     ComponentParser: ColorComponentParser<'i>,
 {
-    // Hue given as an angle
-    // https://drafts.csswg.org/css-values/#angles
-    let hue_degrees = component_parser.parse_angle_or_number(arguments)?.degrees();
+    // Try to parse legacy syntax first.
+    let legacy_syntax_result = arguments.try_parse(|input| {
+        input.parse_entirely(|input| {
+            let computed_hue = fix_hue_rounding_errors(component_parser.parse_hue(input)?.degrees);
 
-    // Subtract an integer before rounding, to avoid some rounding errors:
-    let hue_normalized_degrees = hue_degrees - 360. * (hue_degrees / 360.).floor();
-    let hue = hue_normalized_degrees / 360.;
+            input.expect_comma()?;
 
-    // Saturation and lightness are clamped to 0% ... 100%
-    let uses_commas = allow_comma && arguments.try_parse(|i| i.expect_comma()).is_ok();
+            let computed_saturation = input.expect_percentage()?;
 
-    let first_percentage = component_parser.parse_percentage(arguments)?.max(0.).min(1.);
+            input.expect_comma()?;
 
-    if uses_commas {
-        arguments.expect_comma()?;
+            let computed_lightness = input.expect_percentage()?;
+
+            let computed_alpha;
+            if !input.is_exhausted() {
+                input.expect_comma()?;
+
+                computed_alpha = component_parser.parse_alpha_value(input)?.number;
+            } else {
+                computed_alpha = 1.;
+            }
+
+            Ok((
+                computed_hue,
+                computed_saturation,
+                computed_lightness,
+                computed_alpha,
+            ))
+        })
+    });
+
+    let computed_hue;
+    let computed_saturation;
+    let computed_lightness;
+    let computed_alpha;
+    if legacy_syntax_result.is_ok() {
+        (
+            computed_hue,
+            computed_saturation,
+            computed_lightness,
+            computed_alpha,
+        ) = legacy_syntax_result?;
+    } else {
+        computed_hue = fix_hue_rounding_errors(component_parser.parse_hue(arguments)?.degrees);
+
+        computed_saturation = component_parser.parse_percentage(arguments)?.clamp(0., 1.);
+
+        computed_lightness = component_parser.parse_percentage(arguments)?.clamp(0., 1.);
+
+        computed_alpha = parse_alpha_component(component_parser, arguments)?;
     }
 
-    let second_percentage = component_parser.parse_percentage(arguments)?.max(0.).min(1.);
+    let (red, green, blue) = hsl_to_rgb(computed_hue, computed_saturation, computed_lightness);
 
-    let (red, green, blue) = to_rgb(hue, first_percentage, second_percentage);
-    let red = clamp_unit_f32(red);
-    let green = clamp_unit_f32(green);
-    let blue = clamp_unit_f32(blue);
-    Ok((red, green, blue, uses_commas))
+    Ok((
+        clamp_unit_f32(red),
+        clamp_unit_f32(green),
+        clamp_unit_f32(blue),
+        clamp_unit_f32(computed_alpha),
+    ))
 }
 
-/// https://drafts.csswg.org/css-color-4/#hwb-to-rgb
+/// https://w3c.github.io/csswg-drafts/css-color-4/#the-hwb-notation
+#[inline]
+fn parse_rgb_components_hwb<'i, 't, ComponentParser>(
+    component_parser: &ComponentParser,
+    arguments: &mut Parser<'i, 't>,
+) -> Result<(u8, u8, u8, u8), ParseError<'i, ComponentParser::Error>>
+where
+    ComponentParser: ColorComponentParser<'i>,
+{
+    let computed_hue = fix_hue_rounding_errors(component_parser.parse_hue(arguments)?.degrees);
+
+    let computed_whiteness = component_parser.parse_percentage(arguments)?.clamp(0., 1.);
+
+    let computed_blackness = component_parser.parse_percentage(arguments)?.clamp(0., 1.);
+
+    let computed_alpha = parse_alpha_component(component_parser, arguments)?;
+
+    let (red, green, blue) = hwb_to_rgb(computed_hue, computed_whiteness, computed_blackness);
+
+    Ok((
+        clamp_unit_f32(red),
+        clamp_unit_f32(green),
+        clamp_unit_f32(blue),
+        clamp_unit_f32(computed_alpha),
+    ))
+}
+
+/// https://w3c.github.io/csswg-drafts/css-color-4/#hwb-to-rgb
 #[inline]
 pub fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
     if w + b >= 1.0 {
@@ -680,7 +843,7 @@ pub fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
     (red, green, blue)
 }
 
-/// https://drafts.csswg.org/css-color/#hsl-color
+/// https://w3c.github.io/csswg-drafts/css-color-4/#hsl-to-rgb
 /// except with h pre-multiplied by 3, to avoid some rounding errors.
 #[inline]
 pub fn hsl_to_rgb(hue: f32, saturation: f32, lightness: f32) -> (f32, f32, f32) {
