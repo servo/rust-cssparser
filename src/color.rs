@@ -10,36 +10,24 @@ use super::{BasicParseError, ParseError, Parser, ToCss, Token};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// Implement for colors with an alpha channel.
-pub trait WithAlpha {
-    const LEGACY_SYNTAX: bool = false;
-
-    fn alpha(&self) -> u8;
-
-    /// Returns the alpha channel in a floating point number form, from 0 to 1.
-    #[inline]
-    fn alpha_f32(&self) -> f32 {
-        self.alpha() as f32 / 255.0
+/// https://w3c.github.io/csswg-drafts/css-color-4/#serializing-alpha-values
+#[inline]
+fn serialize_alpha(dest: &mut impl fmt::Write, alpha: u8, legacy_syntax: bool) -> fmt::Result {
+    // If the alpha component is full opaque, don't emit the alpha value in CSS.
+    if alpha == 255 {
+        return Ok(());
     }
 
-    /// https://w3c.github.io/csswg-drafts/css-color-4/#serializing-alpha-values
-    #[inline]
-    fn serialize_alpha(&self, dest: &mut impl fmt::Write) -> fmt::Result {
-        // If the alpha component is full opaque, don't emit the alpha value in CSS.
-        if self.alpha() == 255 {
-            return Ok(());
-        }
+    dest.write_str(if legacy_syntax { ", " } else { " / " })?;
 
-        dest.write_str(if Self::LEGACY_SYNTAX { ", " } else { " / " })?;
-
-        // Try first with two decimal places, then with three.
-        let mut rounded_alpha = (self.alpha_f32() * 100.).round() / 100.;
-        if clamp_unit_f32(rounded_alpha) != self.alpha() {
-            rounded_alpha = (self.alpha_f32() * 1000.).round() / 1000.;
-        }
-
-        rounded_alpha.to_css(dest)
+    // Try first with two decimal places, then with three.
+    let alpha_f32 = alpha as f32 / 255.0;
+    let mut rounded_alpha = (alpha_f32 * 100.).round() / 100.;
+    if clamp_unit_f32(rounded_alpha) != alpha {
+        rounded_alpha = (alpha_f32 * 1000.).round() / 1000.;
     }
+
+    rounded_alpha.to_css(dest)
 }
 
 /// A color with red, green, blue, and alpha components, in a byte each.
@@ -54,15 +42,6 @@ pub struct RGBA {
     pub blue: u8,
     /// The alpha component.
     pub alpha: u8,
-}
-
-impl WithAlpha for RGBA {
-    const LEGACY_SYNTAX: bool = true;
-
-    #[inline]
-    fn alpha(&self) -> u8 {
-        self.alpha
-    }
 }
 
 impl RGBA {
@@ -179,23 +158,23 @@ impl ToCss for RGBA {
     where
         W: fmt::Write,
     {
-        let serialize_alpha = self.alpha != 255;
+        let has_alpha = self.alpha != 255;
 
-        dest.write_str(if serialize_alpha { "rgba(" } else { "rgb(" })?;
+        dest.write_str(if has_alpha { "rgba(" } else { "rgb(" })?;
         self.red.to_css(dest)?;
         dest.write_str(", ")?;
         self.green.to_css(dest)?;
         dest.write_str(", ")?;
         self.blue.to_css(dest)?;
 
-        self.serialize_alpha(dest)?;
+        serialize_alpha(dest, self.alpha, true)?;
 
         dest.write_char(')')
     }
 }
 
-// NOTE: LAB and OKLAB is not declared inside the macro, because it causes
-// cbindgen to ignore them.
+// NOTE: LAB and OKLAB is not declared inside the [impl_lab_like] macro,
+// because it causes cbindgen to ignore them.
 
 /// Color specified by lightness, a- and b-axis components.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -227,13 +206,6 @@ pub struct OKLAB {
 
 macro_rules! impl_lab_like {
     ($cls:ident, $fname:literal) => {
-        impl WithAlpha for $cls {
-            #[inline]
-            fn alpha(&self) -> u8 {
-                self.alpha
-            }
-        }
-
         impl $cls {
             /// Construct a new Lab color format with lightness, a, b and alpha components.
             pub fn new(lightness: f32, a: f32, b: f32, alpha: u8) -> Self {
@@ -263,7 +235,7 @@ macro_rules! impl_lab_like {
                 D: Deserializer<'de>,
             {
                 let (lightness, a, b, alpha) = Deserialize::deserialize(deserializer)?;
-                Ok(LAB::new(lightness, a, b, alpha))
+                Ok(Self::new(lightness, a, b, alpha))
             }
         }
 
@@ -275,13 +247,11 @@ macro_rules! impl_lab_like {
                 dest.write_str($fname)?;
                 dest.write_str("(")?;
                 self.lightness.to_css(dest)?;
-                dest.write_str(" ")?;
+                dest.write_char(' ')?;
                 self.a.to_css(dest)?;
-                dest.write_str(" ")?;
+                dest.write_char(' ')?;
                 self.b.to_css(dest)?;
-                if self.alpha() != 255 {
-                    self.serialize_alpha(dest)?;
-                }
+                serialize_alpha(dest, self.alpha, false)?;
                 dest.write_char(')')
             }
         }
@@ -291,8 +261,8 @@ macro_rules! impl_lab_like {
 impl_lab_like!(LAB, "lab");
 impl_lab_like!(OKLAB, "oklab");
 
-// NOTE: LCH and OKLCH is not declared inside the macro, because it causes
-// cbindgen to ignore them.
+// NOTE: LCH and OKLCH is not declared inside the [impl_lch_like] macro,
+// because it causes cbindgen to ignore them.
 
 /// Color specified by lightness, chroma and hue components.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -324,13 +294,6 @@ pub struct OKLCH {
 
 macro_rules! impl_lch_like {
     ($cls:ident, $fname:literal) => {
-        impl WithAlpha for $cls {
-            #[inline]
-            fn alpha(&self) -> u8 {
-                self.alpha
-            }
-        }
-
         impl $cls {
             /// Construct a new color with lightness, chroma and hue components.
             pub fn new(lightness: f32, chroma: f32, hue: f32, alpha: u8) -> Self {
@@ -360,7 +323,7 @@ macro_rules! impl_lch_like {
                 D: Deserializer<'de>,
             {
                 let (lightness, chroma, hue, alpha) = Deserialize::deserialize(deserializer)?;
-                Ok(LCH::new(lightness, chroma, hue, alpha))
+                Ok(Self::new(lightness, chroma, hue, alpha))
             }
         }
 
@@ -372,13 +335,11 @@ macro_rules! impl_lch_like {
                 dest.write_str($fname)?;
                 dest.write_str("(")?;
                 self.lightness.to_css(dest)?;
-                dest.write_str(" ")?;
+                dest.write_char(' ')?;
                 self.chroma.to_css(dest)?;
-                dest.write_str(" ")?;
+                dest.write_char(' ')?;
                 self.hue.to_css(dest)?;
-                if self.alpha() != 255 {
-                    self.serialize_alpha(dest)?;
-                }
+                serialize_alpha(dest, self.alpha, false)?;
                 dest.write_char(')')
             }
         }
@@ -414,11 +375,11 @@ impl AbsoluteColor {
     /// Return the alpha component of any of the schemes within.
     pub fn alpha(&self) -> u8 {
         match self {
-            Self::RGBA(c) => c.alpha(),
-            Self::LAB(c) => c.alpha(),
-            Self::LCH(c) => c.alpha(),
-            Self::OKLAB(c) => c.alpha(),
-            Self::OKLCH(c) => c.alpha(),
+            Self::RGBA(c) => c.alpha,
+            Self::LAB(c) => c.alpha,
+            Self::LCH(c) => c.alpha,
+            Self::OKLAB(c) => c.alpha,
+            Self::OKLCH(c) => c.alpha,
         }
     }
 }
