@@ -10,21 +10,22 @@ use super::{BasicParseError, ParseError, Parser, ToCss, Token};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+const OPAQUE: f32 = 1.0;
+
 /// https://w3c.github.io/csswg-drafts/css-color-4/#serializing-alpha-values
 #[inline]
-fn serialize_alpha(dest: &mut impl fmt::Write, alpha: u8, legacy_syntax: bool) -> fmt::Result {
+fn serialize_alpha(dest: &mut impl fmt::Write, alpha: f32, legacy_syntax: bool) -> fmt::Result {
     // If the alpha component is full opaque, don't emit the alpha value in CSS.
-    if alpha == 255 {
+    if alpha == OPAQUE {
         return Ok(());
     }
 
     dest.write_str(if legacy_syntax { ", " } else { " / " })?;
 
     // Try first with two decimal places, then with three.
-    let alpha_f32 = alpha as f32 / 255.0;
-    let mut rounded_alpha = (alpha_f32 * 100.).round() / 100.;
-    if clamp_unit_f32(rounded_alpha) != alpha {
-        rounded_alpha = (alpha_f32 * 1000.).round() / 1000.;
+    let mut rounded_alpha = (alpha * 100.).round() / 100.;
+    if clamp_unit_f32(rounded_alpha) != clamp_unit_f32(alpha) {
+        rounded_alpha = (alpha * 1000.).round() / 1000.;
     }
 
     rounded_alpha.to_css(dest)
@@ -41,7 +42,7 @@ pub struct RGBA {
     /// The blue component.
     pub blue: u8,
     /// The alpha component.
-    pub alpha: u8,
+    pub alpha: f32,
 }
 
 impl RGBA {
@@ -54,19 +55,19 @@ impl RGBA {
             clamp_unit_f32(red),
             clamp_unit_f32(green),
             clamp_unit_f32(blue),
-            clamp_unit_f32(alpha),
+            alpha.max(0.0).min(1.0),
         )
     }
 
     /// Returns a transparent color.
     #[inline]
     pub fn transparent() -> Self {
-        Self::new(0, 0, 0, 0)
+        Self::new(0, 0, 0, 0.0)
     }
 
     /// Same thing, but with `u8` values instead of floats in the 0 to 1 range.
     #[inline]
-    pub const fn new(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
+    pub const fn new(red: u8, green: u8, blue: u8, alpha: f32) -> Self {
         Self {
             red,
             green,
@@ -96,7 +97,7 @@ impl RGBA {
     /// Returns the alpha channel in a floating point number form, from 0 to 1.
     #[inline]
     pub fn alpha_f32(&self) -> f32 {
-        self.alpha as f32 / 255.0
+        self.alpha
     }
 
     /// Parse a color hash, without the leading '#' character.
@@ -107,25 +108,25 @@ impl RGBA {
                 from_hex(value[0])? * 16 + from_hex(value[1])?,
                 from_hex(value[2])? * 16 + from_hex(value[3])?,
                 from_hex(value[4])? * 16 + from_hex(value[5])?,
-                from_hex(value[6])? * 16 + from_hex(value[7])?,
+                (from_hex(value[6])? * 16 + from_hex(value[7])?) as f32 / 255.0,
             ),
             6 => Self::new(
                 from_hex(value[0])? * 16 + from_hex(value[1])?,
                 from_hex(value[2])? * 16 + from_hex(value[3])?,
                 from_hex(value[4])? * 16 + from_hex(value[5])?,
-                255,
+                OPAQUE,
             ),
             4 => Self::new(
                 from_hex(value[0])? * 17,
                 from_hex(value[1])? * 17,
                 from_hex(value[2])? * 17,
-                from_hex(value[3])? * 17,
+                (from_hex(value[3])? * 17) as f32 / 255.0,
             ),
             3 => Self::new(
                 from_hex(value[0])? * 17,
                 from_hex(value[1])? * 17,
                 from_hex(value[2])? * 17,
-                255,
+                OPAQUE,
             ),
             _ => return Err(()),
         })
@@ -158,7 +159,7 @@ impl ToCss for RGBA {
     where
         W: fmt::Write,
     {
-        let has_alpha = self.alpha != 255;
+        let has_alpha = self.alpha != OPAQUE;
 
         dest.write_str(if has_alpha { "rgba(" } else { "rgb(" })?;
         self.red.to_css(dest)?;
@@ -187,7 +188,7 @@ pub struct LAB {
     /// The b-axis component.
     pub b: f32,
     /// The alpha component.
-    pub alpha: u8,
+    pub alpha: f32,
 }
 
 /// Color specified by lightness, a- and b-axis components.
@@ -201,14 +202,14 @@ pub struct OKLAB {
     /// The b-axis component.
     pub b: f32,
     /// The alpha component.
-    pub alpha: u8,
+    pub alpha: f32,
 }
 
 macro_rules! impl_lab_like {
     ($cls:ident, $fname:literal) => {
         impl $cls {
             /// Construct a new Lab color format with lightness, a, b and alpha components.
-            pub fn new(lightness: f32, a: f32, b: f32, alpha: u8) -> Self {
+            pub fn new(lightness: f32, a: f32, b: f32, alpha: f32) -> Self {
                 Self {
                     lightness,
                     a,
@@ -275,7 +276,7 @@ pub struct LCH {
     /// The hue component.
     pub hue: f32,
     /// The alpha component.
-    pub alpha: u8,
+    pub alpha: f32,
 }
 
 /// Color specified by lightness, chroma and hue components.
@@ -289,14 +290,14 @@ pub struct OKLCH {
     /// The hue component.
     pub hue: f32,
     /// The alpha component.
-    pub alpha: u8,
+    pub alpha: f32,
 }
 
 macro_rules! impl_lch_like {
     ($cls:ident, $fname:literal) => {
         impl $cls {
             /// Construct a new color with lightness, chroma and hue components.
-            pub fn new(lightness: f32, chroma: f32, hue: f32, alpha: u8) -> Self {
+            pub fn new(lightness: f32, chroma: f32, hue: f32, alpha: f32) -> Self {
                 Self {
                     lightness,
                     chroma,
@@ -373,7 +374,7 @@ pub enum AbsoluteColor {
 
 impl AbsoluteColor {
     /// Return the alpha component of any of the schemes within.
-    pub fn alpha(&self) -> u8 {
+    pub fn alpha(&self) -> f32 {
         match self {
             Self::RGBA(c) => c.alpha,
             Self::LAB(c) => c.alpha,
@@ -401,11 +402,11 @@ impl ToCss for AbsoluteColor {
 
 #[inline]
 pub(crate) const fn rgb(red: u8, green: u8, blue: u8) -> Color {
-    rgba(red, green, blue, 255)
+    rgba(red, green, blue, OPAQUE)
 }
 
 #[inline]
-pub(crate) const fn rgba(red: u8, green: u8, blue: u8, alpha: u8) -> Color {
+pub(crate) const fn rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Color {
     Color::Absolute(AbsoluteColor::RGBA(RGBA::new(red, green, blue, alpha)))
 }
 
@@ -744,7 +745,7 @@ pub fn parse_color_keyword(ident: &str) -> Result<Color, ()> {
             "whitesmoke" => rgb(245, 245, 245),
             "yellowgreen" => rgb(154, 205, 50),
 
-            "transparent" => rgba(0, 0, 0, 0),
+            "transparent" => rgba(0, 0, 0, 0.0),
             "currentcolor" => Color::CurrentColor,
         }
     }
@@ -839,7 +840,7 @@ fn parse_alpha<'i, 't, ComponentParser>(
     component_parser: &ComponentParser,
     arguments: &mut Parser<'i, 't>,
     uses_commas: bool,
-) -> Result<u8, ParseError<'i, ComponentParser::Error>>
+) -> Result<f32, ParseError<'i, ComponentParser::Error>>
 where
     ComponentParser: ColorComponentParser<'i>,
 {
@@ -849,13 +850,13 @@ where
         } else {
             arguments.expect_delim('/')?;
         };
-        clamp_unit_f32(
-            component_parser
-                .parse_number_or_percentage(arguments)?
-                .unit_value(),
-        )
+        component_parser
+            .parse_number_or_percentage(arguments)?
+            .unit_value()
+            .max(0.0)
+            .min(OPAQUE)
     } else {
-        255
+        OPAQUE
     })
 }
 
@@ -863,7 +864,7 @@ where
 fn parse_rgb_components_rgb<'i, 't, ComponentParser>(
     component_parser: &ComponentParser,
     arguments: &mut Parser<'i, 't>,
-) -> Result<(u8, u8, u8, u8), ParseError<'i, ComponentParser::Error>>
+) -> Result<(u8, u8, u8, f32), ParseError<'i, ComponentParser::Error>>
 where
     ComponentParser: ColorComponentParser<'i>,
 {
@@ -1014,7 +1015,7 @@ fn parse_lab_like<'i, 't, ComponentParser>(
     arguments: &mut Parser<'i, 't>,
     lightness_range: f32,
     a_b_range: f32,
-    into_color: fn(l: f32, a: f32, b: f32, alpha: u8) -> Color,
+    into_color: fn(l: f32, a: f32, b: f32, alpha: f32) -> Color,
 ) -> Result<Color, ParseError<'i, ComponentParser::Error>>
 where
     ComponentParser: ColorComponentParser<'i>,
@@ -1047,7 +1048,7 @@ fn parse_lch_like<'i, 't, ComponentParser>(
     arguments: &mut Parser<'i, 't>,
     lightness_range: f32,
     chroma_range: f32,
-    into_color: fn(l: f32, c: f32, h: f32, alpha: u8) -> Color,
+    into_color: fn(l: f32, c: f32, h: f32, alpha: f32) -> Color,
 ) -> Result<Color, ParseError<'i, ComponentParser::Error>>
 where
     ComponentParser: ColorComponentParser<'i>,

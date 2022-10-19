@@ -2,26 +2,26 @@ items = []
 
 
 def lab(lightness, a, b, alpha=1):
-    return (max(0.0, lightness), a, b, round(alpha * 100000) * 255 / 100000)
+    return (max(0.0, lightness), a, b, alpha)
 
 
 def labp(lightness, a, b, alpha=1):
-    return (max(0.0, lightness), a * 125.0 / 100.0, b * 125.0 / 100.0, round(alpha * 100000) * 255 / 100000)
+    return (max(0.0, lightness), a * 125.0 / 100.0, b * 125.0 / 100.0, alpha)
 
 
 def oklab(lightness, a, b, alpha=1):
-    return (max(0.0, lightness), a, b, round(alpha * 100000) * 255 / 100000)
+    return (max(0.0, lightness), a, b, alpha)
 
 
 def oklabp(lightness, a, b, alpha=1):
-    return (max(0.0, lightness / 100.0), a * 0.4 / 100.0, b * 0.4 / 100.0, round(alpha * 100000) * 255 / 100000)
+    return (max(0.0, lightness / 100.0), a * 0.4 / 100.0, b * 0.4 / 100.0, alpha)
 
 
-def slab(name, lightness, a, b, alpha=255):
-    if alpha == 255:
+def slab(name, lightness, a, b, alpha=1):
+    if alpha == 1.0:
         return '{}({:g} {:g} {:g})'.format(name, lightness, a, b)
     else:
-        return '{}({:g} {:g} {:g} / {:g})'.format(name, lightness, a, b, alpha / 255.0)
+        return '{}({:g} {:g} {:g} / {:g})'.format(name, lightness, a, b, alpha)
 
 
 def lab_like(name, f, fp):
@@ -53,26 +53,26 @@ def calc_deg(deg):
 
 
 def lch(lightness, c, h, alpha=1):
-    return (max(lightness, 0.0), max(0.0, c), calc_deg(h), round(alpha * 100000) * 255 / 100000)
+    return (max(lightness, 0.0), max(0.0, c), calc_deg(h), alpha)
 
 
 def lchp(lightness, c, h, alpha=1):
-    return (max(lightness, 0.0), max(0.0, c * 150.0 / 100.0), calc_deg(h), round(alpha * 100000) * 255 / 100000)
+    return (max(lightness, 0.0), max(0.0, c * 150.0 / 100.0), calc_deg(h), alpha)
 
 
 def oklch(lightness, c, h, alpha=1):
-    return (max(lightness, 0.0), max(0.0, c), calc_deg(h), round(alpha * 100000) * 255 / 100000)
+    return (max(lightness, 0.0), max(0.0, c), calc_deg(h), alpha)
 
 
 def oklchp(lightness, c, h, alpha=1):
-    return (max(lightness, 0.0) / 100.0, max(0.0, c * 0.4 / 100.0), calc_deg(h), round(alpha * 100000) * 255 / 100000)
+    return (max(lightness, 0.0) / 100.0, max(0.0, c * 0.4 / 100.0), calc_deg(h), alpha)
 
 
 def slch(name, lightness, c, h, alpha=1):
-    if alpha == 255:
+    if alpha == 1:
         return '{}({:g} {:g} {:g})'.format(name, lightness, c, h)
     else:
-        return '{}({:g} {:g} {:g} / {:g})'.format(name, lightness, c, h, alpha / 255.0)
+        return '{}({:g} {:g} {:g} / {:g})'.format(name, lightness, c, h, alpha)
 
 
 def lch_like(name, f, fp):

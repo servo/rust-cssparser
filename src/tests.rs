@@ -9,17 +9,16 @@ use encoding_rs;
 use matches::matches;
 use serde_json::{self, json, Map, Value};
 
-use crate::{AbsoluteColor, RGBA};
-
 #[cfg(feature = "bench")]
 use self::test::Bencher;
 
 use super::{
-    color::rgba, parse_important, parse_nth, parse_one_declaration, parse_one_rule,
-    stylesheet_encoding, AtRuleParser, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
+    color::{rgb, rgba},
+    parse_important, parse_nth, parse_one_declaration, parse_one_rule, stylesheet_encoding,
+    AbsoluteColor, AtRuleParser, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
     DeclarationListParser, DeclarationParser, Delimiter, EncodingSupport, ParseError,
     ParseErrorKind, Parser, ParserInput, ParserState, QualifiedRuleParser, RuleListParser,
-    SourceLocation, ToCss, Token, TokenSerializationType, UnicodeRange,
+    SourceLocation, ToCss, Token, TokenSerializationType, UnicodeRange, RGBA,
 };
 
 macro_rules! JArray {
@@ -399,11 +398,7 @@ fn color4_lab_lch_oklab_oklch() {
     run_color_tests(
         include_str!("css-parsing-tests/color4_lab_lch_oklab_oklch.json"),
         |c| match c {
-            Ok(color) => {
-                let mut s = String::new();
-                color.to_css(&mut s).unwrap();
-                Value::Array(vec![color.to_json(), s.to_json()])
-            }
+            Ok(color) => Value::Array(vec![color.to_json(), color.to_css_string().to_json()]),
             Err(_) => Value::Null,
         },
     )
@@ -544,13 +539,13 @@ fn serialize_current_color() {
 
 #[test]
 fn serialize_rgb_full_alpha() {
-    let c = rgba(255, 230, 204, 255);
+    let c = rgb(255, 230, 204);
     assert_eq!(c.to_css_string(), "rgb(255, 230, 204)");
 }
 
 #[test]
 fn serialize_rgba() {
-    let c = rgba(26, 51, 77, 32);
+    let c = rgba(26, 51, 77, 0.125);
     assert_eq!(c.to_css_string(), "rgba(26, 51, 77, 0.125)");
 }
 
