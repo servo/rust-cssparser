@@ -17,8 +17,8 @@ use super::{
     parse_important, parse_nth, parse_one_declaration, parse_one_rule, stylesheet_encoding,
     AbsoluteColor, AtRuleParser, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
     DeclarationListParser, DeclarationParser, Delimiter, EncodingSupport, ParseError,
-    ParseErrorKind, Parser, ParserInput, ParserState, QualifiedRuleParser, RuleListParser,
-    SourceLocation, ToCss, Token, TokenSerializationType, UnicodeRange, RGBA,
+    ParseErrorKind, Parser, ParserInput, ParserState, QualifiedRuleParser, Rgba, RuleListParser,
+    SourceLocation, ToCss, Token, TokenSerializationType, UnicodeRange,
 };
 
 macro_rules! JArray {
@@ -551,7 +551,7 @@ fn serialize_rgba() {
 
 #[test]
 fn serialize_rgba_two_digit_float_if_roundtrips() {
-    let c = Color::Absolute(AbsoluteColor::RGBA(RGBA::from_floats(0., 0., 0., 0.5)));
+    let c = Color::Absolute(AbsoluteColor::RGBA(Rgba::from_floats(0., 0., 0., 0.5)));
     assert_eq!(c.to_css_string(), "rgba(0, 0, 0, 0.5)");
 }
 

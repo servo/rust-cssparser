@@ -34,7 +34,7 @@ fn serialize_alpha(dest: &mut impl fmt::Write, alpha: f32, legacy_syntax: bool) 
 /// A color with red, green, blue, and alpha components, in a byte each.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
-pub struct RGBA {
+pub struct Rgba {
     /// The red component.
     pub red: u8,
     /// The green component.
@@ -45,7 +45,7 @@ pub struct RGBA {
     pub alpha: f32,
 }
 
-impl RGBA {
+impl Rgba {
     /// Constructs a new RGBA value from float components. It expects the red,
     /// green, blue and alpha channels in that order, and all values will be
     /// clamped to the 0.0 ... 1.0 range.
@@ -134,7 +134,7 @@ impl RGBA {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for RGBA {
+impl Serialize for Rgba {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -144,17 +144,17 @@ impl Serialize for RGBA {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for RGBA {
+impl<'de> Deserialize<'de> for Rgba {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         let (r, g, b, a) = Deserialize::deserialize(deserializer)?;
-        Ok(RGBA::new(r, g, b, a))
+        Ok(Rgba::new(r, g, b, a))
     }
 }
 
-impl ToCss for RGBA {
+impl ToCss for Rgba {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result
     where
         W: fmt::Write,
@@ -180,7 +180,7 @@ impl ToCss for RGBA {
 /// Color specified by lightness, a- and b-axis components.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
-pub struct LAB {
+pub struct Lab {
     /// The lightness component.
     pub lightness: f32,
     /// The a-axis component.
@@ -194,7 +194,7 @@ pub struct LAB {
 /// Color specified by lightness, a- and b-axis components.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
-pub struct OKLAB {
+pub struct Oklab {
     /// The lightness component.
     pub lightness: f32,
     /// The a-axis component.
@@ -259,8 +259,8 @@ macro_rules! impl_lab_like {
     };
 }
 
-impl_lab_like!(LAB, "lab");
-impl_lab_like!(OKLAB, "oklab");
+impl_lab_like!(Lab, "lab");
+impl_lab_like!(Oklab, "oklab");
 
 // NOTE: LCH and OKLCH is not declared inside the [impl_lch_like] macro,
 // because it causes cbindgen to ignore them.
@@ -268,7 +268,7 @@ impl_lab_like!(OKLAB, "oklab");
 /// Color specified by lightness, chroma and hue components.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
-pub struct LCH {
+pub struct Lch {
     /// The lightness component.
     pub lightness: f32,
     /// The chroma component.
@@ -282,7 +282,7 @@ pub struct LCH {
 /// Color specified by lightness, chroma and hue components.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
-pub struct OKLCH {
+pub struct Oklch {
     /// The lightness component.
     pub lightness: f32,
     /// The chroma component.
@@ -347,29 +347,29 @@ macro_rules! impl_lch_like {
     };
 }
 
-impl_lch_like!(LCH, "lch");
-impl_lch_like!(OKLCH, "oklch");
+impl_lch_like!(Lch, "lch");
+impl_lch_like!(Oklch, "oklch");
 
 /// An absolutely specified color.
 /// https://w3c.github.io/csswg-drafts/css-color-4/#typedef-absolute-color-base
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum AbsoluteColor {
     /// Specify sRGB colors directly by their red/green/blue/alpha chanels.
-    RGBA(RGBA),
+    RGBA(Rgba),
     /// Specifies a CIELAB color by CIE Lightness and its a- and b-axis hue
     /// coordinates (red/green-ness, and yellow/blue-ness) using the CIE LAB
     /// rectangular coordinate model.
-    LAB(LAB),
+    LAB(Lab),
     /// Specifies a CIELAB color by CIE Lightness, Chroma, and hue using the
     /// CIE LCH cylindrical coordinate model.
-    LCH(LCH),
+    LCH(Lch),
     /// Specifies an Oklab color by Oklab Lightness and its a- and b-axis hue
     /// coordinates (red/green-ness, and yellow/blue-ness) using the Oklab
     /// rectangular coordinate model.
-    OKLAB(OKLAB),
+    OKLAB(Oklab),
     /// Specifies an Oklab color by Oklab Lightness, Chroma, and hue using
     /// the OKLCH cylindrical coordinate model.
-    OKLCH(OKLCH),
+    OKLCH(Oklch),
 }
 
 impl AbsoluteColor {
@@ -407,7 +407,7 @@ pub(crate) const fn rgb(red: u8, green: u8, blue: u8) -> Color {
 
 #[inline]
 pub(crate) const fn rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Color {
-    Color::Absolute(AbsoluteColor::RGBA(RGBA::new(red, green, blue, alpha)))
+    Color::Absolute(AbsoluteColor::RGBA(Rgba::new(red, green, blue, alpha)))
 }
 
 /// A <color> value.
@@ -565,7 +565,7 @@ impl Color {
         let location = input.current_source_location();
         let token = input.next()?;
         match *token {
-            Token::Hash(ref value) | Token::IDHash(ref value) => RGBA::parse_hash(value.as_bytes())
+            Token::Hash(ref value) | Token::IDHash(ref value) => Rgba::parse_hash(value.as_bytes())
                 .map(|rgba| Color::Absolute(AbsoluteColor::RGBA(rgba))),
             Token::Ident(ref value) => parse_color_keyword(&*value),
             Token::Function(ref name) => {
@@ -806,25 +806,25 @@ where
         // for L: 0% = 0.0, 100% = 100.0
         // for a and b: -100% = -125, 100% = 125
         "lab" => parse_lab_like(component_parser, arguments, 100.0, 125.0, |l, a, b, alpha| {
-            Color::Absolute(AbsoluteColor::LAB(LAB::new(l.max(0.), a , b , alpha)))
+            Color::Absolute(AbsoluteColor::LAB(Lab::new(l.max(0.), a , b , alpha)))
         }),
 
         // for L: 0% = 0.0, 100% = 100.0
         // for C: 0% = 0, 100% = 150
         "lch" => parse_lch_like(component_parser, arguments, 100.0, 150.0, |l, c, h, alpha| {
-            Color::Absolute(AbsoluteColor::LCH(LCH::new(l.max(0.), c.max(0.), h, alpha)))
+            Color::Absolute(AbsoluteColor::LCH(Lch::new(l.max(0.), c.max(0.), h, alpha)))
         }),
 
         // for L: 0% = 0.0, 100% = 1.0
         // for a and b: -100% = -0.4, 100% = 0.4
         "oklab" => parse_lab_like(component_parser, arguments, 1.0, 0.4, |l, a, b, alpha| {
-            Color::Absolute(AbsoluteColor::OKLAB(OKLAB::new(l.max(0.), a, b, alpha)))
+            Color::Absolute(AbsoluteColor::OKLAB(Oklab::new(l.max(0.), a, b, alpha)))
         }),
 
         // for L: 0% = 0.0, 100% = 1.0
         // for C: 0% = 0.0 100% = 0.4
         "oklch" => parse_lch_like(component_parser, arguments, 1.0, 0.4, |l, c, h, alpha| {
-            Color::Absolute(AbsoluteColor::OKLCH(OKLCH::new(l.max(0.), c.max(0.), h, alpha)))
+            Color::Absolute(AbsoluteColor::OKLCH(Oklch::new(l.max(0.), c.max(0.), h, alpha)))
         }),
 
         _ => return Err(arguments.new_unexpected_token_error(Token::Ident(name.to_owned().into()))),
