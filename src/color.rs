@@ -34,7 +34,7 @@ fn serialize_alpha(dest: &mut impl fmt::Write, alpha: f32, legacy_syntax: bool) 
 /// A color with red, green, blue, and alpha components, in a byte each.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
-pub struct Rgba {
+pub struct RGBA {
     /// The red component.
     pub red: u8,
     /// The green component.
@@ -45,7 +45,7 @@ pub struct Rgba {
     pub alpha: f32,
 }
 
-impl Rgba {
+impl RGBA {
     /// Constructs a new RGBA value from float components. It expects the red,
     /// green, blue and alpha channels in that order, and all values will be
     /// clamped to the 0.0 ... 1.0 range.
@@ -134,7 +134,7 @@ impl Rgba {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for Rgba {
+impl Serialize for RGBA {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -144,17 +144,17 @@ impl Serialize for Rgba {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for Rgba {
+impl<'de> Deserialize<'de> for RGBA {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         let (r, g, b, a) = Deserialize::deserialize(deserializer)?;
-        Ok(Rgba::new(r, g, b, a))
+        Ok(RGBA::new(r, g, b, a))
     }
 }
 
-impl ToCss for Rgba {
+impl ToCss for RGBA {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result
     where
         W: fmt::Write,
@@ -355,7 +355,7 @@ impl_lch_like!(Oklch, "oklch");
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum AbsoluteColor {
     /// Specify sRGB colors directly by their red/green/blue/alpha chanels.
-    Rgba(Rgba),
+    Rgba(RGBA),
     /// Specifies a CIELAB color by CIE Lightness and its a- and b-axis hue
     /// coordinates (red/green-ness, and yellow/blue-ness) using the CIE LAB
     /// rectangular coordinate model.
@@ -407,7 +407,7 @@ pub(crate) const fn rgb(red: u8, green: u8, blue: u8) -> Color {
 
 #[inline]
 pub(crate) const fn rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Color {
-    Color::Absolute(AbsoluteColor::Rgba(Rgba::new(red, green, blue, alpha)))
+    Color::Absolute(AbsoluteColor::Rgba(RGBA::new(red, green, blue, alpha)))
 }
 
 /// A <color> value.
@@ -565,7 +565,7 @@ impl Color {
         let location = input.current_source_location();
         let token = input.next()?;
         match *token {
-            Token::Hash(ref value) | Token::IDHash(ref value) => Rgba::parse_hash(value.as_bytes())
+            Token::Hash(ref value) | Token::IDHash(ref value) => RGBA::parse_hash(value.as_bytes())
                 .map(|rgba| Color::Absolute(AbsoluteColor::Rgba(rgba))),
             Token::Ident(ref value) => parse_color_keyword(&*value),
             Token::Function(ref name) => {
