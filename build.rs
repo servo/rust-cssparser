@@ -42,5 +42,9 @@ fn main() {
         println!("cargo:rustc-cfg=rustc_has_pr45225")
     }
 
+    if std::mem::size_of::<std::borrow::Cow<'static, str>>() == 24 {
+        println!("cargo:rustc-cfg=rustc_has_better_cow_layout")
+    }
+
     codegen::main();
 }

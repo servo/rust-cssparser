@@ -38,7 +38,7 @@ macro_rules! size_of_test {
 
 // Some of these assume 64-bit
 size_of_test!(token, Token, 32);
-size_of_test!(std_cow_str, Cow<'static, str>, 32);
+size_of_test!(std_cow_str, Cow<'static, str>, if cfg!(rustc_has_better_cow_layout) { 24 } else { 32 });
 size_of_test!(cow_rc_str, CowRcStr, 16);
 
 size_of_test!(tokenizer, crate::tokenizer::Tokenizer, 72);
@@ -51,9 +51,15 @@ size_of_test!(parser, crate::parser::Parser, 16);
 size_of_test!(source_position, crate::SourcePosition, 8);
 size_of_test!(parser_state, crate::ParserState, 24);
 
-size_of_test!(basic_parse_error, crate::BasicParseError, 48);
+size_of_test!(basic_parse_error, crate::BasicParseError, if cfg!(rustc_has_better_cow_layout) { 40 } else { 48 });
 size_of_test!(
     parse_error_lower_bound,
     crate::ParseError<()>,
-    if cfg!(rustc_has_pr45225) { 48 } else { 56 }
+    if cfg!(rustc_has_better_cow_layout) {
+        40
+    } else if cfg!(rustc_has_pr45225) {
+        48
+    } else {
+        56
+    }
 );
