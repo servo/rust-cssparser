@@ -355,32 +355,32 @@ impl_lch_like!(Oklch, "oklch");
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum AbsoluteColor {
     /// Specify sRGB colors directly by their red/green/blue/alpha chanels.
-    RGBA(Rgba),
+    Rgba(Rgba),
     /// Specifies a CIELAB color by CIE Lightness and its a- and b-axis hue
     /// coordinates (red/green-ness, and yellow/blue-ness) using the CIE LAB
     /// rectangular coordinate model.
-    LAB(Lab),
+    Lab(Lab),
     /// Specifies a CIELAB color by CIE Lightness, Chroma, and hue using the
     /// CIE LCH cylindrical coordinate model.
-    LCH(Lch),
+    Lch(Lch),
     /// Specifies an Oklab color by Oklab Lightness and its a- and b-axis hue
     /// coordinates (red/green-ness, and yellow/blue-ness) using the Oklab
     /// rectangular coordinate model.
-    OKLAB(Oklab),
+    Oklab(Oklab),
     /// Specifies an Oklab color by Oklab Lightness, Chroma, and hue using
     /// the OKLCH cylindrical coordinate model.
-    OKLCH(Oklch),
+    Oklch(Oklch),
 }
 
 impl AbsoluteColor {
     /// Return the alpha component of any of the schemes within.
     pub fn alpha(&self) -> f32 {
         match self {
-            Self::RGBA(c) => c.alpha,
-            Self::LAB(c) => c.alpha,
-            Self::LCH(c) => c.alpha,
-            Self::OKLAB(c) => c.alpha,
-            Self::OKLCH(c) => c.alpha,
+            Self::Rgba(c) => c.alpha,
+            Self::Lab(c) => c.alpha,
+            Self::Lch(c) => c.alpha,
+            Self::Oklab(c) => c.alpha,
+            Self::Oklch(c) => c.alpha,
         }
     }
 }
@@ -391,11 +391,11 @@ impl ToCss for AbsoluteColor {
         W: fmt::Write,
     {
         match self {
-            Self::RGBA(rgba) => rgba.to_css(dest),
-            Self::LAB(lab) => lab.to_css(dest),
-            Self::LCH(lch) => lch.to_css(dest),
-            Self::OKLAB(lab) => lab.to_css(dest),
-            Self::OKLCH(lch) => lch.to_css(dest),
+            Self::Rgba(rgba) => rgba.to_css(dest),
+            Self::Lab(lab) => lab.to_css(dest),
+            Self::Lch(lch) => lch.to_css(dest),
+            Self::Oklab(lab) => lab.to_css(dest),
+            Self::Oklch(lch) => lch.to_css(dest),
         }
     }
 }
@@ -407,7 +407,7 @@ pub(crate) const fn rgb(red: u8, green: u8, blue: u8) -> Color {
 
 #[inline]
 pub(crate) const fn rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Color {
-    Color::Absolute(AbsoluteColor::RGBA(Rgba::new(red, green, blue, alpha)))
+    Color::Absolute(AbsoluteColor::Rgba(Rgba::new(red, green, blue, alpha)))
 }
 
 /// A <color> value.
@@ -566,7 +566,7 @@ impl Color {
         let token = input.next()?;
         match *token {
             Token::Hash(ref value) | Token::IDHash(ref value) => Rgba::parse_hash(value.as_bytes())
-                .map(|rgba| Color::Absolute(AbsoluteColor::RGBA(rgba))),
+                .map(|rgba| Color::Absolute(AbsoluteColor::Rgba(rgba))),
             Token::Ident(ref value) => parse_color_keyword(&*value),
             Token::Function(ref name) => {
                 let name = name.clone();
@@ -806,25 +806,25 @@ where
         // for L: 0% = 0.0, 100% = 100.0
         // for a and b: -100% = -125, 100% = 125
         "lab" => parse_lab_like(component_parser, arguments, 100.0, 125.0, |l, a, b, alpha| {
-            Color::Absolute(AbsoluteColor::LAB(Lab::new(l.max(0.), a , b , alpha)))
+            Color::Absolute(AbsoluteColor::Lab(Lab::new(l.max(0.), a , b , alpha)))
         }),
 
         // for L: 0% = 0.0, 100% = 100.0
         // for C: 0% = 0, 100% = 150
         "lch" => parse_lch_like(component_parser, arguments, 100.0, 150.0, |l, c, h, alpha| {
-            Color::Absolute(AbsoluteColor::LCH(Lch::new(l.max(0.), c.max(0.), h, alpha)))
+            Color::Absolute(AbsoluteColor::Lch(Lch::new(l.max(0.), c.max(0.), h, alpha)))
         }),
 
         // for L: 0% = 0.0, 100% = 1.0
         // for a and b: -100% = -0.4, 100% = 0.4
         "oklab" => parse_lab_like(component_parser, arguments, 1.0, 0.4, |l, a, b, alpha| {
-            Color::Absolute(AbsoluteColor::OKLAB(Oklab::new(l.max(0.), a, b, alpha)))
+            Color::Absolute(AbsoluteColor::Oklab(Oklab::new(l.max(0.), a, b, alpha)))
         }),
 
         // for L: 0% = 0.0, 100% = 1.0
         // for C: 0% = 0.0 100% = 0.4
         "oklch" => parse_lch_like(component_parser, arguments, 1.0, 0.4, |l, c, h, alpha| {
-            Color::Absolute(AbsoluteColor::OKLCH(Oklch::new(l.max(0.), c.max(0.), h, alpha)))
+            Color::Absolute(AbsoluteColor::Oklch(Oklch::new(l.max(0.), c.max(0.), h, alpha)))
         }),
 
         _ => return Err(arguments.new_unexpected_token_error(Token::Ident(name.to_owned().into()))),

@@ -551,7 +551,7 @@ fn serialize_rgba() {
 
 #[test]
 fn serialize_rgba_two_digit_float_if_roundtrips() {
-    let c = Color::Absolute(AbsoluteColor::RGBA(Rgba::from_floats(0., 0., 0., 0.5)));
+    let c = Color::Absolute(AbsoluteColor::Rgba(Rgba::from_floats(0., 0., 0., 0.5)));
     assert_eq!(c.to_css_string(), "rgba(0, 0, 0, 0.5)");
 }
 
@@ -845,13 +845,13 @@ impl ToJson for Color {
         match *self {
             Color::CurrentColor => "currentcolor".to_json(),
             Color::Absolute(absolute) => match absolute {
-                AbsoluteColor::RGBA(ref rgba) => {
+                AbsoluteColor::Rgba(ref rgba) => {
                     json!([rgba.red, rgba.green, rgba.blue, rgba.alpha])
                 }
-                AbsoluteColor::LAB(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
-                AbsoluteColor::LCH(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
-                AbsoluteColor::OKLAB(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
-                AbsoluteColor::OKLCH(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
+                AbsoluteColor::Lab(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
+                AbsoluteColor::Lch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
+                AbsoluteColor::Oklab(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
+                AbsoluteColor::Oklch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
             },
         }
     }
