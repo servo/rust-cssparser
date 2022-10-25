@@ -9,11 +9,12 @@ use encoding_rs;
 use matches::matches;
 use serde_json::{self, json, Map, Value};
 
+use crate::rgb;
+
 #[cfg(feature = "bench")]
 use self::test::Bencher;
 
 use super::{
-    color::{rgb, rgba},
     parse_important, parse_nth, parse_one_declaration, parse_one_rule, stylesheet_encoding,
     AbsoluteColor, AtRuleParser, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
     DeclarationListParser, DeclarationParser, Delimiter, EncodingSupport, ParseError,
@@ -366,14 +367,18 @@ fn run_color_tests<F: Fn(Result<Color, ()>) -> Value>(json_data: &str, to_json: 
 #[test]
 fn color3() {
     run_color_tests(include_str!("css-parsing-tests/color3.json"), |c| {
-        c.ok().map(|v| v.to_json()).unwrap_or(Value::Null)
+        c.ok()
+            .map(|v| v.to_css_string().to_json())
+            .unwrap_or(Value::Null)
     })
 }
 
 #[test]
 fn color3_hsl() {
     run_color_tests(include_str!("css-parsing-tests/color3_hsl.json"), |c| {
-        c.ok().map(|v| v.to_json()).unwrap_or(Value::Null)
+        c.ok()
+            .map(|v| v.to_css_string().to_json())
+            .unwrap_or(Value::Null)
     })
 }
 
@@ -382,14 +387,20 @@ fn color3_hsl() {
 fn color3_keywords() {
     run_color_tests(
         include_str!("css-parsing-tests/color3_keywords.json"),
-        |c| c.ok().map(|v| v.to_json()).unwrap_or(Value::Null),
+        |c| {
+            c.ok()
+                .map(|v| v.to_css_string().to_json())
+                .unwrap_or(Value::Null)
+        },
     )
 }
 
 #[test]
 fn color4_hwb() {
     run_color_tests(include_str!("css-parsing-tests/color4_hwb.json"), |c| {
-        c.ok().map(|v| v.to_json()).unwrap_or(Value::Null)
+        c.ok()
+            .map(|v| v.to_css_string().to_json())
+            .unwrap_or(Value::Null)
     })
 }
 
@@ -397,9 +408,10 @@ fn color4_hwb() {
 fn color4_lab_lch_oklab_oklch() {
     run_color_tests(
         include_str!("css-parsing-tests/color4_lab_lch_oklab_oklch.json"),
-        |c| match c {
-            Ok(color) => Value::Array(vec![color.to_json(), color.to_css_string().to_json()]),
-            Err(_) => Value::Null,
+        |c| {
+            c.ok()
+                .map(|v| v.to_css_string().to_json())
+                .unwrap_or(Value::Null)
         },
     )
 }
@@ -539,19 +551,19 @@ fn serialize_current_color() {
 
 #[test]
 fn serialize_rgb_full_alpha() {
-    let c = rgb(255, 230, 204);
+    let c = rgb!(1.0, 0.901, 0.8);
     assert_eq!(c.to_css_string(), "rgb(255, 230, 204)");
 }
 
 #[test]
 fn serialize_rgba() {
-    let c = rgba(26, 51, 77, 0.125);
+    let c = rgb!(0.102, 0.2, 0.302, 0.125);
     assert_eq!(c.to_css_string(), "rgba(26, 51, 77, 0.125)");
 }
 
 #[test]
 fn serialize_rgba_two_digit_float_if_roundtrips() {
-    let c = Color::Absolute(AbsoluteColor::Rgba(RGBA::from_floats(0., 0., 0., 0.5)));
+    let c = rgb!(0.0, 0.0, 0.0, 0.5);
     assert_eq!(c.to_css_string(), "rgba(0, 0, 0, 0.5)");
 }
 

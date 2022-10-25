@@ -63,3 +63,5 @@ size_of_test!(
         56
     }
 );
+
+size_of_test!(color, crate::Color, 20);
