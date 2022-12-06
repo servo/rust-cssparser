@@ -419,6 +419,20 @@ fn nth() {
 }
 
 #[test]
+fn parse_comma_separated_ignoring_errors() {
+    let input = "red, green something, yellow, whatever, blue";
+    let mut input = ParserInput::new(input);
+    let mut input = Parser::new(&mut input);
+    let result = input.parse_comma_separated_ignoring_errors(|input| {
+        Color::parse(input).map_err(Into::<ParseError<()>>::into)
+    });
+    assert_eq!(result.len(), 3);
+    assert_eq!(result[0].to_css_string(), "rgb(255, 0, 0)");
+    assert_eq!(result[1].to_css_string(), "rgb(255, 255, 0)");
+    assert_eq!(result[2].to_css_string(), "rgb(0, 0, 255)");
+}
+
+#[test]
 fn unicode_range() {
     run_json_tests(include_str!("css-parsing-tests/urange.json"), |input| {
         let result: Result<_, ParseError<()>> = input.parse_comma_separated(|input| {
