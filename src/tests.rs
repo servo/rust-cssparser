@@ -366,14 +366,18 @@ fn run_color_tests<F: Fn(Result<Color, ()>) -> Value>(json_data: &str, to_json: 
 #[test]
 fn color3() {
     run_color_tests(include_str!("css-parsing-tests/color3.json"), |c| {
-        c.ok().map(|v| v.to_json()).unwrap_or(Value::Null)
+        c.ok()
+            .map(|v| v.to_css_string().to_json())
+            .unwrap_or(Value::Null)
     })
 }
 
 #[test]
 fn color3_hsl() {
     run_color_tests(include_str!("css-parsing-tests/color3_hsl.json"), |c| {
-        c.ok().map(|v| v.to_json()).unwrap_or(Value::Null)
+        c.ok()
+            .map(|v| v.to_css_string().to_json())
+            .unwrap_or(Value::Null)
     })
 }
 
@@ -382,14 +386,20 @@ fn color3_hsl() {
 fn color3_keywords() {
     run_color_tests(
         include_str!("css-parsing-tests/color3_keywords.json"),
-        |c| c.ok().map(|v| v.to_json()).unwrap_or(Value::Null),
+        |c| {
+            c.ok()
+                .map(|v| v.to_css_string().to_json())
+                .unwrap_or(Value::Null)
+        },
     )
 }
 
 #[test]
 fn color4_hwb() {
     run_color_tests(include_str!("css-parsing-tests/color4_hwb.json"), |c| {
-        c.ok().map(|v| v.to_json()).unwrap_or(Value::Null)
+        c.ok()
+            .map(|v| v.to_css_string().to_json())
+            .unwrap_or(Value::Null)
     })
 }
 
@@ -397,9 +407,10 @@ fn color4_hwb() {
 fn color4_lab_lch_oklab_oklch() {
     run_color_tests(
         include_str!("css-parsing-tests/color4_lab_lch_oklab_oklch.json"),
-        |c| match c {
-            Ok(color) => Value::Array(vec![color.to_json(), color.to_css_string().to_json()]),
-            Err(_) => Value::Null,
+        |c| {
+            c.ok()
+                .map(|v| v.to_css_string().to_json())
+                .unwrap_or(Value::Null)
         },
     )
 }
