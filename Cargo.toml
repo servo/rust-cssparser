@@ -11,6 +11,7 @@ keywords = ["css", "syntax", "parser"]
 license = "MPL-2.0"
 build = "build.rs"
 edition = "2018"
+rust-version = "1.56"
 
 exclude = ["src/css-parsing-tests/**", "src/big-data-url.css"]
 
