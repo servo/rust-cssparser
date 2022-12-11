@@ -225,6 +225,40 @@ pub enum SrgbColor {
     },
 }
 
+/// <https://w3c.github.io/csswg-drafts/css-color-4/#hsl-to-rgb>
+#[inline]
+pub fn hsl_to_rgb(hue: f32, saturation: f32, lightness: f32) -> (f32, f32, f32) {
+    let mut hue = hue;
+
+    if hue < 0. {
+        hue += 1.;
+    }
+
+    let f = |n: f32| -> f32 {
+        let k = (hue.mul_add(12., n)) % 12.;
+        let a = saturation * lightness.min(1. - lightness);
+
+        a.mul_add(-(-1f32).max((k - 3.).min(9. - k).min(1.)), lightness)
+    };
+
+    (f(0.), f(8.), f(4.))
+}
+
+/// <https://w3c.github.io/csswg-drafts/css-color-4/#hwb-to-rgb>
+#[inline]
+pub fn hwb_to_rgb(hue: f32, whiteness: f32, blackness: f32) -> (f32, f32, f32) {
+    if whiteness + blackness >= 1. {
+        let gray = whiteness / (whiteness + blackness);
+        return (gray, gray, gray);
+    }
+
+    let (red, green, blue) = hsl_to_rgb(hue, 1., 0.5);
+
+    let f = |c: f32| -> f32 { c.mul_add(1. - whiteness - blackness, whiteness) };
+
+    (f(red), f(green), f(blue))
+}
+
 impl SrgbColor {
     /// Construct an sRGB color from its component channels.
     pub fn new(
@@ -1549,56 +1583,6 @@ where
     Ok(Color::OklabColor(OklabColor::with_lch(
         lightness, chroma, hue, alpha,
     )))
-}
-
-/// https://w3c.github.io/csswg-drafts/css-color-4/#hwb-to-rgb
-#[inline]
-pub fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
-    if w + b >= 1.0 {
-        let gray = w / (w + b);
-        return (gray, gray, gray);
-    }
-
-    let (mut red, mut green, mut blue) = hsl_to_rgb(h, 1.0, 0.5);
-    let x = 1.0 - w - b;
-    red = red * x + w;
-    green = green * x + w;
-    blue = blue * x + w;
-    (red, green, blue)
-}
-
-/// https://w3c.github.io/csswg-drafts/css-color-4/#hsl-to-rgb
-/// except with h pre-multiplied by 3, to avoid some rounding errors.
-#[inline]
-pub fn hsl_to_rgb(hue: f32, saturation: f32, lightness: f32) -> (f32, f32, f32) {
-    fn hue_to_rgb(m1: f32, m2: f32, mut h3: f32) -> f32 {
-        if h3 < 0. {
-            h3 += 3.
-        }
-        if h3 > 3. {
-            h3 -= 3.
-        }
-        if h3 * 2. < 1. {
-            m1 + (m2 - m1) * h3 * 2.
-        } else if h3 * 2. < 3. {
-            m2
-        } else if h3 < 2. {
-            m1 + (m2 - m1) * (2. - h3) * 2.
-        } else {
-            m1
-        }
-    }
-    let m2 = if lightness <= 0.5 {
-        lightness * (saturation + 1.)
-    } else {
-        lightness + saturation - lightness * saturation
-    };
-    let m1 = lightness * 2. - m2;
-    let hue_times_3 = hue * 3.;
-    let red = hue_to_rgb(m1, m2, hue_times_3 + 1.);
-    let green = hue_to_rgb(m1, m2, hue_times_3);
-    let blue = hue_to_rgb(m1, m2, hue_times_3 - 1.);
-    (red, green, blue)
 }
 
 #[cfg(test)]
