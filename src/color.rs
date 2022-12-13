@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::f32::consts::PI;
 use std::fmt;
+use std::{f32::consts::PI, str::FromStr};
 
 use super::{BasicParseError, ParseError, Parser, ToCss, Token};
 
@@ -350,6 +350,81 @@ macro_rules! impl_lch_like {
 impl_lch_like!(Lch, "lch");
 impl_lch_like!(Oklch, "oklch");
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum PredefinedColorSpace {
+    Srgb,
+    SrgbLinear,
+    DisplayP3,
+    A98Rgb,
+    ProphotoRgb,
+    Rec2020,
+    XyzD50,
+    XyzD65,
+}
+
+impl PredefinedColorSpace {
+    fn as_str(&self) -> &str {
+        match self {
+            PredefinedColorSpace::Srgb => "srgb",
+            PredefinedColorSpace::SrgbLinear => "srgb-linear",
+            PredefinedColorSpace::DisplayP3 => "display-p3",
+            PredefinedColorSpace::A98Rgb => "a98-rgb",
+            PredefinedColorSpace::ProphotoRgb => "prophoto-rgb",
+            PredefinedColorSpace::Rec2020 => "rec2020",
+            PredefinedColorSpace::XyzD50 => "xyz-d50",
+            PredefinedColorSpace::XyzD65 => "xyz-d65",
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for PredefinedColorSpace {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_str().serialize(serializer)
+    }
+}
+
+impl ToCss for PredefinedColorSpace {
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        dest.write_str(self.as_str())
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct ColorFunction {
+    pub color_space: PredefinedColorSpace,
+    pub red: f32,
+    pub green: f32,
+    pub blue: f32,
+    pub alpha: f32,
+}
+
+impl ToCss for ColorFunction {
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        dest.write_str("color(")?;
+        self.color_space.to_css(dest)?;
+        dest.write_str(" ")?;
+        self.red.to_css(dest)?;
+        dest.write_str(" ")?;
+        self.green.to_css(dest)?;
+        dest.write_str(" ")?;
+        self.blue.to_css(dest)?;
+
+        serialize_alpha(dest, self.alpha, false)?;
+
+        dest.write_char(')')
+    }
+}
+
 /// An absolutely specified color.
 /// https://w3c.github.io/csswg-drafts/css-color-4/#typedef-absolute-color-base
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -370,6 +445,8 @@ pub enum AbsoluteColor {
     /// Specifies an Oklab color by Oklab Lightness, Chroma, and hue using
     /// the OKLCH cylindrical coordinate model.
     Oklch(Oklch),
+    /// Specified a sRGB based color with a predefined color space.
+    ColorFunction(ColorFunction),
 }
 
 impl AbsoluteColor {
@@ -381,6 +458,7 @@ impl AbsoluteColor {
             Self::Lch(c) => c.alpha,
             Self::Oklab(c) => c.alpha,
             Self::Oklch(c) => c.alpha,
+            Self::ColorFunction(c) => c.alpha,
         }
     }
 }
@@ -396,6 +474,7 @@ impl ToCss for AbsoluteColor {
             Self::Lch(lch) => lch.to_css(dest),
             Self::Oklab(lab) => lab.to_css(dest),
             Self::Oklch(lch) => lch.to_css(dest),
+            Self::ColorFunction(color_function) => color_function.to_css(dest),
         }
     }
 }
@@ -571,7 +650,7 @@ impl Color {
             Token::Function(ref name) => {
                 let name = name.clone();
                 return input.parse_nested_block(|arguments| {
-                    parse_color_function(component_parser, &*name, arguments)
+                    parse_color(component_parser, &*name, arguments)
                 });
             }
             _ => Err(()),
@@ -785,7 +864,7 @@ fn clamp_floor_256_f32(val: f32) -> u8 {
 }
 
 #[inline]
-fn parse_color_function<'i, 't, ComponentParser>(
+fn parse_color<'i, 't, ComponentParser>(
     component_parser: &ComponentParser,
     name: &str,
     arguments: &mut Parser<'i, 't>,
@@ -826,6 +905,8 @@ where
         "oklch" => parse_lch_like(component_parser, arguments, 1.0, 0.4, |l, c, h, alpha| {
             Color::Absolute(AbsoluteColor::Oklch(Oklch::new(l.max(0.), c.max(0.), h, alpha)))
         }),
+
+        "color" => parse_color_function(component_parser, arguments),
 
         _ => return Err(arguments.new_unexpected_token_error(Token::Ident(name.to_owned().into()))),
     }?;
@@ -1071,4 +1152,52 @@ where
     let alpha = parse_alpha(component_parser, arguments, false)?;
 
     Ok(into_color(lightness, chroma, hue, alpha))
+}
+
+#[inline]
+fn parse_color_function<'i, 't, ComponentParser>(
+    component_parser: &ComponentParser,
+    arguments: &mut Parser<'i, 't>,
+) -> Result<Color, ParseError<'i, ComponentParser::Error>>
+where
+    ComponentParser: ColorComponentParser<'i>,
+{
+    let location = arguments.current_source_location();
+    let color_space = arguments.try_parse(|i| {
+        let ident = i.expect_ident()?;
+        Ok(match_ignore_ascii_case! {
+            ident,
+            "srgb" => PredefinedColorSpace::Srgb,
+            "srgb-linear" => PredefinedColorSpace::SrgbLinear,
+            "display-p3" => PredefinedColorSpace::DisplayP3,
+            "a98-rgb" => PredefinedColorSpace::A98Rgb,
+            "prophoto-rgb" => PredefinedColorSpace::ProphotoRgb,
+            "rec2020" => PredefinedColorSpace::Rec2020,
+            "xyz-d50" => PredefinedColorSpace::XyzD50,
+            "xyz-d65" => PredefinedColorSpace::XyzD65,
+            _ => return Err(location.new_unexpected_token_error(Token::Ident(ident.clone())))
+        })
+    })?;
+
+    let red = component_parser
+        .parse_number_or_percentage(arguments)?
+        .unit_value();
+    let green = component_parser
+        .parse_number_or_percentage(arguments)?
+        .unit_value();
+    let blue = component_parser
+        .parse_number_or_percentage(arguments)?
+        .unit_value();
+
+    let alpha = parse_alpha(component_parser, arguments, false)?;
+
+    Ok(Color::Absolute(AbsoluteColor::ColorFunction(
+        ColorFunction {
+            color_space,
+            red,
+            green,
+            blue,
+            alpha,
+        },
+    )))
 }

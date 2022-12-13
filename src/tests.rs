@@ -405,6 +405,18 @@ fn color4_lab_lch_oklab_oklch() {
 }
 
 #[test]
+fn color4_color_function() {
+    run_color_tests(
+        include_str!("css-parsing-tests/color4_color_function.json"),
+        |c| {
+            c.ok()
+                .map(|v| v.to_css_string().to_json())
+                .unwrap_or(Value::Null)
+        },
+    )
+}
+
+#[test]
 fn nth() {
     run_json_tests(include_str!("css-parsing-tests/An+B.json"), |input| {
         input
@@ -854,6 +866,7 @@ where
     }
 }
 
+#[cfg(feature = "serde")]
 impl ToJson for Color {
     fn to_json(&self) -> Value {
         match *self {
@@ -866,6 +879,9 @@ impl ToJson for Color {
                 AbsoluteColor::Lch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
                 AbsoluteColor::Oklab(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
                 AbsoluteColor::Oklch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
+                AbsoluteColor::ColorFunction(ref c) => {
+                    json!([c.color_space, c.red, c.green, c.blue, c.alpha])
+                }
             },
         }
     }
