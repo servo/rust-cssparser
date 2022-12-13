@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use std::f32::consts::PI;
 use std::fmt;
-use std::{f32::consts::PI, str::FromStr};
 
 use super::{BasicParseError, ParseError, Parser, ToCss, Token};
 
@@ -399,9 +399,9 @@ impl ToCss for PredefinedColorSpace {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct ColorFunction {
     pub color_space: PredefinedColorSpace,
-    pub red: f32,
-    pub green: f32,
-    pub blue: f32,
+    pub c1: f32,
+    pub c2: f32,
+    pub c3: f32,
     pub alpha: f32,
 }
 
@@ -413,11 +413,11 @@ impl ToCss for ColorFunction {
         dest.write_str("color(")?;
         self.color_space.to_css(dest)?;
         dest.write_str(" ")?;
-        self.red.to_css(dest)?;
+        self.c1.to_css(dest)?;
         dest.write_str(" ")?;
-        self.green.to_css(dest)?;
+        self.c2.to_css(dest)?;
         dest.write_str(" ")?;
-        self.blue.to_css(dest)?;
+        self.c3.to_css(dest)?;
 
         serialize_alpha(dest, self.alpha, false)?;
 
@@ -445,7 +445,7 @@ pub enum AbsoluteColor {
     /// Specifies an Oklab color by Oklab Lightness, Chroma, and hue using
     /// the OKLCH cylindrical coordinate model.
     Oklch(Oklch),
-    /// Specified a sRGB based color with a predefined color space.
+    /// Specifies a color in a predefined color space.
     ColorFunction(ColorFunction),
 }
 
@@ -1174,29 +1174,33 @@ where
             "prophoto-rgb" => PredefinedColorSpace::ProphotoRgb,
             "rec2020" => PredefinedColorSpace::Rec2020,
             "xyz-d50" => PredefinedColorSpace::XyzD50,
-            "xyz-d65" => PredefinedColorSpace::XyzD65,
+            "xyz" | "xyz-d65" => PredefinedColorSpace::XyzD65,
             _ => return Err(location.new_unexpected_token_error(Token::Ident(ident.clone())))
         })
     })?;
 
-    let red = component_parser
-        .parse_number_or_percentage(arguments)?
-        .unit_value();
-    let green = component_parser
-        .parse_number_or_percentage(arguments)?
-        .unit_value();
-    let blue = component_parser
-        .parse_number_or_percentage(arguments)?
-        .unit_value();
+    macro_rules! parse_component {
+        () => {{
+            if let Ok(c) = arguments.try_parse(|i| component_parser.parse_number_or_percentage(i)) {
+                c.unit_value()
+            } else {
+                0.0
+            }
+        }};
+    }
+
+    let c1 = parse_component!();
+    let c2 = parse_component!();
+    let c3 = parse_component!();
 
     let alpha = parse_alpha(component_parser, arguments, false)?;
 
     Ok(Color::Absolute(AbsoluteColor::ColorFunction(
         ColorFunction {
             color_space,
-            red,
-            green,
-            blue,
+            c1,
+            c2,
+            c3,
             alpha,
         },
     )))
