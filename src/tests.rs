@@ -15,8 +15,8 @@ use self::test::Bencher;
 use super::{
     color::{rgb, rgba},
     parse_important, parse_nth, parse_one_declaration, parse_one_rule, stylesheet_encoding,
-    AbsoluteColor, AtRuleParser, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
-    DeclarationListParser, DeclarationParser, Delimiter, EncodingSupport, ParseError,
+    AbsoluteColor, AtRuleParser, BasicParseError, BasicParseErrorKind, Color,
+    CowRcStr, DeclarationListParser, DeclarationParser, Delimiter, EncodingSupport, ParseError,
     ParseErrorKind, Parser, ParserInput, ParserState, QualifiedRuleParser, RuleListParser,
     SourceLocation, ToCss, Token, TokenSerializationType, UnicodeRange, RGBA,
 };
@@ -866,7 +866,6 @@ where
     }
 }
 
-#[cfg(feature = "serde")]
 impl ToJson for Color {
     fn to_json(&self) -> Value {
         match *self {
@@ -879,9 +878,7 @@ impl ToJson for Color {
                 AbsoluteColor::Lch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
                 AbsoluteColor::Oklab(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
                 AbsoluteColor::Oklch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
-                AbsoluteColor::ColorFunction(ref c) => {
-                    json!([c.color_space, c.red, c.green, c.blue, c.alpha])
-                }
+                AbsoluteColor::ColorFunction(ref c) => json!([c.color_space.as_str(), c.c1, c.c2, c.c3, c.alpha]),
             },
         }
     }

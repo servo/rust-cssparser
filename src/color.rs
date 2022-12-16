@@ -221,7 +221,7 @@ macro_rules! impl_lab_like {
 
         #[cfg(feature = "serde")]
         impl Serialize for $cls {
-            fn serialize<S>(&self, serializer: S) -> Result<serde::ser::Ok, serde::ser::Error>
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: Serializer,
             {
@@ -231,7 +231,7 @@ macro_rules! impl_lab_like {
 
         #[cfg(feature = "serde")]
         impl<'de> Deserialize<'de> for $cls {
-            fn deserialize<D>(deserializer: D) -> Result<Self, serde::de::Error>
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
                 D: Deserializer<'de>,
             {
@@ -309,7 +309,7 @@ macro_rules! impl_lch_like {
 
         #[cfg(feature = "serde")]
         impl Serialize for $cls {
-            fn serialize<S>(&self, serializer: S) -> Result<serde::ser::Ok, serde::ser::Error>
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: Serializer,
             {
@@ -319,7 +319,7 @@ macro_rules! impl_lch_like {
 
         #[cfg(feature = "serde")]
         impl<'de> Deserialize<'de> for $cls {
-            fn deserialize<D>(deserializer: D) -> Result<Self, serde::de::Error>
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
                 D: Deserializer<'de>,
             {
@@ -350,20 +350,31 @@ macro_rules! impl_lch_like {
 impl_lch_like!(Lch, "lch");
 impl_lch_like!(Oklch, "oklch");
 
+/// A Predefined color space specified in:
+/// https://w3c.github.io/csswg-drafts/css-color-4/#predefined
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PredefinedColorSpace {
+    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-sRGB
     Srgb,
+    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-sRGB-linear
     SrgbLinear,
+    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-display-p3
     DisplayP3,
+    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-a98-rgb
     A98Rgb,
+    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-prophoto-rgb
     ProphotoRgb,
+    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-rec2020
     Rec2020,
+    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-xyz
     XyzD50,
+    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-xyz
     XyzD65,
 }
 
 impl PredefinedColorSpace {
-    fn as_str(&self) -> &str {
+    /// Returns the string value of the predefined color space.
+    pub fn as_str(&self) -> &str {
         match self {
             PredefinedColorSpace::Srgb => "srgb",
             PredefinedColorSpace::SrgbLinear => "srgb-linear",
@@ -377,6 +388,25 @@ impl PredefinedColorSpace {
     }
 }
 
+impl ToCss for PredefinedColorSpace {
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        dest.write_str(self.as_str())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for PredefinedColorSpace {
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        todo!()
+    }
+}
+
 #[cfg(feature = "serde")]
 impl Serialize for PredefinedColorSpace {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -387,22 +417,55 @@ impl Serialize for PredefinedColorSpace {
     }
 }
 
-impl ToCss for PredefinedColorSpace {
-    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
-    where
-        W: fmt::Write,
-    {
-        dest.write_str(self.as_str())
+/// A color specified by the color() function.
+/// https://w3c.github.io/csswg-drafts/css-color-4/#color-function
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct ColorFunction {
+    /// The color space for this color.
+    pub color_space: PredefinedColorSpace,
+    /// The first component of the color.  Either red or x.
+    pub c1: f32,
+    /// The second component of the color.  Either green or y.
+    pub c2: f32,
+    /// The third component of the color.  Either blue or z.
+    pub c3: f32,
+    /// The alpha component of the color.
+    pub alpha: f32,
+}
+
+impl ColorFunction {
+    /// Construct a new color function definition with the given color space and
+    /// color components.
+    pub fn new(color_space: PredefinedColorSpace, c1: f32, c2: f32, c3: f32, alpha: f32) -> Self {
+        Self {
+            color_space,
+            c1,
+            c2,
+            c3,
+            alpha,
+        }
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct ColorFunction {
-    pub color_space: PredefinedColorSpace,
-    pub c1: f32,
-    pub c2: f32,
-    pub c3: f32,
-    pub alpha: f32,
+#[cfg(feature = "serde")]
+impl Serialize for ColorFunction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        (self.color_space, self.c1, self.c2, self.c3, self.alpha).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for ColorFunction {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let (color_space, r, g, b, a) = Deserialize::deserialize(deserializer)?;
+        Ok(ColorFunction::new(color_space, r, g, b, a))
+    }
 }
 
 impl ToCss for ColorFunction {
