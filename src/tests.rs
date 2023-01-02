@@ -13,12 +13,12 @@ use serde_json::{self, json, Map, Value};
 use self::test::Bencher;
 
 use super::{
-    color::{rgb, rgba},
     parse_important, parse_nth, parse_one_declaration, parse_one_rule, stylesheet_encoding,
-    AbsoluteColor, AtRuleParser, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
-    DeclarationListParser, DeclarationParser, Delimiter, EncodingSupport, ParseError,
-    ParseErrorKind, Parser, ParserInput, ParserState, QualifiedRuleParser, RuleListParser,
-    SourceLocation, ToCss, Token, TokenSerializationType, UnicodeRange, RGBA,
+    AtRuleParser, BasicParseError, BasicParseErrorKind, CielabColor, Color, CowRcStr, CurrentColor,
+    DeclarationListParser, DeclarationParser, Delimiter, DeprecatedColor, EncodingSupport,
+    NamedColor, OklabColor, ParseError, ParseErrorKind, Parser, ParserInput, ParserState,
+    QualifiedRuleParser, RuleListParser, SourceLocation, SrgbColor, ToCss, Token,
+    TokenSerializationType, UnicodeRange,
 };
 
 macro_rules! JArray {
@@ -398,7 +398,14 @@ fn color4_lab_lch_oklab_oklch() {
     run_color_tests(
         include_str!("css-parsing-tests/color4_lab_lch_oklab_oklch.json"),
         |c| match c {
-            Ok(color) => Value::Array(vec![color.to_json(), color.to_css_string().to_json()]),
+            Ok(color) => Value::Array(vec![
+                color.to_json(),
+                match color {
+                    Color::CielabColor(cielab_color) => cielab_color.to_css_string().to_json(),
+                    Color::OklabColor(oklab_color) => oklab_color.to_css_string().to_json(),
+                    _ => Value::Null,
+                },
+            ]),
             Err(_) => Value::Null,
         },
     )
@@ -427,9 +434,27 @@ fn parse_comma_separated_ignoring_errors() {
         Color::parse(input).map_err(Into::<ParseError<()>>::into)
     });
     assert_eq!(result.len(), 3);
-    assert_eq!(result[0].to_css_string(), "rgb(255, 0, 0)");
-    assert_eq!(result[1].to_css_string(), "rgb(255, 255, 0)");
-    assert_eq!(result[2].to_css_string(), "rgb(0, 0, 255)");
+    assert_eq!(
+        result[0],
+        Color::NamedColor(NamedColor::new(
+            "red".to_string(),
+            SrgbColor::from_ints(255, 0, 0, 255)
+        ))
+    );
+    assert_eq!(
+        result[1],
+        Color::NamedColor(NamedColor::new(
+            "yellow".to_string(),
+            SrgbColor::from_ints(255, 255, 0, 255)
+        ))
+    );
+    assert_eq!(
+        result[2],
+        Color::NamedColor(NamedColor::new(
+            "blue".to_string(),
+            SrgbColor::from_ints(0, 0, 255, 255)
+        ))
+    );
 }
 
 #[test]
@@ -547,25 +572,25 @@ fn serialize_bad_tokens() {
 
 #[test]
 fn serialize_current_color() {
-    let c = Color::CurrentColor;
+    let c = CurrentColor;
     assert!(c.to_css_string() == "currentcolor");
 }
 
 #[test]
 fn serialize_rgb_full_alpha() {
-    let c = rgb(255, 230, 204);
+    let c = SrgbColor::from_ints(255, 230, 204, 255);
     assert_eq!(c.to_css_string(), "rgb(255, 230, 204)");
 }
 
 #[test]
 fn serialize_rgba() {
-    let c = rgba(26, 51, 77, 0.125);
-    assert_eq!(c.to_css_string(), "rgba(26, 51, 77, 0.125)");
+    let c = SrgbColor::from_ints(26, 51, 77, 32);
+    assert_eq!(c.to_css_string(), "rgba(26, 51, 77, 0.12549)");
 }
 
 #[test]
 fn serialize_rgba_two_digit_float_if_roundtrips() {
-    let c = Color::Absolute(AbsoluteColor::Rgba(RGBA::from_floats(0., 0., 0., 0.5)));
+    let c = SrgbColor::from_floats(0., 0., 0., 0.5);
     assert_eq!(c.to_css_string(), "rgba(0, 0, 0, 0.5)");
 }
 
@@ -857,16 +882,43 @@ where
 impl ToJson for Color {
     fn to_json(&self) -> Value {
         match *self {
-            Color::CurrentColor => "currentcolor".to_json(),
-            Color::Absolute(absolute) => match absolute {
-                AbsoluteColor::Rgba(ref rgba) => {
-                    json!([rgba.red, rgba.green, rgba.blue, rgba.alpha])
+            Color::SrgbColor(ref srgb_color)
+            | Color::NamedColor(NamedColor {
+                value: ref srgb_color,
+                ..
+            }) => {
+                let rgba = srgb_color.to_rgba();
+                json!([rgba.red, rgba.green, rgba.blue, srgb_color.to_floats().3])
+            }
+            Color::SystemColor(ref system_color)
+            | Color::DeprecatedColor(DeprecatedColor {
+                same_as: ref system_color,
+                ..
+            }) => system_color.name.to_json(),
+            Color::CurrentColor(CurrentColor) => "currentcolor".to_json(),
+            Color::CielabColor(CielabColor::CieLab(ref lab_coords))
+            | Color::OklabColor(OklabColor::OkLab(ref lab_coords)) => json!([
+                lab_coords.lightness,
+                lab_coords.a,
+                lab_coords.b,
+                match lab_coords.alpha {
+                    Some(alpha) => alpha.number,
+                    None => 0.,
                 }
-                AbsoluteColor::Lab(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
-                AbsoluteColor::Lch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
-                AbsoluteColor::Oklab(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
-                AbsoluteColor::Oklch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
-            },
+            ]),
+            Color::CielabColor(CielabColor::CieLch(ref lch_coords))
+            | Color::OklabColor(OklabColor::OkLch(ref lch_coords)) => json!([
+                lch_coords.lightness,
+                lch_coords.chroma,
+                match lch_coords.hue {
+                    Some(hue) => hue.degrees,
+                    None => 0.,
+                },
+                match lch_coords.alpha {
+                    Some(alpha) => alpha.number,
+                    None => 0.,
+                }
+            ]),
         }
     }
 }
