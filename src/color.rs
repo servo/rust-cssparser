@@ -388,6 +388,25 @@ impl PredefinedColorSpace {
     }
 }
 
+impl std::str::FromStr for PredefinedColorSpace {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
+            "srgb" => PredefinedColorSpace::Srgb,
+            "srgb-linear" => PredefinedColorSpace::SrgbLinear,
+            "display-p3" => PredefinedColorSpace::DisplayP3,
+            "a98-rgb" => PredefinedColorSpace::A98Rgb,
+            "prophoto-rgb" => PredefinedColorSpace::ProphotoRgb,
+            "rec2020" => PredefinedColorSpace::Rec2020,
+            "xyz-d50" => PredefinedColorSpace::XyzD50,
+            "xyz-d65" => PredefinedColorSpace::XyzD65,
+
+            _ => return Err(()),
+        })
+    }
+}
+
 impl ToCss for PredefinedColorSpace {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result
     where
@@ -399,11 +418,16 @@ impl ToCss for PredefinedColorSpace {
 
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for PredefinedColorSpace {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        todo!()
+        use std::str::FromStr;
+
+        let s: &str = Deserialize::deserialize(deserializer)?;
+
+        PredefinedColorSpace::from_str(s)
+            .map_err(|_| serde::de::Error::custom("invalid predefined color space"))
     }
 }
 
