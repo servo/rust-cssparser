@@ -28,15 +28,15 @@ def lab_like(name, f, fp):
     for b in [0.0, 10.0, 110.0, -10.0]:
         for a in [0.0, 10.0, 110.0, -10.0]:
             for lightness in [0.0, 10.0, 110.0, -10.0]:
-                items.append('"{}({:g} {:g} {:g})", "{:s}"'.format(
-                    name, lightness, a, b, slab(name, *f(lightness, a, b))))
-                items.append('"{}({:g}% {:g}% {:g}%)", "{:s}"'.format(
-                    name, lightness, a, b, slab(name, *fp(lightness, a, b))))
+                items.append('"{}({:g} {:g} {:g})", [[{:g}, {:g}, {:g}, {:g}], "{:s}"]'.format(
+                    name, lightness, a, b, *f(lightness, a, b), slab(name, *f(lightness, a, b))))
+                items.append('"{}({:g}% {:g}% {:g}%)", [[{:g}, {:g}, {:g}, {:g}], "{:s}"]'.format(
+                    name, lightness, a, b, *fp(lightness, a, b), slab(name, *fp(lightness, a, b))))
                 for alpha in [0, 0.2, 1]:
-                    items.append('"{}({:g} {:g} {:g} / {:g})", "{:s}"'.format(
-                        name, lightness, a, b, alpha, slab(name, *f(lightness, a, b, alpha))))
-                    items.append('"{}({:g}% {:g}% {:g}% / {:g})", "{:s}"'.format(
-                        name, lightness, a, b, alpha, slab(name, *fp(lightness, a, b, alpha))))
+                    items.append('"{}({:g} {:g} {:g} / {:g})", [[{:g}, {:g}, {:g}, {:g}], "{:s}"]'.format(
+                        name, lightness, a, b, alpha, *f(lightness, a, b, alpha), slab(name, *f(lightness, a, b, alpha))))
+                    items.append('"{}({:g}% {:g}% {:g}% / {:g})", [[{:g}, {:g}, {:g}, {:g}], "{:s}"]'.format(
+                        name, lightness, a, b, alpha, *fp(lightness, a, b, alpha), slab(name, *fp(lightness, a, b, alpha))))
 
 
 lab_like('lab', lab, labp)
@@ -79,15 +79,15 @@ def lch_like(name, f, fp):
     for h in [0, 30, 60, 90, 120, 180, 210, 240, 270, 300, 330, 360, 380, 700, -20]:
         for c in [0.0, 10.0, 110.0, -10.0]:
             for lightness in [0.0, 10.0, 110.0, -10.0]:
-                items.append('"{}({:g} {:g} {:g})", "{:s}"'.format(
-                    name, lightness, c, h, slch(name, *f(lightness, c, h))))
-                items.append('"{}({:g}% {:g}% {:g}deg)", "{:s}"'.format(
-                    name, lightness, c, h, slch(name, *fp(lightness, c, h))))
+                items.append('"{}({:g} {:g} {:g})", [[{:g}, {:g}, {:g}, {:g}], "{:s}"]'.format(
+                    name, lightness, c, h, *f(lightness, c, h), slch(name, *f(lightness, c, h))))
+                items.append('"{}({:g}% {:g}% {:g}deg)", [[{:g}, {:g}, {:g}, {:g}], "{:s}"]'.format(
+                    name, lightness, c, h, *fp(lightness, c, h), slch(name, *fp(lightness, c, h))))
                 for alpha in [0, 0.2, 1]:
-                    items.append('"{}({:g} {:g} {:g} / {:g})", "{:s}"'.format(
-                        name, lightness, c, h, alpha, slch(name, *f(lightness, c, h, alpha))))
-                    items.append('"{}({:g}% {:g}% {:g}deg / {:g})", "{:s}"'.format(
-                        name, lightness, c, h, alpha, slch(name, *fp(lightness, c, h, alpha))))
+                    items.append('"{}({:g} {:g} {:g} / {:g})", [[{:g}, {:g}, {:g}, {:g}], "{:s}"]'.format(
+                        name, lightness, c, h, alpha, *f(lightness, c, h, alpha), slch(name, *f(lightness, c, h, alpha))))
+                    items.append('"{}({:g}% {:g}% {:g}deg / {:g})", [[{:g}, {:g}, {:g}, {:g}], "{:s}"]'.format(
+                        name, lightness, c, h, alpha, *fp(lightness, c, h, alpha), slch(name, *fp(lightness, c, h, alpha))))
 
 
 lch_like('lch', lch, lchp)

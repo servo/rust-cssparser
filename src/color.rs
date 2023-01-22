@@ -221,7 +221,7 @@ macro_rules! impl_lab_like {
 
         #[cfg(feature = "serde")]
         impl Serialize for $cls {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            fn serialize<S>(&self, serializer: S) -> Result<serde::ser::Ok, serde::ser::Error>
             where
                 S: Serializer,
             {
@@ -231,7 +231,7 @@ macro_rules! impl_lab_like {
 
         #[cfg(feature = "serde")]
         impl<'de> Deserialize<'de> for $cls {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            fn deserialize<D>(deserializer: D) -> Result<Self, serde::de::Error>
             where
                 D: Deserializer<'de>,
             {
@@ -309,7 +309,7 @@ macro_rules! impl_lch_like {
 
         #[cfg(feature = "serde")]
         impl Serialize for $cls {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            fn serialize<S>(&self, serializer: S) -> Result<serde::ser::Ok, serde::ser::Error>
             where
                 S: Serializer,
             {
@@ -319,7 +319,7 @@ macro_rules! impl_lch_like {
 
         #[cfg(feature = "serde")]
         impl<'de> Deserialize<'de> for $cls {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            fn deserialize<D>(deserializer: D) -> Result<Self, serde::de::Error>
             where
                 D: Deserializer<'de>,
             {
@@ -853,7 +853,8 @@ where
         component_parser
             .parse_number_or_percentage(arguments)?
             .unit_value()
-            .clamp(0.0, OPAQUE)
+            .max(0.0)
+            .min(OPAQUE)
     } else {
         OPAQUE
     })
@@ -936,7 +937,8 @@ where
 
     let first_percentage = component_parser
         .parse_percentage(arguments)?
-        .clamp(0.0, 1.0);
+        .max(0.)
+        .min(1.);
 
     if uses_commas {
         arguments.expect_comma()?;
@@ -944,7 +946,8 @@ where
 
     let second_percentage = component_parser
         .parse_percentage(arguments)?
-        .clamp(0.0, 1.0);
+        .max(0.)
+        .min(1.);
 
     let (red, green, blue) = to_rgb(hue, first_percentage, second_percentage);
     let red = clamp_unit_f32(red);
