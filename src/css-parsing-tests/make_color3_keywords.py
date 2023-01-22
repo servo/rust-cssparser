@@ -172,17 +172,9 @@ def replace(s, i, r):
     i %= len(s)
     return s[:i] + r(s[i]) + s[i + 1:]
 
-
-def rgba_to_str(r, g, b, a=1.0):
-    if a == 1.0:
-        return '"rgb({:g}, {:g}, {:g})"'.format(r, g, b)
-    else:
-        return '"rgba({:g}, {:g}, {:g}, {:g})"'.format(r, g, b, a)
-
-
 print('[')
 print(',\n'.join(
-    '"%s", %s' % (css, rgba_to_str(*rgba) if valid else 'null')
+    '"%s", %s' % (css, list(rgba) if valid else 'null')
     for i, (keyword, rgba) in enumerate(all_keywords)
     for css, valid, run in [
         (keyword, True, True),
