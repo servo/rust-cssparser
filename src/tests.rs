@@ -6,7 +6,6 @@
 extern crate test;
 
 use encoding_rs;
-use matches::matches;
 use serde_json::{self, json, Map, Value};
 
 #[cfg(feature = "bench")]
