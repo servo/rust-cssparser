@@ -4,6 +4,7 @@
 
 use std::f32::consts::PI;
 use std::fmt;
+use std::str::FromStr;
 
 use super::{BasicParseError, ParseError, Parser, ToCss, Token};
 
@@ -388,11 +389,11 @@ impl PredefinedColorSpace {
     }
 }
 
-impl std::str::FromStr for PredefinedColorSpace {
+impl FromStr for PredefinedColorSpace {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.to_lowercase().as_str() {
+        Ok(match_ignore_ascii_case! { s,
             "srgb" => PredefinedColorSpace::Srgb,
             "srgb-linear" => PredefinedColorSpace::SrgbLinear,
             "display-p3" => PredefinedColorSpace::DisplayP3,
@@ -400,7 +401,7 @@ impl std::str::FromStr for PredefinedColorSpace {
             "prophoto-rgb" => PredefinedColorSpace::ProphotoRgb,
             "rec2020" => PredefinedColorSpace::Rec2020,
             "xyz-d50" => PredefinedColorSpace::XyzD50,
-            "xyz-d65" => PredefinedColorSpace::XyzD65,
+            "xyz" | "xyz-d65" => PredefinedColorSpace::XyzD65,
 
             _ => return Err(()),
         })
@@ -422,10 +423,7 @@ impl<'de> Deserialize<'de> for PredefinedColorSpace {
     where
         D: Deserializer<'de>,
     {
-        use std::str::FromStr;
-
         let s: &str = Deserialize::deserialize(deserializer)?;
-
         PredefinedColorSpace::from_str(s)
             .map_err(|_| serde::de::Error::custom("invalid predefined color space"))
     }
@@ -477,7 +475,14 @@ impl Serialize for ColorFunction {
     where
         S: Serializer,
     {
-        (self.color_space, self.c1, self.c2, self.c3, self.alpha).serialize(serializer)
+        (
+            self.color_space.as_str(),
+            self.c1,
+            self.c2,
+            self.c3,
+            self.alpha,
+        )
+            .serialize(serializer)
     }
 }
 
@@ -499,11 +504,11 @@ impl ToCss for ColorFunction {
     {
         dest.write_str("color(")?;
         self.color_space.to_css(dest)?;
-        dest.write_str(" ")?;
+        dest.write_char(' ')?;
         self.c1.to_css(dest)?;
-        dest.write_str(" ")?;
+        dest.write_char(' ')?;
         self.c2.to_css(dest)?;
-        dest.write_str(" ")?;
+        dest.write_char(' ')?;
         self.c3.to_css(dest)?;
 
         serialize_alpha(dest, self.alpha, false)?;
@@ -1252,18 +1257,8 @@ where
     let location = arguments.current_source_location();
     let color_space = arguments.try_parse(|i| {
         let ident = i.expect_ident()?;
-        Ok(match_ignore_ascii_case! {
-            ident,
-            "srgb" => PredefinedColorSpace::Srgb,
-            "srgb-linear" => PredefinedColorSpace::SrgbLinear,
-            "display-p3" => PredefinedColorSpace::DisplayP3,
-            "a98-rgb" => PredefinedColorSpace::A98Rgb,
-            "prophoto-rgb" => PredefinedColorSpace::ProphotoRgb,
-            "rec2020" => PredefinedColorSpace::Rec2020,
-            "xyz-d50" => PredefinedColorSpace::XyzD50,
-            "xyz" | "xyz-d65" => PredefinedColorSpace::XyzD65,
-            _ => return Err(location.new_unexpected_token_error(Token::Ident(ident.clone())))
-        })
+        PredefinedColorSpace::from_str(ident)
+            .map_err(|_| location.new_unexpected_token_error(Token::Ident(ident.clone())))
     })?;
 
     macro_rules! parse_component {
