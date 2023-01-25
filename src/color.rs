@@ -1204,9 +1204,9 @@ fn parse_color_function<'i, 't, ComponentParser>(
 where
     ComponentParser: ColorComponentParser<'i>,
 {
-    let location = arguments.current_source_location();
-
     let color_space = {
+        let location = arguments.current_source_location();
+
         let ident = arguments.expect_ident()?;
         PredefinedColorSpace::from_str(ident)
             .map_err(|_| location.new_unexpected_token_error(Token::Ident(ident.clone())))?
