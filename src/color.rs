@@ -417,28 +417,6 @@ impl ToCss for PredefinedColorSpace {
     }
 }
 
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for PredefinedColorSpace {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        PredefinedColorSpace::from_str(s)
-            .map_err(|_| serde::de::Error::custom("invalid predefined color space"))
-    }
-}
-
-#[cfg(feature = "serde")]
-impl Serialize for PredefinedColorSpace {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.as_str().serialize(serializer)
-    }
-}
-
 /// A color specified by the color() function.
 /// https://w3c.github.io/csswg-drafts/css-color-4/#color-function
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -466,34 +444,6 @@ impl ColorFunction {
             c3,
             alpha,
         }
-    }
-}
-
-#[cfg(feature = "serde")]
-impl Serialize for ColorFunction {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        (
-            self.color_space.as_str(),
-            self.c1,
-            self.c2,
-            self.c3,
-            self.alpha,
-        )
-            .serialize(serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for ColorFunction {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let (color_space, r, g, b, a) = Deserialize::deserialize(deserializer)?;
-        Ok(ColorFunction::new(color_space, r, g, b, a))
     }
 }
 
