@@ -1205,19 +1205,18 @@ where
     ComponentParser: ColorComponentParser<'i>,
 {
     let location = arguments.current_source_location();
-    let color_space = arguments.try_parse(|i| {
-        let ident = i.expect_ident()?;
+
+    let color_space = {
+        let ident = arguments.expect_ident()?;
         PredefinedColorSpace::from_str(ident)
-            .map_err(|_| location.new_unexpected_token_error(Token::Ident(ident.clone())))
-    })?;
+            .map_err(|_| location.new_unexpected_token_error(Token::Ident(ident.clone())))?
+    };
 
     macro_rules! parse_component {
         () => {{
-            if let Ok(c) = arguments.try_parse(|i| component_parser.parse_number_or_percentage(i)) {
-                c.unit_value()
-            } else {
-                0.0
-            }
+            component_parser
+                .parse_number_or_percentage(arguments)?
+                .unit_value()
         }};
     }
 

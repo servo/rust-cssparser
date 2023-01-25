@@ -15,8 +15,8 @@ use self::test::Bencher;
 use super::{
     color::{rgb, rgba},
     parse_important, parse_nth, parse_one_declaration, parse_one_rule, stylesheet_encoding,
-    AbsoluteColor, AtRuleParser, BasicParseError, BasicParseErrorKind, Color,
-    CowRcStr, DeclarationListParser, DeclarationParser, Delimiter, EncodingSupport, ParseError,
+    AbsoluteColor, AtRuleParser, BasicParseError, BasicParseErrorKind, Color, CowRcStr,
+    DeclarationListParser, DeclarationParser, Delimiter, EncodingSupport, ParseError,
     ParseErrorKind, Parser, ParserInput, ParserState, QualifiedRuleParser, RuleListParser,
     SourceLocation, ToCss, Token, TokenSerializationType, UnicodeRange, RGBA,
 };
@@ -414,6 +414,21 @@ fn color4_color_function() {
                 .unwrap_or(Value::Null)
         },
     )
+}
+
+macro_rules! parse_single_color {
+    ($i:expr) => {{
+        let input = $i;
+        let mut input = ParserInput::new(input);
+        let mut input = Parser::new(&mut input);
+        Color::parse(&mut input).map_err(Into::<ParseError<()>>::into)
+    }};
+}
+
+#[test]
+fn color4_invalid_color_space() {
+    let result = parse_single_color!("color(invalid 1 1 1)");
+    assert!(result.is_err());
 }
 
 #[test]
@@ -878,7 +893,9 @@ impl ToJson for Color {
                 AbsoluteColor::Lch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
                 AbsoluteColor::Oklab(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
                 AbsoluteColor::Oklch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
-                AbsoluteColor::ColorFunction(ref c) => json!([c.color_space.as_str(), c.c1, c.c2, c.c3, c.alpha]),
+                AbsoluteColor::ColorFunction(ref c) => {
+                    json!([c.color_space.as_str(), c.c1, c.c2, c.c3, c.alpha])
+                }
             },
         }
     }
