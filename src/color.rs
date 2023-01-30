@@ -13,7 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 const OPAQUE: f32 = 1.0;
 
-/// https://w3c.github.io/csswg-drafts/css-color-4/#serializing-alpha-values
+/// https://drafts.csswg.org/css-color-4/#serializing-alpha-values
 #[inline]
 fn serialize_alpha(dest: &mut impl fmt::Write, alpha: f32, legacy_syntax: bool) -> fmt::Result {
     // If the alpha component is full opaque, don't emit the alpha value in CSS.
@@ -352,24 +352,24 @@ impl_lch_like!(Lch, "lch");
 impl_lch_like!(Oklch, "oklch");
 
 /// A Predefined color space specified in:
-/// https://w3c.github.io/csswg-drafts/css-color-4/#predefined
+/// https://drafts.csswg.org/css-color-4/#predefined
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PredefinedColorSpace {
-    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-sRGB
+    /// https://drafts.csswg.org/css-color-4/#predefined-sRGB
     Srgb,
-    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-sRGB-linear
+    /// https://drafts.csswg.org/css-color-4/#predefined-sRGB-linear
     SrgbLinear,
-    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-display-p3
+    /// https://drafts.csswg.org/css-color-4/#predefined-display-p3
     DisplayP3,
-    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-a98-rgb
+    /// https://drafts.csswg.org/css-color-4/#predefined-a98-rgb
     A98Rgb,
-    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-prophoto-rgb
+    /// https://drafts.csswg.org/css-color-4/#predefined-prophoto-rgb
     ProphotoRgb,
-    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-rec2020
+    /// https://drafts.csswg.org/css-color-4/#predefined-rec2020
     Rec2020,
-    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-xyz
+    /// https://drafts.csswg.org/css-color-4/#predefined-xyz
     XyzD50,
-    /// https://w3c.github.io/csswg-drafts/css-color-4/#predefined-xyz
+    /// https://drafts.csswg.org/css-color-4/#predefined-xyz
     XyzD65,
 }
 
@@ -418,7 +418,7 @@ impl ToCss for PredefinedColorSpace {
 }
 
 /// A color specified by the color() function.
-/// https://w3c.github.io/csswg-drafts/css-color-4/#color-function
+/// https://drafts.csswg.org/css-color-4/#color-function
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct ColorFunction {
     /// The color space for this color.
