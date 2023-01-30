@@ -467,10 +467,12 @@ impl ToCss for ColorFunction {
     }
 }
 
-/// An absolutely specified color.
-/// https://w3c.github.io/csswg-drafts/css-color-4/#typedef-absolute-color-base
+/// A <color> value.
+/// https://drafts.csswg.org/css-color-4/#color-type
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum AbsoluteColor {
+pub enum Color {
+    /// The 'currentcolor' keyword.
+    CurrentColor,
     /// Specify sRGB colors directly by their red/green/blue/alpha chanels.
     Rgba(RGBA),
     /// Specifies a CIELAB color by CIE Lightness and its a- and b-axis hue
@@ -491,56 +493,6 @@ pub enum AbsoluteColor {
     ColorFunction(ColorFunction),
 }
 
-impl AbsoluteColor {
-    /// Return the alpha component of any of the schemes within.
-    pub fn alpha(&self) -> f32 {
-        match self {
-            Self::Rgba(c) => c.alpha,
-            Self::Lab(c) => c.alpha,
-            Self::Lch(c) => c.alpha,
-            Self::Oklab(c) => c.alpha,
-            Self::Oklch(c) => c.alpha,
-            Self::ColorFunction(c) => c.alpha,
-        }
-    }
-}
-
-impl ToCss for AbsoluteColor {
-    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
-    where
-        W: fmt::Write,
-    {
-        match self {
-            Self::Rgba(rgba) => rgba.to_css(dest),
-            Self::Lab(lab) => lab.to_css(dest),
-            Self::Lch(lch) => lch.to_css(dest),
-            Self::Oklab(lab) => lab.to_css(dest),
-            Self::Oklch(lch) => lch.to_css(dest),
-            Self::ColorFunction(color_function) => color_function.to_css(dest),
-        }
-    }
-}
-
-#[inline]
-pub(crate) const fn rgb(red: u8, green: u8, blue: u8) -> Color {
-    rgba(red, green, blue, OPAQUE)
-}
-
-#[inline]
-pub(crate) const fn rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Color {
-    Color::Absolute(AbsoluteColor::Rgba(RGBA::new(red, green, blue, alpha)))
-}
-
-/// A <color> value.
-/// https://w3c.github.io/csswg-drafts/css-color-4/#color-type
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum Color {
-    /// The 'currentcolor' keyword.
-    CurrentColor,
-    /// An absolutely specified color.
-    Absolute(AbsoluteColor),
-}
-
 impl ToCss for Color {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result
     where
@@ -548,7 +500,12 @@ impl ToCss for Color {
     {
         match *self {
             Color::CurrentColor => dest.write_str("currentcolor"),
-            Color::Absolute(absolute) => absolute.to_css(dest),
+            Color::Rgba(rgba) => rgba.to_css(dest),
+            Color::Lab(lab) => lab.to_css(dest),
+            Color::Lch(lch) => lch.to_css(dest),
+            Color::Oklab(lab) => lab.to_css(dest),
+            Color::Oklch(lch) => lch.to_css(dest),
+            Color::ColorFunction(color_function) => color_function.to_css(dest),
         }
     }
 }
@@ -686,8 +643,9 @@ impl Color {
         let location = input.current_source_location();
         let token = input.next()?;
         match *token {
-            Token::Hash(ref value) | Token::IDHash(ref value) => RGBA::parse_hash(value.as_bytes())
-                .map(|rgba| Color::Absolute(AbsoluteColor::Rgba(rgba))),
+            Token::Hash(ref value) | Token::IDHash(ref value) => {
+                RGBA::parse_hash(value.as_bytes()).map(|rgba| Color::Rgba(rgba))
+            }
             Token::Ident(ref value) => parse_color_keyword(&*value),
             Token::Function(ref name) => {
                 let name = name.clone();
@@ -714,6 +672,16 @@ impl Color {
 /// (For example, the value of an `Ident` token is fine.)
 #[inline]
 pub fn parse_color_keyword(ident: &str) -> Result<Color, ()> {
+    #[inline]
+    pub(crate) const fn rgb(red: u8, green: u8, blue: u8) -> Color {
+        rgba(red, green, blue, OPAQUE)
+    }
+
+    #[inline]
+    pub(crate) const fn rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Color {
+        Color::Rgba(RGBA::new(red, green, blue, alpha))
+    }
+
     ascii_case_insensitive_phf_map! {
         keyword -> Color = {
             "black" => rgb(0, 0, 0),
@@ -927,25 +895,25 @@ where
         // for L: 0% = 0.0, 100% = 100.0
         // for a and b: -100% = -125, 100% = 125
         "lab" => parse_lab_like(component_parser, arguments, 100.0, 125.0, |l, a, b, alpha| {
-            Color::Absolute(AbsoluteColor::Lab(Lab::new(l.max(0.), a , b , alpha)))
+            Color::Lab(Lab::new(l.max(0.), a , b , alpha))
         }),
 
         // for L: 0% = 0.0, 100% = 100.0
         // for C: 0% = 0, 100% = 150
         "lch" => parse_lch_like(component_parser, arguments, 100.0, 150.0, |l, c, h, alpha| {
-            Color::Absolute(AbsoluteColor::Lch(Lch::new(l.max(0.), c.max(0.), h, alpha)))
+            Color::Lch(Lch::new(l.max(0.), c.max(0.), h, alpha))
         }),
 
         // for L: 0% = 0.0, 100% = 1.0
         // for a and b: -100% = -0.4, 100% = 0.4
         "oklab" => parse_lab_like(component_parser, arguments, 1.0, 0.4, |l, a, b, alpha| {
-            Color::Absolute(AbsoluteColor::Oklab(Oklab::new(l.max(0.), a, b, alpha)))
+            Color::Oklab(Oklab::new(l.max(0.), a, b, alpha))
         }),
 
         // for L: 0% = 0.0, 100% = 1.0
         // for C: 0% = 0.0 100% = 0.4
         "oklch" => parse_lch_like(component_parser, arguments, 1.0, 0.4, |l, c, h, alpha| {
-            Color::Absolute(AbsoluteColor::Oklch(Oklch::new(l.max(0.), c.max(0.), h, alpha)))
+            Color::Oklch(Oklch::new(l.max(0.), c.max(0.), h, alpha))
         }),
 
         "color" => parse_color_function(component_parser, arguments),
@@ -1029,7 +997,7 @@ where
     ComponentParser: ColorComponentParser<'i>,
 {
     let (red, green, blue, alpha) = parse_rgb_components_rgb(component_parser, arguments)?;
-    Ok(rgba(red, green, blue, alpha))
+    Ok(Color::Rgba(RGBA::new(red, green, blue, alpha)))
 }
 
 /// Parses hsl and hbw syntax, which happens to be identical.
@@ -1076,7 +1044,7 @@ where
 
     let alpha = parse_alpha(component_parser, arguments, uses_commas)?;
 
-    Ok(rgba(red, green, blue, alpha))
+    Ok(Color::Rgba(RGBA::new(red, green, blue, alpha)))
 }
 
 /// https://drafts.csswg.org/css-color-4/#hwb-to-rgb
@@ -1223,13 +1191,11 @@ where
 
     let alpha = parse_alpha(component_parser, arguments, false)?;
 
-    Ok(Color::Absolute(AbsoluteColor::ColorFunction(
-        ColorFunction {
-            color_space,
-            c1,
-            c2,
-            c3,
-            alpha,
-        },
-    )))
+    Ok(Color::ColorFunction(ColorFunction {
+        color_space,
+        c1,
+        c2,
+        c3,
+        alpha,
+    }))
 }
