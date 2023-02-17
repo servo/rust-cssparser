@@ -644,6 +644,7 @@ impl Color {
     }
 }
 
+/// This trait is used by the [`ColorParser`] to construct colors of any type.
 pub trait FromParsedColor {
     /// Construct a new color from the CSS `currentcolor` keyword.
     fn from_current_color() -> Self;
