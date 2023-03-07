@@ -32,6 +32,13 @@ fn serialize_alpha(dest: &mut impl fmt::Write, alpha: f32, legacy_syntax: bool) 
     rounded_alpha.to_css(dest)
 }
 
+// Guaratees hue in [0..360)
+fn normalize_hue(hue: f32) -> f32 {
+    // https://drafts.csswg.org/css-values/#angles
+    // Subtract an integer before rounding, to avoid some rounding errors:
+    hue - 360.0 * (hue / 360.0).floor()
+}
+
 /// A color with red, green, blue, and alpha components, in a byte each.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
@@ -532,6 +539,13 @@ impl NumberOrPercentage {
             NumberOrPercentage::Percentage { unit_value } => unit_value,
         }
     }
+
+    fn value(&self, percentage_max: f32) -> f32 {
+        match *self {
+            Self::Number { value } => value,
+            Self::Percentage { unit_value } => unit_value * percentage_max,
+        }
+    }
 }
 
 /// Either an angle or a number.
@@ -945,7 +959,7 @@ fn clamp_unit_f32(val: f32) -> u8 {
 }
 
 fn clamp_floor_256_f32(val: f32) -> u8 {
-    val.round().max(0.).min(255.) as u8
+    val.round().clamp(0., 255.) as u8
 }
 
 /// Parse one of the color functions: rgba(), lab(), color(), etc.
@@ -958,67 +972,30 @@ fn parse_color_function<'i, 't, P>(
 where
     P: ColorParser<'i>,
 {
-    // FIXME: Should the parser clamp values? or should specified/computed
-    // value processing handle clamping?
-
     let color = match_ignore_ascii_case! { name,
         "rgb" | "rgba" => parse_rgb(color_parser, arguments),
 
-        "hsl" | "hsla" => parse_hsl_hwb(
-            color_parser,
-            arguments,
-            hsl_to_rgb,
-            /* allow_comma = */ true,
-        ),
+        "hsl" | "hsla" => parse_hsl(color_parser, arguments),
 
-        "hwb" => parse_hsl_hwb(
-            color_parser,
-            arguments,
-            hwb_to_rgb,
-            /* allow_comma = */ false,
-        ),
+        "hwb" => parse_hwb(color_parser, arguments),
 
         // for L: 0% = 0.0, 100% = 100.0
         // for a and b: -100% = -125, 100% = 125
-        "lab" => parse_lab_like(
-            color_parser,
-            arguments,
-            100.0,
-            125.0,
-            P::Output::from_lab,
-        ),
+        "lab" => parse_lab_like(color_parser, arguments, 100.0, 125.0, P::Output::from_lab),
 
         // for L: 0% = 0.0, 100% = 100.0
         // for C: 0% = 0, 100% = 150
-        "lch" => parse_lch_like(
-            color_parser,
-            arguments,
-            100.0,
-            150.0,
-            P::Output::from_lch,
-        ),
+        "lch" => parse_lch_like(color_parser, arguments, 100.0, 150.0, P::Output::from_lch),
 
         // for L: 0% = 0.0, 100% = 1.0
         // for a and b: -100% = -0.4, 100% = 0.4
-        "oklab" => parse_lab_like(
-            color_parser,
-            arguments,
-            1.0,
-            0.4,
-            P::Output::from_oklab,
-        ),
+        "oklab" => parse_lab_like(color_parser, arguments, 1.0, 0.4, P::Output::from_oklab),
 
         // for L: 0% = 0.0, 100% = 1.0
         // for C: 0% = 0.0 100% = 0.4
-        "oklch" => parse_lch_like(
-            color_parser,
-            arguments,
-            1.0,
-            0.4,
-            P::Output::from_oklch,
-        ),
+        "oklch" => parse_lch_like(color_parser, arguments, 1.0, 0.4, P::Output::from_oklch),
 
-        "color" => parse_color_color_function(color_parser, arguments),
+        "color" => parse_color_with_color_space(color_parser, arguments),
 
         _ => return Err(arguments.new_unexpected_token_error(Token::Ident(name.to_owned().into()))),
     }?;
@@ -1028,8 +1005,23 @@ where
     Ok(color)
 }
 
+/// Parse the alpha component by itself from either number or percentage,
+/// clipping the result to [0.0..1.0].
 #[inline]
-fn parse_alpha<'i, 't, P>(
+fn parse_alpha_component<'i, 't, P>(
+    color_parser: &P,
+    arguments: &mut Parser<'i, 't>,
+) -> Result<f32, ParseError<'i, P::Error>>
+where
+    P: ColorParser<'i>,
+{
+    Ok(color_parser
+        .parse_number_or_percentage(arguments)?
+        .unit_value()
+        .clamp(0.0, OPAQUE))
+}
+
+fn parse_legacy_alpha<'i, 't, P>(
     color_parser: &P,
     arguments: &mut Parser<'i, 't>,
     uses_commas: bool,
@@ -1043,10 +1035,7 @@ where
         } else {
             arguments.expect_delim('/')?;
         };
-        color_parser
-            .parse_number_or_percentage(arguments)?
-            .unit_value()
-            .clamp(0.0, OPAQUE)
+        parse_alpha_component(color_parser, arguments)?
     } else {
         OPAQUE
     })
@@ -1085,52 +1074,75 @@ where
         blue = clamp_unit_f32(color_parser.parse_percentage(arguments)?);
     }
 
-    let alpha = parse_alpha(color_parser, arguments, uses_commas)?;
+    let alpha = parse_legacy_alpha(color_parser, arguments, uses_commas)?;
 
     Ok(P::Output::from_rgba(red, green, blue, alpha))
 }
 
-/// Parses hsl and hbw syntax, which happens to be identical.
+/// Parses hsl syntax.
 ///
 /// https://drafts.csswg.org/css-color/#the-hsl-notation
-/// https://drafts.csswg.org/css-color/#the-hbw-notation
 #[inline]
-fn parse_hsl_hwb<'i, 't, P>(
+fn parse_hsl<'i, 't, P>(
     color_parser: &P,
     arguments: &mut Parser<'i, 't>,
-    to_rgb: impl FnOnce(f32, f32, f32) -> (f32, f32, f32),
-    allow_comma: bool,
 ) -> Result<P::Output, ParseError<'i, P::Error>>
 where
     P: ColorParser<'i>,
 {
-    // Hue given as an angle
-    // https://drafts.csswg.org/css-values/#angles
-    let hue_degrees = color_parser.parse_angle_or_number(arguments)?.degrees();
+    let (hue, saturation, lightness, alpha) = parse_legacy_components(
+        color_parser,
+        arguments,
+        P::parse_angle_or_number,
+        P::parse_percentage,
+        P::parse_percentage,
+    )?;
 
-    // Subtract an integer before rounding, to avoid some rounding errors:
-    let hue_normalized_degrees = hue_degrees - 360. * (hue_degrees / 360.).floor();
-    let hue = hue_normalized_degrees / 360.;
+    let hue = normalize_hue(hue.degrees());
+    let saturation = saturation.clamp(0.0, 1.0);
+    let lightness = lightness.clamp(0.0, 1.0);
 
-    // Saturation and lightness are clamped to 0% ... 100%
-    let uses_commas = allow_comma && arguments.try_parse(|i| i.expect_comma()).is_ok();
+    let (red, green, blue) = hsl_to_rgb(hue / 360.0, saturation, lightness);
 
-    let first_percentage = color_parser.parse_percentage(arguments)?.clamp(0.0, 1.0);
+    Ok(P::Output::from_rgba(
+        clamp_unit_f32(red),
+        clamp_unit_f32(green),
+        clamp_unit_f32(blue),
+        alpha,
+    ))
+}
 
-    if uses_commas {
-        arguments.expect_comma()?;
-    }
+/// Parses hwb syntax.
+///
+/// https://drafts.csswg.org/css-color/#the-hbw-notation
+#[inline]
+fn parse_hwb<'i, 't, P>(
+    color_parser: &P,
+    arguments: &mut Parser<'i, 't>,
+) -> Result<P::Output, ParseError<'i, P::Error>>
+where
+    P: ColorParser<'i>,
+{
+    let (hue, whiteness, blackness, alpha) = parse_components(
+        color_parser,
+        arguments,
+        P::parse_angle_or_number,
+        P::parse_percentage,
+        P::parse_percentage,
+    )?;
 
-    let second_percentage = color_parser.parse_percentage(arguments)?.clamp(0.0, 1.0);
+    let hue = normalize_hue(hue.degrees());
+    let whiteness = whiteness.clamp(0.0, 1.0);
+    let blackness = blackness.clamp(0.0, 1.0);
 
-    let (red, green, blue) = to_rgb(hue, first_percentage, second_percentage);
-    let red = clamp_unit_f32(red);
-    let green = clamp_unit_f32(green);
-    let blue = clamp_unit_f32(blue);
+    let (red, green, blue) = hwb_to_rgb(hue / 360.0, whiteness, blackness);
 
-    let alpha = parse_alpha(color_parser, arguments, uses_commas)?;
-
-    Ok(P::Output::from_rgba(red, green, blue, alpha))
+    Ok(P::Output::from_rgba(
+        clamp_unit_f32(red),
+        clamp_unit_f32(green),
+        clamp_unit_f32(blue),
+        alpha,
+    ))
 }
 
 /// https://drafts.csswg.org/css-color-4/#hwb-to-rgb
@@ -1141,6 +1153,7 @@ pub fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
         return (gray, gray, gray);
     }
 
+    // hue is expected in the range [0..1].
     let (mut red, mut green, mut blue) = hsl_to_rgb(h, 1.0, 0.5);
     let x = 1.0 - w - b;
     red = red * x + w;
@@ -1153,6 +1166,8 @@ pub fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
 /// except with h pre-multiplied by 3, to avoid some rounding errors.
 #[inline]
 pub fn hsl_to_rgb(hue: f32, saturation: f32, lightness: f32) -> (f32, f32, f32) {
+    debug_assert!(hue >= 0.0 && hue <= 1.0);
+
     fn hue_to_rgb(m1: f32, m2: f32, mut h3: f32) -> f32 {
         if h3 < 0. {
             h3 += 3.
@@ -1194,25 +1209,17 @@ fn parse_lab_like<'i, 't, P>(
 where
     P: ColorParser<'i>,
 {
-    let lightness = match color_parser.parse_number_or_percentage(arguments)? {
-        NumberOrPercentage::Number { value } => value,
-        NumberOrPercentage::Percentage { unit_value } => unit_value * lightness_range,
-    }
-    .max(0.);
+    let (lightness, a, b, alpha) = parse_components(
+        color_parser,
+        arguments,
+        P::parse_number_or_percentage,
+        P::parse_number_or_percentage,
+        P::parse_number_or_percentage,
+    )?;
 
-    macro_rules! parse_a_b {
-        () => {{
-            match color_parser.parse_number_or_percentage(arguments)? {
-                NumberOrPercentage::Number { value } => value,
-                NumberOrPercentage::Percentage { unit_value } => unit_value * a_b_range,
-            }
-        }};
-    }
-
-    let a = parse_a_b!();
-    let b = parse_a_b!();
-
-    let alpha = parse_alpha(color_parser, arguments, false)?;
+    let lightness = lightness.value(lightness_range).max(0.0);
+    let a = a.value(a_b_range);
+    let b = b.value(a_b_range);
 
     Ok(into_color(lightness, a, b, alpha))
 }
@@ -1228,31 +1235,24 @@ fn parse_lch_like<'i, 't, P>(
 where
     P: ColorParser<'i>,
 {
-    // for L: 0% = 0.0, 100% = 100.0
-    let lightness = match color_parser.parse_number_or_percentage(arguments)? {
-        NumberOrPercentage::Number { value } => value,
-        NumberOrPercentage::Percentage { unit_value } => unit_value * lightness_range,
-    }
-    .max(0.);
+    let (lightness, chroma, hue, alpha) = parse_components(
+        color_parser,
+        arguments,
+        P::parse_number_or_percentage,
+        P::parse_number_or_percentage,
+        P::parse_angle_or_number,
+    )?;
 
-    // for C: 0% = 0, 100% = 150
-    let chroma = match color_parser.parse_number_or_percentage(arguments)? {
-        NumberOrPercentage::Number { value } => value,
-        NumberOrPercentage::Percentage { unit_value } => unit_value * chroma_range,
-    }
-    .max(0.);
-
-    let hue_degrees = color_parser.parse_angle_or_number(arguments)?.degrees();
-    let hue = hue_degrees - 360. * (hue_degrees / 360.).floor();
-
-    let alpha = parse_alpha(color_parser, arguments, false)?;
+    let lightness = lightness.value(lightness_range).max(0.0);
+    let chroma = chroma.value(chroma_range).max(0.0);
+    let hue = normalize_hue(hue.degrees());
 
     Ok(into_color(lightness, chroma, hue, alpha))
 }
 
 /// Parse the color() function.
 #[inline]
-fn parse_color_color_function<'i, 't, P>(
+fn parse_color_with_color_space<'i, 't, P>(
     color_parser: &P,
     arguments: &mut Parser<'i, 't>,
 ) -> Result<P::Output, ParseError<'i, P::Error>>
@@ -1267,19 +1267,17 @@ where
             .map_err(|_| location.new_unexpected_token_error(Token::Ident(ident.clone())))?
     };
 
-    macro_rules! parse_component {
-        () => {{
-            color_parser
-                .parse_number_or_percentage(arguments)?
-                .unit_value()
-        }};
-    }
+    let (c1, c2, c3, alpha) = parse_components(
+        color_parser,
+        arguments,
+        P::parse_number_or_percentage,
+        P::parse_number_or_percentage,
+        P::parse_number_or_percentage,
+    )?;
 
-    let c1 = parse_component!();
-    let c2 = parse_component!();
-    let c3 = parse_component!();
-
-    let alpha = parse_alpha(color_parser, arguments, false)?;
+    let c1 = c1.unit_value();
+    let c2 = c2.unit_value();
+    let c3 = c3.unit_value();
 
     Ok(P::Output::from_color_function(
         color_space,
@@ -1288,4 +1286,62 @@ where
         c3,
         alpha,
     ))
+}
+
+/// Try to parse the components and alpha with the legacy syntax, but also allow
+/// the [color-4] syntax if that fails.
+/// https://drafts.csswg.org/css-color-4/#color-syntax-legacy
+pub fn parse_legacy_components<'i, 't, P, F1, F2, F3, R1, R2, R3>(
+    color_parser: &P,
+    input: &mut Parser<'i, 't>,
+    f1: F1,
+    f2: F2,
+    f3: F3,
+) -> Result<(R1, R2, R3, f32), ParseError<'i, P::Error>>
+where
+    P: ColorParser<'i>,
+    F1: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R1, ParseError<'i, P::Error>>,
+    F2: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R2, ParseError<'i, P::Error>>,
+    F3: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R3, ParseError<'i, P::Error>>,
+{
+    let r1 = f1(color_parser, input)?;
+    // Commas denote that we are using the legacy syntax.
+    let uses_commas = input.try_parse(|i| i.expect_comma()).is_ok();
+    let r2 = f2(color_parser, input)?;
+    if uses_commas {
+        input.expect_comma()?;
+    }
+    let r3 = f3(color_parser, input)?;
+
+    let alpha = parse_legacy_alpha(color_parser, input, uses_commas)?;
+
+    Ok((r1, r2, r3, alpha))
+}
+
+/// Parse the color components and alpha with the [color-4] syntax.
+pub fn parse_components<'i, 't, P, F1, F2, F3, R1, R2, R3>(
+    color_parser: &P,
+    input: &mut Parser<'i, 't>,
+    f1: F1,
+    f2: F2,
+    f3: F3,
+) -> Result<(R1, R2, R3, f32), ParseError<'i, P::Error>>
+where
+    P: ColorParser<'i>,
+    F1: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R1, ParseError<'i, P::Error>>,
+    F2: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R2, ParseError<'i, P::Error>>,
+    F3: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R3, ParseError<'i, P::Error>>,
+{
+    let r1 = f1(color_parser, input)?;
+    let r2 = f2(color_parser, input)?;
+    let r3 = f3(color_parser, input)?;
+
+    let alpha = if !input.is_exhausted() {
+        input.expect_delim('/')?;
+        parse_alpha_component(color_parser, input)?
+    } else {
+        OPAQUE
+    };
+
+    Ok((r1, r2, r3, alpha))
 }
