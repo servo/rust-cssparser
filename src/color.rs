@@ -1276,21 +1276,15 @@ where
 fn parse_legacy_alpha<'i, 't, P>(
     color_parser: &P,
     arguments: &mut Parser<'i, 't>,
-    uses_commas: bool,
-) -> Result<Option<f32>, ParseError<'i, P::Error>>
+) -> Result<f32, ParseError<'i, P::Error>>
 where
     P: ColorParser<'i>,
 {
     Ok(if !arguments.is_exhausted() {
-        if uses_commas {
-            arguments.expect_comma()?;
-            Some(parse_alpha_component(color_parser, arguments)?)
-        } else {
-            arguments.expect_delim('/')?;
-            parse_none_or(arguments, |p| parse_alpha_component(color_parser, p))?
-        }
+        arguments.expect_comma()?;
+        parse_alpha_component(color_parser, arguments)?
     } else {
-        Some(OPAQUE)
+        OPAQUE
     })
 }
 
@@ -1302,60 +1296,62 @@ fn parse_rgb<'i, 't, P>(
 where
     P: ColorParser<'i>,
 {
-    // Either integers or percentages, but all the same type.
-    // https://drafts.csswg.org/css-color/#rgb-functions
-
     let maybe_red = parse_none_or(arguments, |p| color_parser.parse_number_or_percentage(p))?;
 
-    let (red, is_number, is_legacy_syntax) = if let Some(red) = maybe_red {
-        let is_legacy_syntax = arguments.try_parse(|i| i.expect_comma()).is_ok();
-        match red {
+    // If the first component is not "none" and is followed by a comma, then we
+    // are parsing the legacy syntax.
+    let is_legacy_syntax = maybe_red.is_some() && arguments.try_parse(|p| p.expect_comma()).is_ok();
+
+    let red: u8;
+    let green: u8;
+    let blue: u8;
+
+    let alpha = if is_legacy_syntax {
+        match maybe_red.unwrap() {
             NumberOrPercentage::Number { value } => {
-                (clamp_floor_256_f32(value), true, is_legacy_syntax)
+                red = clamp_floor_256_f32(value);
+                green = clamp_floor_256_f32(color_parser.parse_number(arguments)?);
+                arguments.expect_comma()?;
+                blue = clamp_floor_256_f32(color_parser.parse_number(arguments)?);
             }
             NumberOrPercentage::Percentage { unit_value } => {
-                (clamp_unit_f32(unit_value), false, is_legacy_syntax)
+                red = clamp_unit_f32(unit_value);
+                green = clamp_unit_f32(color_parser.parse_percentage(arguments)?);
+                arguments.expect_comma()?;
+                blue = clamp_unit_f32(color_parser.parse_percentage(arguments)?);
             }
         }
+
+        parse_legacy_alpha(color_parser, arguments)?
     } else {
-        (0, true, false)
+        #[inline]
+        fn get_component_value(c: &Option<NumberOrPercentage>) -> u8 {
+            match *c {
+                Some(NumberOrPercentage::Number { value }) => clamp_floor_256_f32(value),
+                Some(NumberOrPercentage::Percentage { unit_value }) => clamp_unit_f32(unit_value),
+                None => 0,
+            }
+        }
+
+        red = get_component_value(&maybe_red);
+
+        green = get_component_value(&parse_none_or(arguments, |p| {
+            color_parser.parse_number_or_percentage(p)
+        })?);
+
+        blue = get_component_value(&parse_none_or(arguments, |p| {
+            color_parser.parse_number_or_percentage(p)
+        })?);
+
+        if !arguments.is_exhausted() {
+            arguments.expect_delim('/')?;
+            parse_none_or(arguments, |p| parse_alpha_component(color_parser, p))?.unwrap_or(0.0)
+        } else {
+            OPAQUE
+        }
     };
 
-    let green;
-    let blue;
-    if is_number {
-        // parse numbers
-        if is_legacy_syntax {
-            green = clamp_floor_256_f32(color_parser.parse_number(arguments)?);
-            arguments.expect_comma()?;
-            blue = clamp_floor_256_f32(color_parser.parse_number(arguments)?);
-        } else {
-            green = clamp_floor_256_f32(
-                parse_none_or(arguments, |p| color_parser.parse_number(p))?.unwrap_or(0.0),
-            );
-            blue = clamp_floor_256_f32(
-                parse_none_or(arguments, |p| color_parser.parse_number(p))?.unwrap_or(0.0),
-            );
-        }
-    } else {
-        // parse percentages
-        if is_legacy_syntax {
-            green = clamp_unit_f32(color_parser.parse_percentage(arguments)?);
-            arguments.expect_comma()?;
-            blue = clamp_unit_f32(color_parser.parse_percentage(arguments)?);
-        } else {
-            green = clamp_unit_f32(
-                parse_none_or(arguments, |p| color_parser.parse_percentage(p))?.unwrap_or(0.0),
-            );
-            blue = clamp_unit_f32(
-                parse_none_or(arguments, |p| color_parser.parse_percentage(p))?.unwrap_or(0.0),
-            );
-        }
-    }
-
-    let alpha = parse_legacy_alpha(color_parser, arguments, is_legacy_syntax)?;
-
-    Ok(P::Output::from_rgba(red, green, blue, alpha.unwrap_or(0.0)))
+    Ok(P::Output::from_rgba(red, green, blue, alpha))
 }
 
 /// Parses hsl syntax.
@@ -1369,15 +1365,33 @@ fn parse_hsl<'i, 't, P>(
 where
     P: ColorParser<'i>,
 {
-    let (hue, saturation, lightness, alpha) = parse_legacy_components(
-        color_parser,
-        arguments,
-        P::parse_angle_or_number,
-        P::parse_percentage,
-        P::parse_percentage,
-    )?;
+    let maybe_hue = parse_none_or(arguments, |p| color_parser.parse_angle_or_number(p))?;
 
-    let hue = hue.map(|h| normalize_hue(h.degrees()));
+    // If the hue is not "none" and is followed by a comma, then we are parsing
+    // the legacy syntax.
+    let is_legacy_syntax = maybe_hue.is_some() && arguments.try_parse(|p| p.expect_comma()).is_ok();
+
+    let saturation: Option<f32>;
+    let lightness: Option<f32>;
+
+    let alpha = if is_legacy_syntax {
+        saturation = Some(color_parser.parse_percentage(arguments)?);
+        arguments.expect_comma()?;
+        lightness = Some(color_parser.parse_percentage(arguments)?);
+        Some(parse_legacy_alpha(color_parser, arguments)?)
+    } else {
+        saturation = parse_none_or(arguments, |p| color_parser.parse_percentage(p))?;
+        lightness = parse_none_or(arguments, |p| color_parser.parse_percentage(p))?;
+
+        if !arguments.is_exhausted() {
+            arguments.expect_delim('/')?;
+            parse_none_or(arguments, |p| parse_alpha_component(color_parser, p))?
+        } else {
+            Some(OPAQUE)
+        }
+    };
+
+    let hue = maybe_hue.map(|h| normalize_hue(h.degrees()));
     let saturation = saturation.map(|s| s.clamp(0.0, 1.0));
     let lightness = lightness.map(|s| s.clamp(0.0, 1.0));
 
@@ -1553,50 +1567,7 @@ where
     ))
 }
 
-/// Try to parse the components and alpha with the legacy syntax, but also allow
-/// the [color-4] syntax if that fails.
-/// https://drafts.csswg.org/css-color-4/#color-syntax-legacy
-pub fn parse_legacy_components<'i, 't, P, F1, F2, F3, R1, R2, R3>(
-    color_parser: &P,
-    input: &mut Parser<'i, 't>,
-    f1: F1,
-    f2: F2,
-    f3: F3,
-) -> Result<(Option<R1>, Option<R2>, Option<R3>, Option<f32>), ParseError<'i, P::Error>>
-where
-    P: ColorParser<'i>,
-    F1: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R1, ParseError<'i, P::Error>>,
-    F2: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R2, ParseError<'i, P::Error>>,
-    F3: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R3, ParseError<'i, P::Error>>,
-{
-    let r1 = parse_none_or(input, |p| f1(color_parser, p))?;
-    // If the first argument is not none and we are separating with commas,
-    // only then are we parsing legacy syntax.
-    let is_legacy_syntax = r1.is_some() && input.try_parse(|i| i.expect_comma()).is_ok();
-
-    let r2;
-    let r3;
-    let alpha;
-    if is_legacy_syntax {
-        r2 = Some(f2(color_parser, input)?);
-        input.expect_comma()?;
-        r3 = Some(f3(color_parser, input)?);
-        alpha = parse_legacy_alpha(color_parser, input, is_legacy_syntax)?;
-    } else {
-        r2 = parse_none_or(input, |p| f2(color_parser, p))?;
-        r3 = parse_none_or(input, |p| f3(color_parser, p))?;
-        if !input.is_exhausted() {
-            input.expect_delim('/')?;
-            alpha = parse_none_or(input, |p| parse_alpha_component(color_parser, p))?;
-        } else {
-            alpha = Some(OPAQUE);
-        }
-    };
-
-    Ok((r1, r2, r3, alpha))
-}
-
-/// Parse the color components and alpha with the [color-4] syntax.
+/// Parse the color components and alpha with the modern [color-4] syntax.
 pub fn parse_components<'i, 't, P, F1, F2, F3, R1, R2, R3>(
     color_parser: &P,
     input: &mut Parser<'i, 't>,
