@@ -540,10 +540,10 @@ impl NumberOrPercentage {
         }
     }
 
-    fn value(&self, percentage_max: f32) -> f32 {
+    fn value(&self, percentage_basis: f32) -> f32 {
         match *self {
             Self::Number { value } => value,
-            Self::Percentage { unit_value } => unit_value * percentage_max,
+            Self::Percentage { unit_value } => unit_value * percentage_basis,
         }
     }
 }
