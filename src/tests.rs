@@ -1618,6 +1618,7 @@ fn generic_parser() {
         ("currentColor", OutputType::CurrentColor),
         ("rgb(1, 2, 3)", OutputType::Rgba(1, 2, 3, 1.0)),
         ("rgba(1, 2, 3, 0.4)", OutputType::Rgba(1, 2, 3, 0.4)),
+        ("rgb(none none none / none)", OutputType::Rgba(0, 0, 0, 0.0)),
         (
             "hsla(45deg, 20%, 30%, 0.4)",
             OutputType::Hsl(Some(45.0), Some(0.2), Some(0.3), Some(0.4)),

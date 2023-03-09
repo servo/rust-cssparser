@@ -1277,19 +1277,20 @@ fn parse_legacy_alpha<'i, 't, P>(
     color_parser: &P,
     arguments: &mut Parser<'i, 't>,
     uses_commas: bool,
-) -> Result<f32, ParseError<'i, P::Error>>
+) -> Result<Option<f32>, ParseError<'i, P::Error>>
 where
     P: ColorParser<'i>,
 {
     Ok(if !arguments.is_exhausted() {
         if uses_commas {
             arguments.expect_comma()?;
+            Some(parse_alpha_component(color_parser, arguments)?)
         } else {
             arguments.expect_delim('/')?;
-        };
-        parse_alpha_component(color_parser, arguments)?
+            parse_none_or(arguments, |p| parse_alpha_component(color_parser, p))?
+        }
     } else {
-        OPAQUE
+        Some(OPAQUE)
     })
 }
 
@@ -1303,32 +1304,58 @@ where
 {
     // Either integers or percentages, but all the same type.
     // https://drafts.csswg.org/css-color/#rgb-functions
-    let (red, is_number) = match color_parser.parse_number_or_percentage(arguments)? {
-        NumberOrPercentage::Number { value } => (clamp_floor_256_f32(value), true),
-        NumberOrPercentage::Percentage { unit_value } => (clamp_unit_f32(unit_value), false),
-    };
 
-    let uses_commas = arguments.try_parse(|i| i.expect_comma()).is_ok();
+    let maybe_red = parse_none_or(arguments, |p| color_parser.parse_number_or_percentage(p))?;
+
+    let (red, is_number, is_legacy_syntax) = if let Some(red) = maybe_red {
+        let is_legacy_syntax = arguments.try_parse(|i| i.expect_comma()).is_ok();
+        match red {
+            NumberOrPercentage::Number { value } => {
+                (clamp_floor_256_f32(value), true, is_legacy_syntax)
+            }
+            NumberOrPercentage::Percentage { unit_value } => {
+                (clamp_unit_f32(unit_value), false, is_legacy_syntax)
+            }
+        }
+    } else {
+        (0, true, false)
+    };
 
     let green;
     let blue;
     if is_number {
-        green = clamp_floor_256_f32(color_parser.parse_number(arguments)?);
-        if uses_commas {
+        // parse numbers
+        if is_legacy_syntax {
+            green = clamp_floor_256_f32(color_parser.parse_number(arguments)?);
             arguments.expect_comma()?;
+            blue = clamp_floor_256_f32(color_parser.parse_number(arguments)?);
+        } else {
+            green = clamp_floor_256_f32(
+                parse_none_or(arguments, |p| color_parser.parse_number(p))?.unwrap_or(0.0),
+            );
+            blue = clamp_floor_256_f32(
+                parse_none_or(arguments, |p| color_parser.parse_number(p))?.unwrap_or(0.0),
+            );
         }
-        blue = clamp_floor_256_f32(color_parser.parse_number(arguments)?);
     } else {
-        green = clamp_unit_f32(color_parser.parse_percentage(arguments)?);
-        if uses_commas {
+        // parse percentages
+        if is_legacy_syntax {
+            green = clamp_unit_f32(color_parser.parse_percentage(arguments)?);
             arguments.expect_comma()?;
+            blue = clamp_unit_f32(color_parser.parse_percentage(arguments)?);
+        } else {
+            green = clamp_unit_f32(
+                parse_none_or(arguments, |p| color_parser.parse_percentage(p))?.unwrap_or(0.0),
+            );
+            blue = clamp_unit_f32(
+                parse_none_or(arguments, |p| color_parser.parse_percentage(p))?.unwrap_or(0.0),
+            );
         }
-        blue = clamp_unit_f32(color_parser.parse_percentage(arguments)?);
     }
 
-    let alpha = parse_legacy_alpha(color_parser, arguments, uses_commas)?;
+    let alpha = parse_legacy_alpha(color_parser, arguments, is_legacy_syntax)?;
 
-    Ok(P::Output::from_rgba(red, green, blue, alpha))
+    Ok(P::Output::from_rgba(red, green, blue, alpha.unwrap_or(0.0)))
 }
 
 /// Parses hsl syntax.
@@ -1554,7 +1581,7 @@ where
         r2 = Some(f2(color_parser, input)?);
         input.expect_comma()?;
         r3 = Some(f3(color_parser, input)?);
-        alpha = Some(parse_legacy_alpha(color_parser, input, is_legacy_syntax)?);
+        alpha = parse_legacy_alpha(color_parser, input, is_legacy_syntax)?;
     } else {
         r2 = parse_none_or(input, |p| f2(color_parser, p))?;
         r3 = parse_none_or(input, |p| f3(color_parser, p))?;
