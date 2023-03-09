@@ -182,6 +182,122 @@ impl ToCss for RGBA {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Hsl {
+    /// The hue component.
+    pub hue: f32,
+    /// The saturation component.
+    pub saturation: f32,
+    /// The lightness component.
+    pub lightness: f32,
+    /// The alpha component.
+    pub alpha: f32,
+}
+
+impl Hsl {
+    pub fn new(hue: f32, saturation: f32, lightness: f32, alpha: f32) -> Self {
+        Self {
+            hue,
+            saturation,
+            lightness,
+            alpha,
+        }
+    }
+}
+
+impl ToCss for Hsl {
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        // HSL serializes to RGB, so we have to convert it.
+        let (red, green, blue) = hsl_to_rgb(
+            self.hue / 360.0, // Hue is expected in range [0..1].
+            self.saturation,
+            self.lightness,
+        );
+
+        RGBA::from_floats(red, green, blue, self.alpha).to_css(dest)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for Hsl {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        (self.hue, self.saturation, self.lightness, self.alpha).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Hsl {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let (lightness, a, b, alpha) = Deserialize::deserialize(deserializer)?;
+        Ok(Self::new(lightness, a, b, alpha))
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Hwb {
+    /// The hue component.
+    pub hue: f32,
+    /// The whiteness component.
+    pub whiteness: f32,
+    /// The blackness component.
+    pub blackness: f32,
+    /// The alpha component.
+    pub alpha: f32,
+}
+
+impl Hwb {
+    pub fn new(hue: f32, whiteness: f32, blackness: f32, alpha: f32) -> Self {
+        Self {
+            hue,
+            whiteness,
+            blackness,
+            alpha,
+        }
+    }
+}
+
+impl ToCss for Hwb {
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        // HWB serializes to RGB, so we have to convert it.
+        let (red, green, blue) = hwb_to_rgb(self.hue / 360.0, self.whiteness, self.blackness);
+
+        RGBA::from_floats(red, green, blue, self.alpha).to_css(dest)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for Hwb {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        (self.hue, self.whiteness, self.blackness, self.alpha).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Hwb {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let (lightness, whiteness, blackness, alpha) = Deserialize::deserialize(deserializer)?;
+        Ok(Self::new(lightness, whiteness, blackness, alpha))
+    }
+}
+
 // NOTE: LAB and OKLAB is not declared inside the [impl_lab_like] macro,
 // because it causes cbindgen to ignore them.
 
@@ -482,6 +598,10 @@ pub enum Color {
     CurrentColor,
     /// Specify sRGB colors directly by their red/green/blue/alpha chanels.
     Rgba(RGBA),
+    /// Specifies a color in sRGB using hue, saturation and lightness components.
+    Hsl(Hsl),
+    /// Specifies a color in sRGB using hue, whiteness and blackness components.
+    Hwb(Hwb),
     /// Specifies a CIELAB color by CIE Lightness and its a- and b-axis hue
     /// coordinates (red/green-ness, and yellow/blue-ness) using the CIE LAB
     /// rectangular coordinate model.
@@ -508,6 +628,8 @@ impl ToCss for Color {
         match *self {
             Color::CurrentColor => dest.write_str("currentcolor"),
             Color::Rgba(rgba) => rgba.to_css(dest),
+            Color::Hsl(hsl) => hsl.to_css(dest),
+            Color::Hwb(hwb) => hwb.to_css(dest),
             Color::Lab(lab) => lab.to_css(dest),
             Color::Lch(lch) => lch.to_css(dest),
             Color::Oklab(lab) => lab.to_css(dest),
@@ -666,6 +788,12 @@ pub trait FromParsedColor {
     /// Construct a new color from red, green, blue and alpha components.
     fn from_rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Self;
 
+    /// Construct a new color from hue, saturation, lightness and alpha components.
+    fn from_hsl(hue: f32, saturation: f32, lightness: f32, alpha: f32) -> Self;
+
+    /// Construct a new color from hue, blackness, whiteness and alpha components.
+    fn from_hwb(hue: f32, whiteness: f32, blackness: f32, alpha: f32) -> Self;
+
     /// Construct a new color from the `lab` notation.
     fn from_lab(lightness: f32, a: f32, b: f32, alpha: f32) -> Self;
 
@@ -723,6 +851,16 @@ impl FromParsedColor for Color {
     #[inline]
     fn from_rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Self {
         Color::Rgba(RGBA::new(red, green, blue, alpha))
+    }
+
+    #[inline]
+    fn from_hsl(hue: f32, saturation: f32, lightness: f32, alpha: f32) -> Self {
+        Color::Hsl(Hsl::new(hue, saturation, lightness, alpha))
+    }
+
+    #[inline]
+    fn from_hwb(hue: f32, whiteness: f32, blackness: f32, alpha: f32) -> Self {
+        Color::Hwb(Hwb::new(hue, whiteness, blackness, alpha))
     }
 
     #[inline]
@@ -1102,14 +1240,7 @@ where
     let saturation = saturation.clamp(0.0, 1.0);
     let lightness = lightness.clamp(0.0, 1.0);
 
-    let (red, green, blue) = hsl_to_rgb(hue / 360.0, saturation, lightness);
-
-    Ok(P::Output::from_rgba(
-        clamp_unit_f32(red),
-        clamp_unit_f32(green),
-        clamp_unit_f32(blue),
-        alpha,
-    ))
+    Ok(P::Output::from_hsl(hue, saturation, lightness, alpha))
 }
 
 /// Parses hwb syntax.
@@ -1135,14 +1266,7 @@ where
     let whiteness = whiteness.clamp(0.0, 1.0);
     let blackness = blackness.clamp(0.0, 1.0);
 
-    let (red, green, blue) = hwb_to_rgb(hue / 360.0, whiteness, blackness);
-
-    Ok(P::Output::from_rgba(
-        clamp_unit_f32(red),
-        clamp_unit_f32(green),
-        clamp_unit_f32(blue),
-        alpha,
-    ))
+    Ok(P::Output::from_hwb(hue, whiteness, blackness, alpha))
 }
 
 /// https://drafts.csswg.org/css-color-4/#hwb-to-rgb
