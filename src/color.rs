@@ -13,18 +13,13 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 const OPAQUE: f32 = 1.0;
 
-// This impl should only live in this module and should not be `pub`. We don't
-// want any other Option<T> to serialize to "none".
-impl<'a, T: ToCss> ToCss for Option<T> {
-    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
-    where
-        W: fmt::Write,
-    {
-        if let Some(v) = self {
-            ToCss::to_css(v, dest)
-        } else {
-            dest.write_str("none")
-        }
+fn serialize_none_or<T>(dest: &mut impl fmt::Write, value: &Option<T>) -> fmt::Result
+where
+    T: ToCss,
+{
+    match value {
+        Some(v) => v.to_css(dest),
+        None => dest.write_str("none"),
     }
 }
 
@@ -415,11 +410,11 @@ macro_rules! impl_lab_like {
             {
                 dest.write_str($fname)?;
                 dest.write_str("(")?;
-                self.lightness.to_css(dest)?;
+                serialize_none_or(dest, &self.lightness)?;
                 dest.write_char(' ')?;
-                self.a.to_css(dest)?;
+                serialize_none_or(dest, &self.a)?;
                 dest.write_char(' ')?;
-                self.b.to_css(dest)?;
+                serialize_none_or(dest, &self.b)?;
                 serialize_alpha(dest, self.alpha, false)?;
                 dest.write_char(')')
             }
@@ -508,11 +503,11 @@ macro_rules! impl_lch_like {
             {
                 dest.write_str($fname)?;
                 dest.write_str("(")?;
-                self.lightness.to_css(dest)?;
+                serialize_none_or(dest, &self.lightness)?;
                 dest.write_char(' ')?;
-                self.chroma.to_css(dest)?;
+                serialize_none_or(dest, &self.chroma)?;
                 dest.write_char(' ')?;
-                self.hue.to_css(dest)?;
+                serialize_none_or(dest, &self.hue)?;
                 serialize_alpha(dest, self.alpha, false)?;
                 dest.write_char(')')
             }
@@ -633,11 +628,11 @@ impl ToCss for ColorFunction {
         dest.write_str("color(")?;
         self.color_space.to_css(dest)?;
         dest.write_char(' ')?;
-        self.c1.to_css(dest)?;
+        serialize_none_or(dest, &self.c1)?;
         dest.write_char(' ')?;
-        self.c2.to_css(dest)?;
+        serialize_none_or(dest, &self.c2)?;
         dest.write_char(' ')?;
-        self.c3.to_css(dest)?;
+        serialize_none_or(dest, &self.c3)?;
 
         serialize_alpha(dest, self.alpha, false)?;
 
