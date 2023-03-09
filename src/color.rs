@@ -205,22 +205,17 @@ impl ToCss for RGBA {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Hsl {
     /// The hue component.
-    pub hue: Option<f32>,
+    pub hue: f32,
     /// The saturation component.
-    pub saturation: Option<f32>,
+    pub saturation: f32,
     /// The lightness component.
-    pub lightness: Option<f32>,
+    pub lightness: f32,
     /// The alpha component.
-    pub alpha: Option<f32>,
+    pub alpha: f32,
 }
 
 impl Hsl {
-    pub fn new(
-        hue: Option<f32>,
-        saturation: Option<f32>,
-        lightness: Option<f32>,
-        alpha: Option<f32>,
-    ) -> Self {
+    pub fn new(hue: f32, saturation: f32, lightness: f32, alpha: f32) -> Self {
         Self {
             hue,
             saturation,
@@ -236,13 +231,9 @@ impl ToCss for Hsl {
         W: fmt::Write,
     {
         // HSL serializes to RGB, so we have to convert it.
-        let (red, green, blue) = hsl_to_rgb(
-            self.hue.unwrap_or(0.0) / 360.0,
-            self.saturation.unwrap_or(0.0),
-            self.lightness.unwrap_or(0.0),
-        );
+        let (red, green, blue) = hsl_to_rgb(self.hue / 360.0, self.saturation, self.lightness);
 
-        RGBA::from_floats(red, green, blue, self.alpha.unwrap_or(0.0)).to_css(dest)
+        RGBA::from_floats(red, green, blue, self.alpha).to_css(dest)
     }
 }
 
@@ -839,12 +830,7 @@ pub trait FromParsedColor {
     fn from_rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Self;
 
     /// Construct a new color from hue, saturation, lightness and alpha components.
-    fn from_hsl(
-        hue: Option<f32>,
-        saturation: Option<f32>,
-        lightness: Option<f32>,
-        alpha: Option<f32>,
-    ) -> Self;
+    fn from_hsl(hue: f32, saturation: f32, lightness: f32, alpha: f32) -> Self;
 
     /// Construct a new color from hue, blackness, whiteness and alpha components.
     fn from_hwb(
@@ -929,12 +915,7 @@ impl FromParsedColor for Color {
         Color::Rgba(RGBA::new(red, green, blue, alpha))
     }
 
-    fn from_hsl(
-        hue: Option<f32>,
-        saturation: Option<f32>,
-        lightness: Option<f32>,
-        alpha: Option<f32>,
-    ) -> Self {
+    fn from_hsl(hue: f32, saturation: f32, lightness: f32, alpha: f32) -> Self {
         Color::Hsl(Hsl::new(hue, saturation, lightness, alpha))
     }
 
@@ -1371,29 +1352,33 @@ where
     // the legacy syntax.
     let is_legacy_syntax = maybe_hue.is_some() && arguments.try_parse(|p| p.expect_comma()).is_ok();
 
-    let saturation: Option<f32>;
-    let lightness: Option<f32>;
+    let saturation: f32;
+    let lightness: f32;
 
     let alpha = if is_legacy_syntax {
-        saturation = Some(color_parser.parse_percentage(arguments)?);
+        saturation = color_parser.parse_percentage(arguments)?;
         arguments.expect_comma()?;
-        lightness = Some(color_parser.parse_percentage(arguments)?);
-        Some(parse_legacy_alpha(color_parser, arguments)?)
+        lightness = color_parser.parse_percentage(arguments)?;
+        parse_legacy_alpha(color_parser, arguments)?
     } else {
-        saturation = parse_none_or(arguments, |p| color_parser.parse_percentage(p))?;
-        lightness = parse_none_or(arguments, |p| color_parser.parse_percentage(p))?;
+        saturation = parse_none_or(arguments, |p| color_parser.parse_percentage(p))?.unwrap_or(0.0);
+        lightness = parse_none_or(arguments, |p| color_parser.parse_percentage(p))?.unwrap_or(0.0);
 
         if !arguments.is_exhausted() {
             arguments.expect_delim('/')?;
-            parse_none_or(arguments, |p| parse_alpha_component(color_parser, p))?
+            parse_none_or(arguments, |p| parse_alpha_component(color_parser, p))?.unwrap_or(0.0)
         } else {
-            Some(OPAQUE)
+            OPAQUE
         }
     };
 
-    let hue = maybe_hue.map(|h| normalize_hue(h.degrees()));
-    let saturation = saturation.map(|s| s.clamp(0.0, 1.0));
-    let lightness = lightness.map(|s| s.clamp(0.0, 1.0));
+    let hue = if let Some(h) = maybe_hue {
+        normalize_hue(h.degrees())
+    } else {
+        0.0
+    };
+    let saturation = saturation.clamp(0.0, 1.0);
+    let lightness = lightness.clamp(0.0, 1.0);
 
     Ok(P::Output::from_hsl(hue, saturation, lightness, alpha))
 }

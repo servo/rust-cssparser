@@ -1519,7 +1519,7 @@ fn generic_parser() {
     enum OutputType {
         CurrentColor,
         Rgba(u8, u8, u8, f32),
-        Hsl(Option<f32>, Option<f32>, Option<f32>, Option<f32>),
+        Hsl(f32, f32, f32, f32),
         Hwb(Option<f32>, Option<f32>, Option<f32>, Option<f32>),
         Lab(Option<f32>, Option<f32>, Option<f32>, Option<f32>),
         Lch(Option<f32>, Option<f32>, Option<f32>, Option<f32>),
@@ -1543,12 +1543,7 @@ fn generic_parser() {
             OutputType::Rgba(red, green, blue, alpha)
         }
 
-        fn from_hsl(
-            hue: Option<f32>,
-            saturation: Option<f32>,
-            lightness: Option<f32>,
-            alpha: Option<f32>,
-        ) -> Self {
+        fn from_hsl(hue: f32, saturation: f32, lightness: f32, alpha: f32) -> Self {
             OutputType::Hsl(hue, saturation, lightness, alpha)
         }
 
@@ -1619,17 +1614,15 @@ fn generic_parser() {
         ("rgb(1, 2, 3)", OutputType::Rgba(1, 2, 3, 1.0)),
         ("rgba(1, 2, 3, 0.4)", OutputType::Rgba(1, 2, 3, 0.4)),
         ("rgb(none none none / none)", OutputType::Rgba(0, 0, 0, 0.0)),
+        ("rgb(1 none 3 / none)", OutputType::Rgba(1, 0, 3, 0.0)),
         (
             "hsla(45deg, 20%, 30%, 0.4)",
-            OutputType::Hsl(Some(45.0), Some(0.2), Some(0.3), Some(0.4)),
+            OutputType::Hsl(45.0, 0.2, 0.3, 0.4),
         ),
-        (
-            "hsl(45deg none none)",
-            OutputType::Hsl(Some(45.0), None, None, Some(1.0)),
-        ),
+        ("hsl(45deg none none)", OutputType::Hsl(45.0, 0.0, 0.0, 1.0)),
         (
             "hsl(none 10% none / none)",
-            OutputType::Hsl(None, Some(0.1), None, None),
+            OutputType::Hsl(0.0, 0.1, 0.0, 0.0),
         ),
         (
             "hwb(45deg 20% 30% / 0.4)",
