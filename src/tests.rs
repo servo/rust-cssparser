@@ -900,6 +900,8 @@ impl ToJson for Color {
             Color::Rgba(ref rgba) => {
                 json!([rgba.red, rgba.green, rgba.blue, rgba.alpha])
             }
+            Color::Hsl(ref c) => json!([c.hue, c.saturation, c.lightness, c.alpha]),
+            Color::Hwb(ref c) => json!([c.hue, c.whiteness, c.blackness, c.alpha]),
             Color::Lab(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
             Color::Lch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
             Color::Oklab(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
@@ -1517,6 +1519,8 @@ fn generic_parser() {
     enum OutputType {
         CurrentColor,
         Rgba(u8, u8, u8, f32),
+        Hsl(f32, f32, f32, f32),
+        Hwb(f32, f32, f32, f32),
         Lab(f32, f32, f32, f32),
         Lch(f32, f32, f32, f32),
         Oklab(f32, f32, f32, f32),
@@ -1531,6 +1535,14 @@ fn generic_parser() {
 
         fn from_rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Self {
             OutputType::Rgba(red, green, blue, alpha)
+        }
+
+        fn from_hsl(hue: f32, saturation: f32, lightness: f32, alpha: f32) -> Self {
+            OutputType::Hsl(hue, saturation, lightness, alpha)
+        }
+
+        fn from_hwb(hue: f32, blackness: f32, whiteness: f32, alpha: f32) -> Self {
+            OutputType::Hwb(hue, blackness, whiteness, alpha)
         }
 
         fn from_lab(lightness: f32, a: f32, b: f32, alpha: f32) -> Self {
@@ -1570,6 +1582,14 @@ fn generic_parser() {
         ("currentColor", OutputType::CurrentColor),
         ("rgb(1, 2, 3)", OutputType::Rgba(1, 2, 3, 1.0)),
         ("rgba(1, 2, 3, 0.4)", OutputType::Rgba(1, 2, 3, 0.4)),
+        (
+            "hsla(45deg, 20%, 30%, 0.4)",
+            OutputType::Hsl(45.0, 0.2, 0.3, 0.4),
+        ),
+        (
+            "hwb(45deg 20% 30% / 0.4)",
+            OutputType::Hwb(45.0, 0.2, 0.3, 0.4),
+        ),
         (
             "lab(100 20 30 / 0.4)",
             OutputType::Lab(100.0, 20.0, 30.0, 0.4),
