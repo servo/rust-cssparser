@@ -842,31 +842,30 @@ pub trait FromParsedColor {
 
 /// Parse a color hash, without the leading '#' character.
 #[inline]
-
-pub fn parse_hash_color<'i, 't, P>(value: &[u8]) -> Result<P::Output, ()>
+pub fn parse_hash_color<'i, 't, O>(value: &[u8]) -> Result<O, ()>
 where
-    P: ColorParser<'i>,
+    O: FromParsedColor,
 {
     Ok(match value.len() {
-        8 => P::Output::from_rgba(
+        8 => O::from_rgba(
             Some(from_hex(value[0])? * 16 + from_hex(value[1])?),
             Some(from_hex(value[2])? * 16 + from_hex(value[3])?),
             Some(from_hex(value[4])? * 16 + from_hex(value[5])?),
             Some((from_hex(value[6])? * 16 + from_hex(value[7])?) as f32 / 255.0),
         ),
-        6 => P::Output::from_rgba(
+        6 => O::from_rgba(
             Some(from_hex(value[0])? * 16 + from_hex(value[1])?),
             Some(from_hex(value[2])? * 16 + from_hex(value[3])?),
             Some(from_hex(value[4])? * 16 + from_hex(value[5])?),
             Some(OPAQUE),
         ),
-        4 => P::Output::from_rgba(
+        4 => O::from_rgba(
             Some(from_hex(value[0])? * 17),
             Some(from_hex(value[1])? * 17),
             Some(from_hex(value[2])? * 17),
             Some((from_hex(value[3])? * 17) as f32 / 255.0),
         ),
-        3 => P::Output::from_rgba(
+        3 => O::from_rgba(
             Some(from_hex(value[0])? * 17),
             Some(from_hex(value[1])? * 17),
             Some(from_hex(value[2])? * 17),
@@ -888,9 +887,7 @@ where
     let location = input.current_source_location();
     let token = input.next()?;
     match *token {
-        Token::Hash(ref value) | Token::IDHash(ref value) => {
-            parse_hash_color::<P>(value.as_bytes())
-        }
+        Token::Hash(ref value) | Token::IDHash(ref value) => parse_hash_color(value.as_bytes()),
         Token::Ident(ref value) => parse_color_keyword(&*value),
         Token::Function(ref name) => {
             let name = name.clone();

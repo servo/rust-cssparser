@@ -1626,20 +1626,20 @@ fn generic_parser() {
         ("rgba(1, 2, 3, 0.4)",          OutputType::Rgba(Some(1), Some(2), Some(3), Some(0.4))),
         ("rgb(none none none / none)",  OutputType::Rgba(None, None, None, None)),
         ("rgb(1 none 3 / none)",        OutputType::Rgba(Some(1), None, Some(3), None)),
-        
+
         ("hsla(45deg, 20%, 30%, 0.4)",  OutputType::Hsl(Some(45.0), Some(0.2), Some(0.3), Some(0.4))),
         ("hsl(45deg none none)",        OutputType::Hsl(Some(45.0), None, None, Some(1.0))),
         ("hsl(none 10% none / none)",   OutputType::Hsl(None, Some(0.1), None, None)),
         ("hsl(120 100.0% 50.0%)",       OutputType::Hsl(Some(120.0), Some(1.0), Some(0.5), Some(1.0))),
-        
+
         ("hwb(45deg 20% 30% / 0.4)",    OutputType::Hwb(Some(45.0), Some(0.2), Some(0.3), Some(0.4))),
-        
+
         ("lab(100 20 30 / 0.4)",        OutputType::Lab(Some(100.0), Some(20.0), Some(30.0), Some(0.4))),
         ("lch(100 20 30 / 0.4)",        OutputType::Lch(Some(100.0), Some(20.0), Some(30.0), Some(0.4))),
-        
+
         ("oklab(100 20 30 / 0.4)",      OutputType::Oklab(Some(100.0), Some(20.0), Some(30.0), Some(0.4))),
         ("oklch(100 20 30 / 0.4)",      OutputType::Oklch(Some(100.0), Some(20.0), Some(30.0), Some(0.4))),
-        
+
         ("color(srgb 0.1 0.2 0.3 / 0.4)",           OutputType::ColorFunction(PredefinedColorSpace::Srgb, Some(0.1), Some(0.2), Some(0.3), Some(0.4))),
         ("color(srgb none none none)",              OutputType::ColorFunction(PredefinedColorSpace::Srgb, None, None, None, Some(1.0))),
         ("color(srgb none none none / none)",       OutputType::ColorFunction(PredefinedColorSpace::Srgb, None, None, None, None)),
