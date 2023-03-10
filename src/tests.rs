@@ -1625,6 +1625,10 @@ fn generic_parser() {
             OutputType::Hsl(0.0, 0.1, 0.0, 0.0),
         ),
         (
+            "hsl(120 100.0% 50.0%)",
+            OutputType::Hsl(120.0, 1.0, 0.5, 1.0),
+        ),
+        (
             "hwb(45deg 20% 30% / 0.4)",
             OutputType::Hwb(Some(45.0), Some(0.2), Some(0.3), Some(0.4)),
         ),

@@ -1269,6 +1269,21 @@ where
     })
 }
 
+fn parse_modern_alpha<'i, 't, P>(
+    color_parser: &P,
+    arguments: &mut Parser<'i, 't>,
+) -> Result<Option<f32>, ParseError<'i, P::Error>>
+where
+    P: ColorParser<'i>,
+{
+    if !arguments.is_exhausted() {
+        arguments.expect_delim('/')?;
+        parse_none_or(arguments, |p| parse_alpha_component(color_parser, p))
+    } else {
+        Ok(Some(OPAQUE))
+    }
+}
+
 #[inline]
 fn parse_rgb<'i, 't, P>(
     color_parser: &P,
@@ -1324,12 +1339,7 @@ where
             color_parser.parse_number_or_percentage(p)
         })?);
 
-        if !arguments.is_exhausted() {
-            arguments.expect_delim('/')?;
-            parse_none_or(arguments, |p| parse_alpha_component(color_parser, p))?.unwrap_or(0.0)
-        } else {
-            OPAQUE
-        }
+        parse_modern_alpha(color_parser, arguments)?.unwrap_or(0.0)
     };
 
     Ok(P::Output::from_rgba(red, green, blue, alpha))
@@ -1364,12 +1374,7 @@ where
         saturation = parse_none_or(arguments, |p| color_parser.parse_percentage(p))?.unwrap_or(0.0);
         lightness = parse_none_or(arguments, |p| color_parser.parse_percentage(p))?.unwrap_or(0.0);
 
-        if !arguments.is_exhausted() {
-            arguments.expect_delim('/')?;
-            parse_none_or(arguments, |p| parse_alpha_component(color_parser, p))?.unwrap_or(0.0)
-        } else {
-            OPAQUE
-        }
+        parse_modern_alpha(color_parser, arguments)?.unwrap_or(0.0)
     };
 
     let hue = if let Some(h) = maybe_hue {
@@ -1570,12 +1575,7 @@ where
     let r2 = parse_none_or(input, |p| f2(color_parser, p))?;
     let r3 = parse_none_or(input, |p| f3(color_parser, p))?;
 
-    let alpha = if !input.is_exhausted() {
-        input.expect_delim('/')?;
-        parse_none_or(input, |p| parse_alpha_component(color_parser, p))?
-    } else {
-        Some(OPAQUE)
-    };
+    let alpha = parse_modern_alpha(color_parser, input)?;
 
     Ok((r1, r2, r3, alpha))
 }
