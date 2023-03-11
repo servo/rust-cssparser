@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+// Allow text like <color> in docs.
+#![allow(rustdoc::invalid_html_tags)]
+
 use std::f32::consts::PI;
 use std::fmt;
 use std::str::FromStr;
@@ -23,7 +26,7 @@ where
     }
 }
 
-/// https://drafts.csswg.org/css-color-4/#serializing-alpha-values
+/// <https://drafts.csswg.org/css-color-4/#serializing-alpha-values>
 #[inline]
 fn serialize_alpha(
     dest: &mut impl fmt::Write,
@@ -53,7 +56,7 @@ fn serialize_alpha(
 
 // Guaratees hue in [0..360)
 fn normalize_hue(hue: f32) -> f32 {
-    // https://drafts.csswg.org/css-values/#angles
+    // <https://drafts.csswg.org/css-values/#angles>
     // Subtract an integer before rounding, to avoid some rounding errors:
     hue - 360.0 * (hue / 360.0).floor()
 }
@@ -466,24 +469,24 @@ impl_lch_like!(Lch, "lch");
 impl_lch_like!(Oklch, "oklch");
 
 /// A Predefined color space specified in:
-/// https://drafts.csswg.org/css-color-4/#predefined
+/// <https://drafts.csswg.org/css-color-4/#predefined>
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PredefinedColorSpace {
-    /// https://drafts.csswg.org/css-color-4/#predefined-sRGB
+    /// <https://drafts.csswg.org/css-color-4/#predefined-sRGB>
     Srgb,
-    /// https://drafts.csswg.org/css-color-4/#predefined-sRGB-linear
+    /// <https://drafts.csswg.org/css-color-4/#predefined-sRGB-linear>
     SrgbLinear,
-    /// https://drafts.csswg.org/css-color-4/#predefined-display-p3
+    /// <https://drafts.csswg.org/css-color-4/#predefined-display-p3>
     DisplayP3,
-    /// https://drafts.csswg.org/css-color-4/#predefined-a98-rgb
+    /// <https://drafts.csswg.org/css-color-4/#predefined-a98-rgb>
     A98Rgb,
-    /// https://drafts.csswg.org/css-color-4/#predefined-prophoto-rgb
+    /// <https://drafts.csswg.org/css-color-4/#predefined-prophoto-rgb>
     ProphotoRgb,
-    /// https://drafts.csswg.org/css-color-4/#predefined-rec2020
+    /// <https://drafts.csswg.org/css-color-4/#predefined-rec2020>
     Rec2020,
-    /// https://drafts.csswg.org/css-color-4/#predefined-xyz
+    /// <https://drafts.csswg.org/css-color-4/#predefined-xyz>
     XyzD50,
-    /// https://drafts.csswg.org/css-color-4/#predefined-xyz
+    /// <https://drafts.csswg.org/css-color-4/#predefined-xyz>
     XyzD65,
 }
 
@@ -532,7 +535,7 @@ impl ToCss for PredefinedColorSpace {
 }
 
 /// A color specified by the color() function.
-/// https://drafts.csswg.org/css-color-4/#color-function
+/// <https://drafts.csswg.org/css-color-4/#color-function>
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct ColorFunction {
     /// The color space for this color.
@@ -593,7 +596,7 @@ impl ToCss for ColorFunction {
 /// Most components are `Option<_>`, so when the value is `None`, that component
 /// serializes to the "none" keyword.
 ///
-/// https://drafts.csswg.org/css-color-4/#color-type
+/// <https://drafts.csswg.org/css-color-4/#color-type>
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Color {
     /// The 'currentcolor' keyword.
@@ -881,8 +884,8 @@ where
     })
 }
 
-/// Parse a CSS color with the specified [`ColorComponentParser`] and return a
-/// new color value on success.
+/// Parse a CSS color using the specified [`ColorParser`] and return a new color
+/// value on success.
 pub fn parse_color_with<'i, 't, P>(
     color_parser: &P,
     input: &mut Parser<'i, 't>,
@@ -1179,12 +1182,12 @@ fn clamp_unit_f32(val: f32) -> u8 {
     // Chrome does something similar for the alpha value, but not
     // the rgb values.
     //
-    // See https://bugzilla.mozilla.org/show_bug.cgi?id=1340484
+    // See <https://bugzilla.mozilla.org/show_bug.cgi?id=1340484>
     //
     // Clamping to 256 and rounding after would let 1.0 map to 256, and
     // `256.0_f32 as u8` is undefined behavior:
     //
-    // https://github.com/rust-lang/rust/issues/10184
+    // <https://github.com/rust-lang/rust/issues/10184>
     clamp_floor_256_f32(val * 255.)
 }
 
@@ -1353,7 +1356,7 @@ where
 
 /// Parses hsl syntax.
 ///
-/// https://drafts.csswg.org/css-color/#the-hsl-notation
+/// <https://drafts.csswg.org/css-color/#the-hsl-notation>
 #[inline]
 fn parse_hsl<'i, 't, P>(
     color_parser: &P,
@@ -1392,7 +1395,7 @@ where
 
 /// Parses hwb syntax.
 ///
-/// https://drafts.csswg.org/css-color/#the-hbw-notation
+/// <https://drafts.csswg.org/css-color/#the-hbw-notation>
 #[inline]
 fn parse_hwb<'i, 't, P>(
     color_parser: &P,
@@ -1416,7 +1419,7 @@ where
     Ok(P::Output::from_hwb(hue, whiteness, blackness, alpha))
 }
 
-/// https://drafts.csswg.org/css-color-4/#hwb-to-rgb
+/// <https://drafts.csswg.org/css-color-4/#hwb-to-rgb>
 #[inline]
 pub fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
     if w + b >= 1.0 {
@@ -1433,7 +1436,7 @@ pub fn hwb_to_rgb(h: f32, w: f32, b: f32) -> (f32, f32, f32) {
     (red, green, blue)
 }
 
-/// https://drafts.csswg.org/css-color/#hsl-color
+/// <https://drafts.csswg.org/css-color/#hsl-color>
 /// except with h pre-multiplied by 3, to avoid some rounding errors.
 #[inline]
 pub fn hsl_to_rgb(hue: f32, saturation: f32, lightness: f32) -> (f32, f32, f32) {
