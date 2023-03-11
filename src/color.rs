@@ -150,6 +150,7 @@ impl ToCss for RGBA {
     }
 }
 
+/// Color specified by hue, saturation and lightness components.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Hsl {
     /// The hue component.
@@ -215,6 +216,7 @@ impl<'de> Deserialize<'de> for Hsl {
     }
 }
 
+/// Color specified by hue, whiteness and blackness components.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Hwb {
     /// The hue component.
