@@ -585,7 +585,12 @@ impl ToCss for ColorFunction {
     }
 }
 
-/// A <color> value.
+/// Describes one of the value <color> values according to the CSS
+/// specification.
+///
+/// Most components are `Option<_>`, so when the value is `None`, that component
+/// serializes to the "none" keyword.
+///
 /// https://drafts.csswg.org/css-color-4/#color-type
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Color {
