@@ -84,9 +84,9 @@ impl RGBA {
         alpha: Option<f32>,
     ) -> Self {
         Self::new(
-            red.map(|r| clamp_unit_f32(r)),
-            green.map(|g| clamp_unit_f32(g)),
-            blue.map(|b| clamp_unit_f32(b)),
+            red.map(clamp_unit_f32),
+            green.map(clamp_unit_f32),
+            blue.map(clamp_unit_f32),
             alpha.map(|a| a.clamp(0.0, OPAQUE)),
         )
     }
