@@ -60,7 +60,6 @@ fn normalize_hue(hue: f32) -> f32 {
 
 /// A color with red, green, blue, and alpha components, in a byte each.
 #[derive(Clone, Copy, PartialEq, Debug)]
-#[repr(C)]
 pub struct RGBA {
     /// The red component.
     pub red: Option<u8>,
@@ -287,7 +286,6 @@ impl<'de> Deserialize<'de> for Hwb {
 
 /// Color specified by lightness, a- and b-axis components.
 #[derive(Clone, Copy, PartialEq, Debug)]
-#[repr(C)]
 pub struct Lab {
     /// The lightness component.
     pub lightness: Option<f32>,
@@ -301,7 +299,6 @@ pub struct Lab {
 
 /// Color specified by lightness, a- and b-axis components.
 #[derive(Clone, Copy, PartialEq, Debug)]
-#[repr(C)]
 pub struct Oklab {
     /// The lightness component.
     pub lightness: Option<f32>,
@@ -380,7 +377,6 @@ impl_lab_like!(Oklab, "oklab");
 
 /// Color specified by lightness, chroma and hue components.
 #[derive(Clone, Copy, PartialEq, Debug)]
-#[repr(C)]
 pub struct Lch {
     /// The lightness component.
     pub lightness: Option<f32>,
@@ -394,7 +390,6 @@ pub struct Lch {
 
 /// Color specified by lightness, chroma and hue components.
 #[derive(Clone, Copy, PartialEq, Debug)]
-#[repr(C)]
 pub struct Oklch {
     /// The lightness component.
     pub lightness: Option<f32>,
