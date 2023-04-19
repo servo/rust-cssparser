@@ -12,11 +12,9 @@ use std::mem::MaybeUninit;
 /// # Example
 ///
 /// ```rust
-/// #[macro_use] extern crate cssparser;
-///
 /// # fn main() {}  // Make doctest not wrap everything in its own main
 /// # fn dummy(function_name: &String) { let _ =
-/// match_ignore_ascii_case! { &function_name,
+/// cssparser::match_ignore_ascii_case! { &function_name,
 ///     "rgb" => parse_rgb(..),
 /// #   #[cfg(not(something))]
 ///     "rgba" => parse_rgba(..),
@@ -51,7 +49,7 @@ macro_rules! match_ignore_ascii_case {
                     $( $( $pattern )+ )+
                 }
             }
-            _cssparser_internal_to_lowercase!($input, cssparser_internal::MAX_LENGTH => lowercase);
+            $crate::_cssparser_internal_to_lowercase!($input, cssparser_internal::MAX_LENGTH => lowercase);
             // "A" is a short string that we know is different for every string pattern,
             // since we’ve verified that none of them include ASCII upper case letters.
             match lowercase.unwrap_or("A") {
@@ -74,12 +72,10 @@ macro_rules! match_ignore_ascii_case {
 /// ## Example:
 ///
 /// ```rust
-/// #[macro_use] extern crate cssparser;
-///
 /// # fn main() {}  // Make doctest not wrap everything in its own main
 ///
 /// fn color_rgb(input: &str) -> Option<(u8, u8, u8)> {
-///     ascii_case_insensitive_phf_map! {
+///     cssparser::ascii_case_insensitive_phf_map! {
 ///         keyword -> (u8, u8, u8) = {
 ///             "red" => (255, 0, 0),
 ///             "green" => (0, 255, 0),
@@ -108,7 +104,7 @@ macro_rules! ascii_case_insensitive_phf_map {
                     $key => $value,
                 )*
             };
-            _cssparser_internal_to_lowercase!(input, _cssparser_internal::MAX_LENGTH => lowercase);
+            $crate::_cssparser_internal_to_lowercase!(input, _cssparser_internal::MAX_LENGTH => lowercase);
             lowercase.and_then(|s| MAP.get(s))
         }
     }
