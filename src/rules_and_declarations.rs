@@ -51,6 +51,13 @@ pub trait DeclarationParser<'i> {
         name: CowRcStr<'i>,
         input: &mut Parser<'i, 't>,
     ) -> Result<Self::Declaration, ParseError<'i, Self::Error>>;
+
+    /// Whether to try to parse qualified rules along with declarations. See
+    /// <https://github.com/w3c/csswg-drafts/issues/7961> for the current state of the discussion.
+    /// This is a low effort opt-in to be able to experiment with it, but it's likely to be needed
+    /// when nesting is less experimental as well (e.g., you probably don't want to allow nesting
+    /// in a style attribute anyways).
+    fn enable_nesting(&self) -> bool { false }
 }
 
 /// A trait to provide various parsing of at-rules.
@@ -231,7 +238,9 @@ where
 /// or `Err(())` for an invalid one.
 impl<'i, 't, 'a, I, P, E: 'i> Iterator for DeclarationListParser<'i, 't, 'a, P>
 where
-    P: DeclarationParser<'i, Declaration = I, Error = E> + AtRuleParser<'i, AtRule = I, Error = E>,
+    P: DeclarationParser<'i, Declaration = I, Error = E>
+        + AtRuleParser<'i, AtRule = I, Error = E>
+        + QualifiedRuleParser<'i, QualifiedRule = I, Error = E>,
 {
     type Item = Result<I, (ParseError<'i, E>, &'i str)>;
 
@@ -244,13 +253,19 @@ where
                 }
                 Ok(&Token::Ident(ref name)) => {
                     let name = name.clone();
-                    let result = {
+                    let mut result = {
                         let parser = &mut self.parser;
                         parse_until_after(self.input, Delimiter::Semicolon, |input| {
                             input.expect_colon()?;
                             parser.parse_value(name, input)
                         })
                     };
+
+                    if result.is_err() && self.parser.enable_nesting() {
+                        self.input.reset(&start);
+                        result = parse_qualified_rule(&start, self.input, &mut self.parser);
+                    }
+
                     return Some(result.map_err(|e| (e, self.input.slice_from(start.position()))));
                 }
                 Ok(&Token::AtKeyword(ref name)) => {
@@ -258,10 +273,17 @@ where
                     return Some(parse_at_rule(&start, name, self.input, &mut self.parser));
                 }
                 Ok(token) => {
-                    let token = token.clone();
-                    let result = self.input.parse_until_after(Delimiter::Semicolon, |_| {
-                        Err(start.source_location().new_unexpected_token_error(token))
-                    });
+                    let result = if self.parser.enable_nesting() {
+                        self.input.reset(&start);
+                        // XXX do we need to, if we fail, consume only until the next semicolon,
+                        // rather than until the next `{`?
+                        parse_qualified_rule(&start, self.input, &mut self.parser)
+                    } else {
+                        let token = token.clone();
+                        self.input.parse_until_after(Delimiter::Semicolon, |_| {
+                            Err(start.source_location().new_unexpected_token_error(token))
+                        })
+                    };
                     return Some(result.map_err(|e| (e, self.input.slice_from(start.position()))));
                 }
                 Err(..) => return None,
@@ -367,7 +389,7 @@ where
                 }
             } else {
                 self.any_rule_so_far = true;
-                let result = parse_qualified_rule(self.input, &mut self.parser);
+                let result = parse_qualified_rule(&start, self.input, &mut self.parser);
                 return Some(result.map_err(|e| (e, self.input.slice_from(start.position()))));
             }
         }
@@ -419,7 +441,7 @@ where
         if let Some(name) = at_keyword {
             parse_at_rule(&start, name, input, parser).map_err(|e| e.0)
         } else {
-            parse_qualified_rule(input, parser)
+            parse_qualified_rule(&start, input, parser)
         }
     })
 }
@@ -460,13 +482,13 @@ where
 }
 
 fn parse_qualified_rule<'i, 't, P, E>(
+    start: &ParserState,
     input: &mut Parser<'i, 't>,
     parser: &mut P,
 ) -> Result<<P as QualifiedRuleParser<'i>>::QualifiedRule, ParseError<'i, E>>
 where
     P: QualifiedRuleParser<'i, Error = E>,
 {
-    let start = input.state();
     let prelude = parse_until_before(input, Delimiter::CurlyBracketBlock, |input| {
         parser.parse_prelude(input)
     });
