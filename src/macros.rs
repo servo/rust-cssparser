@@ -152,22 +152,21 @@ pub fn _cssparser_internal_to_lowercase<'a>(
         input: &'a str,
         first_uppercase: usize,
     ) -> &'a str {
-        
-            // This cast doesn't change the pointer's validity
-            // since `u8` has the same layout as `MaybeUninit<u8>`:
-            let input_bytes = unsafe { &*(input.as_bytes() as *const [u8] as *const [MaybeUninit<u8>]) };
+        // This cast doesn't change the pointer's validity
+        // since `u8` has the same layout as `MaybeUninit<u8>`:
+        let input_bytes =
+            unsafe { &*(input.as_bytes() as *const [u8] as *const [MaybeUninit<u8>]) };
 
-            buffer.copy_from_slice(&*input_bytes);
+        buffer.copy_from_slice(&*input_bytes);
 
-            // Same as above re layout, plus these bytes have been initialized:
-            let buffer = unsafe { &mut *(buffer as *mut [MaybeUninit<u8>] as *mut [u8]) };
+        // Same as above re layout, plus these bytes have been initialized:
+        let buffer = unsafe { &mut *(buffer as *mut [MaybeUninit<u8>] as *mut [u8]) };
 
-            buffer[first_uppercase..].make_ascii_lowercase();
-            // `buffer` was initialized to a copy of `input`
-            // (which is `&str` so well-formed UTF-8)
-            // then ASCII-lowercased (which preserves UTF-8 well-formedness):
-            unsafe { ::std::str::from_utf8_unchecked(buffer) }
-        
+        buffer[first_uppercase..].make_ascii_lowercase();
+        // `buffer` was initialized to a copy of `input`
+        // (which is `&str` so well-formed UTF-8)
+        // then ASCII-lowercased (which preserves UTF-8 well-formedness):
+        unsafe { ::std::str::from_utf8_unchecked(buffer) }
     }
 
     Some(
