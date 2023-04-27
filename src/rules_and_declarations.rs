@@ -140,14 +140,14 @@ pub trait AtRuleParser<'i> {
 
 /// A trait to provide various parsing of qualified rules.
 ///
-/// For example, there could be different implementations
-/// for top-level qualified rules (i.e. style rules with Selectors as prelude)
-/// and for qualified rules inside `@keyframes` (keyframe rules with keyframe selectors as prelude).
+/// For example, there could be different implementations for top-level qualified rules (i.e. style
+/// rules with Selectors as prelude) and for qualified rules inside `@keyframes` (keyframe rules
+/// with keyframe selectors as prelude).
 ///
-/// Default implementations that reject all qualified rules are provided,
-/// so that `impl QualifiedRuleParser<(), ()> for ... {}` can be used
-/// for example for using `RuleListParser` to parse a rule list with only at-rules
-/// (such as inside `@font-feature-values`).
+/// Default implementations that reject all qualified rules are provided, so that
+/// `impl QualifiedRuleParser<(), ()> for ... {}` can be used for example for using
+/// `RuleListParser` to parse a rule list with only at-rules (such as inside
+/// `@font-feature-values`).
 pub trait QualifiedRuleParser<'i> {
     /// The intermediate representation of a qualified rule prelude.
     type Prelude;
@@ -223,10 +223,7 @@ where
     /// since `<DeclarationListParser as Iterator>::next` can return either.
     /// It could be a custom enum.
     pub fn new(input: &'a mut Parser<'i, 't>, parser: P) -> Self {
-        DeclarationListParser {
-            input: input,
-            parser: parser,
-        }
+        DeclarationListParser { input, parser }
     }
 }
 
@@ -304,8 +301,8 @@ where
     /// It could be a custom enum.
     pub fn new_for_stylesheet(input: &'a mut Parser<'i, 't>, parser: P) -> Self {
         RuleListParser {
-            input: input,
-            parser: parser,
+            input,
+            parser,
             is_stylesheet: true,
             any_rule_so_far: false,
         }
@@ -319,8 +316,8 @@ where
     /// (This is to deal with legacy workarounds for `<style>` HTML element parsing.)
     pub fn new_for_nested_rule(input: &'a mut Parser<'i, 't>, parser: P) -> Self {
         RuleListParser {
-            input: input,
-            parser: parser,
+            input,
+            parser,
             is_stylesheet: false,
             any_rule_so_far: false,
         }
