@@ -246,12 +246,10 @@ where
                     let name = name.clone();
                     let result = {
                         let parser = &mut self.parser;
-                        // FIXME: https://github.com/servo/rust-cssparser/issues/254
-                        let callback = |input: &mut Parser<'i, '_>| {
+                        parse_until_after(self.input, Delimiter::Semicolon, |input| {
                             input.expect_colon()?;
                             parser.parse_value(name, input)
-                        };
-                        parse_until_after(self.input, Delimiter::Semicolon, callback)
+                        })
                     };
                     return Some(result.map_err(|e| (e, self.input.slice_from(start.position()))));
                 }
@@ -436,26 +434,20 @@ where
     P: AtRuleParser<'i, Error = E>,
 {
     let delimiters = Delimiter::Semicolon | Delimiter::CurlyBracketBlock;
-    // FIXME: https://github.com/servo/rust-cssparser/issues/254
-    let callback = |input: &mut Parser<'i, '_>| parser.parse_prelude(name, input);
-    let result = parse_until_before(input, delimiters, callback);
+    let result = parse_until_before(input, delimiters, |input| parser.parse_prelude(name, input));
     match result {
         Ok(prelude) => {
             let result = match input.next() {
-                Ok(&Token::Semicolon) | Err(_) => {
-                    parser.rule_without_block(prelude, start)
-                        .map_err(|()| input.new_unexpected_token_error(Token::Semicolon))
-                },
+                Ok(&Token::Semicolon) | Err(_) => parser
+                    .rule_without_block(prelude, start)
+                    .map_err(|()| input.new_unexpected_token_error(Token::Semicolon)),
                 Ok(&Token::CurlyBracketBlock) => {
-                    // FIXME: https://github.com/servo/rust-cssparser/issues/254
-                    let callback =
-                        |input: &mut Parser<'i, '_>| parser.parse_block(prelude, start, input);
-                    parse_nested_block(input, callback)
-                },
+                    parse_nested_block(input, |input| parser.parse_block(prelude, start, input))
+                }
                 Ok(_) => unreachable!(),
             };
             result.map_err(|e| (e, input.slice_from(start.position())))
-        },
+        }
         Err(error) => {
             let end_position = input.position();
             match input.next() {
@@ -463,7 +455,7 @@ where
                 _ => unreachable!(),
             };
             Err((error, input.slice(start.position()..end_position)))
-        },
+        }
     }
 }
 
@@ -475,16 +467,14 @@ where
     P: QualifiedRuleParser<'i, Error = E>,
 {
     let start = input.state();
-    // FIXME: https://github.com/servo/rust-cssparser/issues/254
-    let callback = |input: &mut Parser<'i, '_>| parser.parse_prelude(input);
-    let prelude = parse_until_before(input, Delimiter::CurlyBracketBlock, callback);
+    let prelude = parse_until_before(input, Delimiter::CurlyBracketBlock, |input| {
+        parser.parse_prelude(input)
+    });
     match *input.next()? {
         Token::CurlyBracketBlock => {
             // Do this here so that we consume the `{` even if the prelude is `Err`.
             let prelude = prelude?;
-            // FIXME: https://github.com/servo/rust-cssparser/issues/254
-            let callback = |input: &mut Parser<'i, '_>| parser.parse_block(prelude, &start, input);
-            parse_nested_block(input, callback)
+            parse_nested_block(input, |input| parser.parse_block(prelude, &start, input))
         }
         _ => unreachable!(),
     }
