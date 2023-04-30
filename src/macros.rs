@@ -131,8 +131,7 @@ pub fn _cssparser_internal_create_uninit_array<const N: usize>() -> [MaybeUninit
 #[doc(hidden)]
 macro_rules! _cssparser_internal_to_lowercase {
     ($input: expr, $BUFFER_SIZE: expr => $output: ident) => {
-        const BUFFER_SIZE: usize = $BUFFER_SIZE as usize;
-        let mut buffer = $crate::macros::_cssparser_internal_create_uninit_array::<BUFFER_SIZE>();
+        let mut buffer = $crate::_cssparser_internal_create_uninit_array::<{ $BUFFER_SIZE }>();
         let input: &str = $input;
         let $output = $crate::_cssparser_internal_to_lowercase(&mut buffer, input);
     };
