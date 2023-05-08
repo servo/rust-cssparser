@@ -97,14 +97,8 @@ pub use phf as _cssparser_internal_phf;
 mod macros;
 
 mod rules_and_declarations;
-
-#[cfg(feature = "dummy_match_byte")]
 mod tokenizer;
 
-#[cfg(not(feature = "dummy_match_byte"))]
-mod tokenizer {
-    include!(concat!(env!("OUT_DIR"), "/tokenizer.rs"));
-}
 mod color;
 mod cow_rc_str;
 mod from_bytes;

@@ -9,7 +9,6 @@ repository = "https://github.com/servo/rust-cssparser"
 readme = "README.md"
 keywords = ["css", "syntax", "parser"]
 license = "MPL-2.0"
-build = "build.rs"
 edition = "2018"
 rust-version = "1.63"
 
