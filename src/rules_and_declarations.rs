@@ -249,11 +249,11 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
+            self.input.skip_whitespace();
             let start = self.input.state();
             match self.input.next_including_whitespace_and_comments().ok()? {
-                Token::WhiteSpace(_) | Token::Comment(_) | Token::Semicolon => {
-                    continue;
-                }
+                Token::Comment(..) => continue,
+                Token::Semicolon if self.parser.parse_declarations() => continue,
                 Token::Ident(ref name) if self.parser.parse_declarations() => {
                     let name = name.clone();
                     let parse_qualified = self.parser.parse_qualified();
