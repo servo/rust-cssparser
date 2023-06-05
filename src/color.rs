@@ -9,7 +9,7 @@ use std::f32::consts::PI;
 use std::fmt;
 use std::str::FromStr;
 
-use super::{ParseError, Parser, ToCss, Token};
+use super::{CowRcStr, ParseError, Parser, ToCss, Token};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -902,7 +902,7 @@ where
         Token::Function(ref name) => {
             let name = name.clone();
             return input.parse_nested_block(|arguments| {
-                parse_color_function(color_parser, &name, arguments)
+                parse_color_function(color_parser, name, arguments)
             });
         }
         _ => Err(()),
@@ -1210,13 +1210,13 @@ where
 #[inline]
 fn parse_color_function<'i, 't, P>(
     color_parser: &P,
-    name: &str,
+    name: CowRcStr<'i>,
     arguments: &mut Parser<'i, 't>,
 ) -> Result<P::Output, ParseError<'i, P::Error>>
 where
     P: ColorParser<'i>,
 {
-    let color = match_ignore_ascii_case! { name,
+    let color = match_ignore_ascii_case! { &name,
         "rgb" | "rgba" => parse_rgb(color_parser, arguments),
 
         "hsl" | "hsla" => parse_hsl(color_parser, arguments),
@@ -1241,7 +1241,7 @@ where
 
         "color" => parse_color_with_color_space(color_parser, arguments),
 
-        _ => return Err(arguments.new_unexpected_token_error(Token::Ident(name.to_owned().into()))),
+        _ => return Err(arguments.new_unexpected_token_error(Token::Ident(name))),
     }?;
 
     arguments.expect_exhausted()?;
