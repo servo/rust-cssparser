@@ -36,6 +36,7 @@ jobs:
           profile: minimal
           toolchain: ${{ matrix.toolchain }}
           override: true
+          components: ${{ matrix.toolchain == 'nightly' && 'miri,rust-src' || '' }}
 
       - name: Cargo build
         run: cargo build ${{ matrix.features }}
@@ -49,6 +50,10 @@ jobs:
       - name: macros build
         run: cargo build
         working-directory: macros
+
+      - name: Cargo miri test
+        if: "matrix.toolchain == 'nightly'"
+        run: cargo miri test ${{ matrix.features }}
 
   build_result:
     name: Result
