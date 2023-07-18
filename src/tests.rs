@@ -373,6 +373,7 @@ fn color3() {
     })
 }
 
+#[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
 #[test]
 fn color3_hsl() {
     run_color_tests(include_str!("css-parsing-tests/color3_hsl.json"), |c| {
@@ -395,6 +396,7 @@ fn color3_keywords() {
     )
 }
 
+#[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
 #[test]
 fn color4_hwb() {
     run_color_tests(include_str!("css-parsing-tests/color4_hwb.json"), |c| {
@@ -404,6 +406,7 @@ fn color4_hwb() {
     })
 }
 
+#[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
 #[test]
 fn color4_lab_lch_oklab_oklch() {
     run_color_tests(
@@ -939,6 +942,7 @@ fn unquoted_url(b: &mut Bencher) {
     })
 }
 
+#[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
 #[cfg(feature = "bench")]
 #[bench]
 fn numeric(b: &mut Bencher) {
@@ -953,6 +957,7 @@ fn numeric(b: &mut Bencher) {
 
 struct JsonParser;
 
+#[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
 #[test]
 fn no_stack_overflow_multiple_nested_blocks() {
     let mut input: String = "{{".into();
@@ -1413,6 +1418,7 @@ fn parse_sourceurl_comments() {
     }
 }
 
+#[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
 #[test]
 fn roundtrip_percentage_token() {
     fn test_roundtrip(value: &str) {

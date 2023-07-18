@@ -53,7 +53,7 @@ jobs:
 
       - name: Cargo miri test
         if: "matrix.toolchain == 'nightly'"
-        run: cargo miri test ${{ matrix.features }}
+        run: cargo miri test --features skip_long_tests ${{ matrix.features }}
 
   build_result:
     name: Result
