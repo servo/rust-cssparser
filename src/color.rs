@@ -16,16 +16,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 const OPAQUE: f32 = 1.0;
 
-fn serialize_none_or<T>(dest: &mut impl fmt::Write, value: &Option<T>) -> fmt::Result
-where
-    T: ToCss,
-{
-    match value {
-        Some(v) => v.to_css(dest),
-        None => dest.write_str("none"),
-    }
-}
-
 /// Serialize the alpha copmonent of a color according to the specification.
 /// <https://drafts.csswg.org/css-color-4/#serializing-alpha-values>
 #[inline]
@@ -53,6 +43,33 @@ pub fn serialize_color_alpha(
     }
 
     rounded_alpha.to_css(dest)
+}
+
+/// A [`ModernComponent`] can serialize to `none`, `nan`, `infinity` and
+/// floating point values.
+struct ModernComponent<'a>(&'a Option<f32>);
+
+impl<'a> ToCss for ModernComponent<'a> {
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        if let Some(value) = self.0 {
+            if value.is_infinite() {
+                if value.is_sign_negative() {
+                    dest.write_str("calc(-infinity)")
+                } else {
+                    dest.write_str("calc(infinity)")
+                }
+            } else if value.is_nan() {
+                dest.write_str("calc(NaN)")
+            } else {
+                value.to_css(dest)
+            }
+        } else {
+            dest.write_str("none")
+        }
+    }
 }
 
 // Guaratees hue in [0..360)
@@ -363,11 +380,11 @@ macro_rules! impl_lab_like {
             {
                 dest.write_str($fname)?;
                 dest.write_str("(")?;
-                serialize_none_or(dest, &self.lightness)?;
+                ModernComponent(&self.lightness).to_css(dest)?;
                 dest.write_char(' ')?;
-                serialize_none_or(dest, &self.a)?;
+                ModernComponent(&self.a).to_css(dest)?;
                 dest.write_char(' ')?;
-                serialize_none_or(dest, &self.b)?;
+                ModernComponent(&self.b).to_css(dest)?;
                 serialize_color_alpha(dest, self.alpha, false)?;
                 dest.write_char(')')
             }
@@ -454,11 +471,11 @@ macro_rules! impl_lch_like {
             {
                 dest.write_str($fname)?;
                 dest.write_str("(")?;
-                serialize_none_or(dest, &self.lightness)?;
+                ModernComponent(&self.lightness).to_css(dest)?;
                 dest.write_char(' ')?;
-                serialize_none_or(dest, &self.chroma)?;
+                ModernComponent(&self.chroma).to_css(dest)?;
                 dest.write_char(' ')?;
-                serialize_none_or(dest, &self.hue)?;
+                ModernComponent(&self.hue).to_css(dest)?;
                 serialize_color_alpha(dest, self.alpha, false)?;
                 dest.write_char(')')
             }
@@ -579,11 +596,11 @@ impl ToCss for ColorFunction {
         dest.write_str("color(")?;
         self.color_space.to_css(dest)?;
         dest.write_char(' ')?;
-        serialize_none_or(dest, &self.c1)?;
+        ModernComponent(&self.c1).to_css(dest)?;
         dest.write_char(' ')?;
-        serialize_none_or(dest, &self.c2)?;
+        ModernComponent(&self.c2).to_css(dest)?;
         dest.write_char(' ')?;
-        serialize_none_or(dest, &self.c3)?;
+        ModernComponent(&self.c3).to_css(dest)?;
 
         serialize_color_alpha(dest, self.alpha, false)?;
 
@@ -1473,6 +1490,15 @@ pub fn hsl_to_rgb(hue: f32, saturation: f32, lightness: f32) -> (f32, f32, f32) 
     (red, green, blue)
 }
 
+#[inline]
+fn max_preserve_nan(value: f32, max: f32) -> f32 {
+    if value.is_nan() {
+        value
+    } else {
+        value.max(max)
+    }
+}
+
 type IntoColorFn<Output> =
     fn(l: Option<f32>, a: Option<f32>, b: Option<f32>, alpha: Option<f32>) -> Output;
 
@@ -1495,7 +1521,7 @@ where
         P::parse_number_or_percentage,
     )?;
 
-    let lightness = lightness.map(|l| l.value(lightness_range).max(0.0));
+    let lightness = lightness.map(|l| max_preserve_nan(l.value(lightness_range), 0.0));
     let a = a.map(|a| a.value(a_b_range));
     let b = b.map(|b| b.value(a_b_range));
 
@@ -1521,8 +1547,8 @@ where
         P::parse_angle_or_number,
     )?;
 
-    let lightness = lightness.map(|l| l.value(lightness_range).max(0.0));
-    let chroma = chroma.map(|c| c.value(chroma_range).max(0.0));
+    let lightness = lightness.map(|l| max_preserve_nan(l.value(lightness_range), 0.0));
+    let chroma = chroma.map(|c| max_preserve_nan(c.value(chroma_range), 0.0));
     let hue = hue.map(|h| normalize_hue(h.degrees()));
 
     Ok(into_color(lightness, chroma, hue, alpha))
@@ -1590,4 +1616,56 @@ where
     let alpha = parse_modern_alpha(color_parser, input)?;
 
     Ok((r1, r2, r3, alpha))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serialize_modern_components() {
+        // None.
+        assert_eq!(ModernComponent(&None).to_css_string(), "none".to_string());
+
+        // Finite values.
+        assert_eq!(
+            ModernComponent(&Some(10.0)).to_css_string(),
+            "10".to_string()
+        );
+        assert_eq!(
+            ModernComponent(&Some(-10.0)).to_css_string(),
+            "-10".to_string()
+        );
+        assert_eq!(ModernComponent(&Some(0.0)).to_css_string(), "0".to_string());
+        assert_eq!(
+            ModernComponent(&Some(-0.0)).to_css_string(),
+            "0".to_string()
+        );
+
+        // Infinite values.
+        assert_eq!(
+            ModernComponent(&Some(f32::INFINITY)).to_css_string(),
+            "calc(infinity)".to_string()
+        );
+        assert_eq!(
+            ModernComponent(&Some(f32::NEG_INFINITY)).to_css_string(),
+            "calc(-infinity)".to_string()
+        );
+
+        // NaN.
+        assert_eq!(
+            ModernComponent(&Some(f32::NAN)).to_css_string(),
+            "calc(NaN)".to_string()
+        );
+    }
+
+    #[test]
+    fn max_preserve_nan_preserves_nan() {
+        assert!(max_preserve_nan(f32::NAN, 0.0).is_nan());
+        assert_eq!(max_preserve_nan(10.0, 0.0), 10.0);
+        assert_eq!(max_preserve_nan(-10.0, 0.0), 0.0);
+        assert_eq!(max_preserve_nan(-10.0, -5.0), -5.0);
+        assert_eq!(max_preserve_nan(f32::INFINITY, 0.0), f32::INFINITY);
+        assert_eq!(max_preserve_nan(f32::NEG_INFINITY, 0.0), 0.0);
+    }
 }
