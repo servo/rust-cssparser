@@ -55,16 +55,17 @@ impl<'a> ToCss for ModernComponent<'a> {
         W: fmt::Write,
     {
         if let Some(value) = self.0 {
-            if value.is_infinite() {
+            if value.is_finite() {
+                value.to_css(dest)
+            } else if value.is_nan() {
+                dest.write_str("calc(NaN)")
+            } else {
+                debug_assert!(value.is_infinite());
                 if value.is_sign_negative() {
                     dest.write_str("calc(-infinity)")
                 } else {
                     dest.write_str("calc(infinity)")
                 }
-            } else if value.is_nan() {
-                dest.write_str("calc(NaN)")
-            } else {
-                value.to_css(dest)
             }
         } else {
             dest.write_str("none")
@@ -1490,15 +1491,6 @@ pub fn hsl_to_rgb(hue: f32, saturation: f32, lightness: f32) -> (f32, f32, f32) 
     (red, green, blue)
 }
 
-#[inline]
-fn max_preserve_nan(value: f32, max: f32) -> f32 {
-    if value.is_nan() {
-        value
-    } else {
-        value.max(max)
-    }
-}
-
 type IntoColorFn<Output> =
     fn(l: Option<f32>, a: Option<f32>, b: Option<f32>, alpha: Option<f32>) -> Output;
 
@@ -1521,7 +1513,7 @@ where
         P::parse_number_or_percentage,
     )?;
 
-    let lightness = lightness.map(|l| max_preserve_nan(l.value(lightness_range), 0.0));
+    let lightness = lightness.map(|l| l.value(lightness_range));
     let a = a.map(|a| a.value(a_b_range));
     let b = b.map(|b| b.value(a_b_range));
 
@@ -1547,8 +1539,8 @@ where
         P::parse_angle_or_number,
     )?;
 
-    let lightness = lightness.map(|l| max_preserve_nan(l.value(lightness_range), 0.0));
-    let chroma = chroma.map(|c| max_preserve_nan(c.value(chroma_range), 0.0));
+    let lightness = lightness.map(|l| l.value(lightness_range));
+    let chroma = chroma.map(|c| c.value(chroma_range));
     let hue = hue.map(|h| normalize_hue(h.degrees()));
 
     Ok(into_color(lightness, chroma, hue, alpha))
@@ -1657,15 +1649,5 @@ mod tests {
             ModernComponent(&Some(f32::NAN)).to_css_string(),
             "calc(NaN)".to_string()
         );
-    }
-
-    #[test]
-    fn max_preserve_nan_preserves_nan() {
-        assert!(max_preserve_nan(f32::NAN, 0.0).is_nan());
-        assert_eq!(max_preserve_nan(10.0, 0.0), 10.0);
-        assert_eq!(max_preserve_nan(-10.0, 0.0), 0.0);
-        assert_eq!(max_preserve_nan(-10.0, -5.0), -5.0);
-        assert_eq!(max_preserve_nan(f32::INFINITY, 0.0), f32::INFINITY);
-        assert_eq!(max_preserve_nan(f32::NEG_INFINITY, 0.0), 0.0);
     }
 }

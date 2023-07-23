@@ -2,19 +2,19 @@ items = []
 
 
 def lab(lightness, a, b, alpha=1):
-    return (max(0.0, lightness), a, b, alpha)
+    return (lightness, a, b, alpha)
 
 
 def labp(lightness, a, b, alpha=1):
-    return (max(0.0, lightness), a * 125.0 / 100.0, b * 125.0 / 100.0, alpha)
+    return (lightness, a * 125.0 / 100.0, b * 125.0 / 100.0, alpha)
 
 
 def oklab(lightness, a, b, alpha=1):
-    return (max(0.0, lightness), a, b, alpha)
+    return (lightness, a, b, alpha)
 
 
 def oklabp(lightness, a, b, alpha=1):
-    return (max(0.0, lightness / 100.0), a * 0.4 / 100.0, b * 0.4 / 100.0, alpha)
+    return (lightness / 100.0, a * 0.4 / 100.0, b * 0.4 / 100.0, alpha)
 
 
 def slab(name, lightness, a, b, alpha=1):
@@ -53,19 +53,19 @@ def calc_deg(deg):
 
 
 def lch(lightness, c, h, alpha=1):
-    return (max(lightness, 0.0), max(0.0, c), calc_deg(h), alpha)
+    return (lightness, c, calc_deg(h), alpha)
 
 
 def lchp(lightness, c, h, alpha=1):
-    return (max(lightness, 0.0), max(0.0, c * 150.0 / 100.0), calc_deg(h), alpha)
+    return (lightness, c * 150.0 / 100.0, calc_deg(h), alpha)
 
 
 def oklch(lightness, c, h, alpha=1):
-    return (max(lightness, 0.0), max(0.0, c), calc_deg(h), alpha)
+    return (lightness, c, calc_deg(h), alpha)
 
 
 def oklchp(lightness, c, h, alpha=1):
-    return (max(lightness, 0.0) / 100.0, max(0.0, c * 0.4 / 100.0), calc_deg(h), alpha)
+    return (lightness / 100.0, c * 0.4 / 100.0, calc_deg(h), alpha)
 
 
 def slch(name, lightness, c, h, alpha=1):
