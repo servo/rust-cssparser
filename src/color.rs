@@ -82,44 +82,34 @@ fn normalize_hue(hue: f32) -> f32 {
 
 /// A color with red, green, blue, and alpha components, in a byte each.
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct RGBA {
+pub struct RgbaLegacy {
     /// The red component.
-    pub red: Option<u8>,
+    pub red: u8,
     /// The green component.
-    pub green: Option<u8>,
+    pub green: u8,
     /// The blue component.
-    pub blue: Option<u8>,
+    pub blue: u8,
     /// The alpha component.
-    pub alpha: Option<f32>,
+    pub alpha: f32,
 }
 
-impl RGBA {
+impl RgbaLegacy {
     /// Constructs a new RGBA value from float components. It expects the red,
     /// green, blue and alpha channels in that order, and all values will be
     /// clamped to the 0.0 ... 1.0 range.
     #[inline]
-    pub fn from_floats(
-        red: Option<f32>,
-        green: Option<f32>,
-        blue: Option<f32>,
-        alpha: Option<f32>,
-    ) -> Self {
+    pub fn from_floats(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
         Self::new(
-            red.map(clamp_unit_f32),
-            green.map(clamp_unit_f32),
-            blue.map(clamp_unit_f32),
-            alpha.map(|a| a.clamp(0.0, OPAQUE)),
+            clamp_unit_f32(red),
+            clamp_unit_f32(green),
+            clamp_unit_f32(blue),
+            alpha.clamp(0.0, OPAQUE),
         )
     }
 
     /// Same thing, but with `u8` values instead of floats in the 0 to 1 range.
     #[inline]
-    pub const fn new(
-        red: Option<u8>,
-        green: Option<u8>,
-        blue: Option<u8>,
-        alpha: Option<f32>,
-    ) -> Self {
+    pub const fn new(red: u8, green: u8, blue: u8, alpha: f32) -> Self {
         Self {
             red,
             green,
@@ -130,7 +120,7 @@ impl RGBA {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for RGBA {
+impl Serialize for RgbaLegacy {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -140,32 +130,32 @@ impl Serialize for RGBA {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for RGBA {
+impl<'de> Deserialize<'de> for RgbaLegacy {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         let (r, g, b, a) = Deserialize::deserialize(deserializer)?;
-        Ok(RGBA::new(r, g, b, a))
+        Ok(RgbaLegacy::new(r, g, b, a))
     }
 }
 
-impl ToCss for RGBA {
+impl ToCss for RgbaLegacy {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result
     where
         W: fmt::Write,
     {
-        let has_alpha = self.alpha.unwrap_or(0.0) != OPAQUE;
+        let has_alpha = self.alpha != OPAQUE;
 
         dest.write_str(if has_alpha { "rgba(" } else { "rgb(" })?;
-        self.red.unwrap_or(0).to_css(dest)?;
+        self.red.to_css(dest)?;
         dest.write_str(", ")?;
-        self.green.unwrap_or(0).to_css(dest)?;
+        self.green.to_css(dest)?;
         dest.write_str(", ")?;
-        self.blue.unwrap_or(0).to_css(dest)?;
+        self.blue.to_css(dest)?;
 
         // Legacy syntax does not allow none components.
-        serialize_color_alpha(dest, Some(self.alpha.unwrap_or(0.0)), true)?;
+        serialize_color_alpha(dest, Some(self.alpha), true)?;
 
         dest.write_char(')')
     }
@@ -213,7 +203,7 @@ impl ToCss for Hsl {
             self.lightness.unwrap_or(0.0),
         );
 
-        RGBA::from_floats(Some(red), Some(green), Some(blue), self.alpha).to_css(dest)
+        RgbaLegacy::from_floats(red, green, blue, self.alpha.unwrap_or(OPAQUE)).to_css(dest)
     }
 }
 
@@ -280,7 +270,7 @@ impl ToCss for Hwb {
             self.blackness.unwrap_or(0.0),
         );
 
-        RGBA::from_floats(Some(red), Some(green), Some(blue), self.alpha).to_css(dest)
+        RgbaLegacy::from_floats(red, green, blue, self.alpha.unwrap_or(OPAQUE)).to_css(dest)
     }
 }
 
@@ -621,7 +611,7 @@ pub enum Color {
     /// The 'currentcolor' keyword.
     CurrentColor,
     /// Specify sRGB colors directly by their red/green/blue/alpha chanels.
-    Rgba(RGBA),
+    Rgba(RgbaLegacy),
     /// Specifies a color in sRGB using hue, saturation and lightness components.
     Hsl(Hsl),
     /// Specifies a color in sRGB using hue, whiteness and blackness components.
@@ -812,7 +802,7 @@ pub trait FromParsedColor {
     fn from_current_color() -> Self;
 
     /// Construct a new color from red, green, blue and alpha components.
-    fn from_rgba(red: Option<u8>, green: Option<u8>, blue: Option<u8>, alpha: Option<f32>) -> Self;
+    fn from_rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Self;
 
     /// Construct a new color from hue, saturation, lightness and alpha components.
     fn from_hsl(
@@ -876,28 +866,28 @@ where
 {
     Ok(match value.len() {
         8 => O::from_rgba(
-            Some(from_hex(value[0])? * 16 + from_hex(value[1])?),
-            Some(from_hex(value[2])? * 16 + from_hex(value[3])?),
-            Some(from_hex(value[4])? * 16 + from_hex(value[5])?),
-            Some((from_hex(value[6])? * 16 + from_hex(value[7])?) as f32 / 255.0),
+            from_hex(value[0])? * 16 + from_hex(value[1])?,
+            from_hex(value[2])? * 16 + from_hex(value[3])?,
+            from_hex(value[4])? * 16 + from_hex(value[5])?,
+            (from_hex(value[6])? * 16 + from_hex(value[7])?) as f32 / 255.0,
         ),
         6 => O::from_rgba(
-            Some(from_hex(value[0])? * 16 + from_hex(value[1])?),
-            Some(from_hex(value[2])? * 16 + from_hex(value[3])?),
-            Some(from_hex(value[4])? * 16 + from_hex(value[5])?),
-            Some(OPAQUE),
+            from_hex(value[0])? * 16 + from_hex(value[1])?,
+            from_hex(value[2])? * 16 + from_hex(value[3])?,
+            from_hex(value[4])? * 16 + from_hex(value[5])?,
+            OPAQUE,
         ),
         4 => O::from_rgba(
-            Some(from_hex(value[0])? * 17),
-            Some(from_hex(value[1])? * 17),
-            Some(from_hex(value[2])? * 17),
-            Some((from_hex(value[3])? * 17) as f32 / 255.0),
+            from_hex(value[0])? * 17,
+            from_hex(value[1])? * 17,
+            from_hex(value[2])? * 17,
+            (from_hex(value[3])? * 17) as f32 / 255.0,
         ),
         3 => O::from_rgba(
-            Some(from_hex(value[0])? * 17),
-            Some(from_hex(value[1])? * 17),
-            Some(from_hex(value[2])? * 17),
-            Some(OPAQUE),
+            from_hex(value[0])? * 17,
+            from_hex(value[1])? * 17,
+            from_hex(value[2])? * 17,
+            OPAQUE,
         ),
         _ => return Err(()),
     })
@@ -935,8 +925,8 @@ impl FromParsedColor for Color {
     }
 
     #[inline]
-    fn from_rgba(red: Option<u8>, green: Option<u8>, blue: Option<u8>, alpha: Option<f32>) -> Self {
-        Color::Rgba(RGBA::new(red, green, blue, alpha))
+    fn from_rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Self {
+        Color::Rgba(RgbaLegacy::new(red, green, blue, alpha))
     }
 
     fn from_hsl(
@@ -1174,10 +1164,10 @@ where
     }
 
     match_ignore_ascii_case! { ident ,
-        "transparent" => Ok(Output::from_rgba(Some(0), Some(0), Some(0), Some(0.0))),
+        "transparent" => Ok(Output::from_rgba(0, 0, 0, 0.0)),
         "currentcolor" => Ok(Output::from_current_color()),
         _ => keyword(ident)
-            .map(|(r, g, b)| Output::from_rgba(Some(*r), Some(*g), Some(*b), Some(1.0)))
+            .map(|&(r, g, b)| Output::from_rgba(r, g, b, 1.0))
             .ok_or(()),
     }
 }
@@ -1327,47 +1317,50 @@ where
     // are parsing the legacy syntax.
     let is_legacy_syntax = maybe_red.is_some() && arguments.try_parse(|p| p.expect_comma()).is_ok();
 
-    let red: Option<u8>;
-    let green: Option<u8>;
-    let blue: Option<u8>;
-
-    let alpha = if is_legacy_syntax {
-        match maybe_red.unwrap() {
+    let (red, green, blue, alpha) = if is_legacy_syntax {
+        let (red, green, blue) = match maybe_red.unwrap() {
             NumberOrPercentage::Number { value } => {
-                red = Some(clamp_floor_256_f32(value));
-                green = Some(clamp_floor_256_f32(color_parser.parse_number(arguments)?));
+                let red = clamp_floor_256_f32(value);
+                let green = clamp_floor_256_f32(color_parser.parse_number(arguments)?);
                 arguments.expect_comma()?;
-                blue = Some(clamp_floor_256_f32(color_parser.parse_number(arguments)?));
+                let blue = clamp_floor_256_f32(color_parser.parse_number(arguments)?);
+                (red, green, blue)
             }
             NumberOrPercentage::Percentage { unit_value } => {
-                red = Some(clamp_unit_f32(unit_value));
-                green = Some(clamp_unit_f32(color_parser.parse_percentage(arguments)?));
+                let red = clamp_unit_f32(unit_value);
+                let green = clamp_unit_f32(color_parser.parse_percentage(arguments)?);
                 arguments.expect_comma()?;
-                blue = Some(clamp_unit_f32(color_parser.parse_percentage(arguments)?));
+                let blue = clamp_unit_f32(color_parser.parse_percentage(arguments)?);
+                (red, green, blue)
             }
-        }
+        };
 
-        Some(parse_legacy_alpha(color_parser, arguments)?)
+        let alpha = parse_legacy_alpha(color_parser, arguments)?;
+
+        (red, green, blue, alpha)
     } else {
         #[inline]
-        fn get_component_value(c: Option<NumberOrPercentage>) -> Option<u8> {
+        fn get_component_value(c: Option<NumberOrPercentage>) -> u8 {
             c.map(|c| match c {
                 NumberOrPercentage::Number { value } => clamp_floor_256_f32(value),
                 NumberOrPercentage::Percentage { unit_value } => clamp_unit_f32(unit_value),
             })
+            .unwrap_or(0)
         }
 
-        red = get_component_value(maybe_red);
+        let red = get_component_value(maybe_red);
 
-        green = get_component_value(parse_none_or(arguments, |p| {
+        let green = get_component_value(parse_none_or(arguments, |p| {
             color_parser.parse_number_or_percentage(p)
         })?);
 
-        blue = get_component_value(parse_none_or(arguments, |p| {
+        let blue = get_component_value(parse_none_or(arguments, |p| {
             color_parser.parse_number_or_percentage(p)
         })?);
 
-        parse_modern_alpha(color_parser, arguments)?
+        let alpha = parse_modern_alpha(color_parser, arguments)?.unwrap_or(0.0);
+
+        (red, green, blue, alpha)
     };
 
     Ok(P::Output::from_rgba(red, green, blue, alpha))

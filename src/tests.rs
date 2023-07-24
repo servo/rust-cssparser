@@ -18,8 +18,8 @@ use super::{
     parse_important, parse_nth, parse_one_declaration, parse_one_rule, stylesheet_encoding,
     AtRuleParser, BasicParseError, BasicParseErrorKind, Color, CowRcStr, DeclarationParser,
     Delimiter, EncodingSupport, ParseError, ParseErrorKind, Parser, ParserInput, ParserState,
-    QualifiedRuleParser, RuleBodyItemParser, RuleBodyParser, SourceLocation, StyleSheetParser,
-    ToCss, Token, TokenSerializationType, UnicodeRange, RGBA,
+    QualifiedRuleParser, RgbaLegacy, RuleBodyItemParser, RuleBodyParser, SourceLocation,
+    StyleSheetParser, ToCss, Token, TokenSerializationType, UnicodeRange,
 };
 
 macro_rules! JArray {
@@ -592,19 +592,19 @@ fn serialize_current_color() {
 
 #[test]
 fn serialize_rgb_full_alpha() {
-    let c = Color::Rgba(RGBA::new(Some(255), Some(230), Some(204), Some(1.0)));
+    let c = Color::Rgba(RgbaLegacy::new(255, 230, 204, 1.0));
     assert_eq!(c.to_css_string(), "rgb(255, 230, 204)");
 }
 
 #[test]
 fn serialize_rgba() {
-    let c = Color::Rgba(RGBA::new(Some(26), Some(51), Some(77), Some(0.125)));
+    let c = Color::Rgba(RgbaLegacy::new(26, 51, 77, 0.125));
     assert_eq!(c.to_css_string(), "rgba(26, 51, 77, 0.125)");
 }
 
 #[test]
 fn serialize_rgba_two_digit_float_if_roundtrips() {
-    let c = Color::Rgba(RGBA::from_floats(Some(0.), Some(0.), Some(0.), Some(0.5)));
+    let c = Color::Rgba(RgbaLegacy::from_floats(0., 0., 0., 0.5));
     assert_eq!(c.to_css_string(), "rgba(0, 0, 0, 0.5)");
 }
 
@@ -1526,7 +1526,7 @@ fn generic_parser() {
     #[derive(Debug, PartialEq)]
     enum OutputType {
         CurrentColor,
-        Rgba(Option<u8>, Option<u8>, Option<u8>, Option<f32>),
+        Rgba(u8, u8, u8, f32),
         Hsl(Option<f32>, Option<f32>, Option<f32>, Option<f32>),
         Hwb(Option<f32>, Option<f32>, Option<f32>, Option<f32>),
         Lab(Option<f32>, Option<f32>, Option<f32>, Option<f32>),
@@ -1547,12 +1547,7 @@ fn generic_parser() {
             OutputType::CurrentColor
         }
 
-        fn from_rgba(
-            red: Option<u8>,
-            green: Option<u8>,
-            blue: Option<u8>,
-            alpha: Option<f32>,
-        ) -> Self {
+        fn from_rgba(red: u8, green: u8, blue: u8, alpha: f32) -> Self {
             OutputType::Rgba(red, green, blue, alpha)
         }
 
@@ -1630,10 +1625,10 @@ fn generic_parser() {
     #[rustfmt::skip]
     const TESTS: &[(&str, OutputType)] = &[
         ("currentColor",                OutputType::CurrentColor),
-        ("rgb(1, 2, 3)",                OutputType::Rgba(Some(1), Some(2), Some(3), Some(1.0))),
-        ("rgba(1, 2, 3, 0.4)",          OutputType::Rgba(Some(1), Some(2), Some(3), Some(0.4))),
-        ("rgb(none none none / none)",  OutputType::Rgba(None, None, None, None)),
-        ("rgb(1 none 3 / none)",        OutputType::Rgba(Some(1), None, Some(3), None)),
+        ("rgb(1, 2, 3)",                OutputType::Rgba(1, 2, 3, 1.0)),
+        ("rgba(1, 2, 3, 0.4)",          OutputType::Rgba(1, 2, 3, 0.4)),
+        ("rgb(none none none / none)",  OutputType::Rgba(0, 0, 0, 0.0)),
+        ("rgb(1 none 3 / none)",        OutputType::Rgba(1, 0, 3, 0.0)),
 
         ("hsla(45deg, 20%, 30%, 0.4)",  OutputType::Hsl(Some(45.0), Some(0.2), Some(0.3), Some(0.4))),
         ("hsl(45deg none none)",        OutputType::Hsl(Some(45.0), None, None, Some(1.0))),
