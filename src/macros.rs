@@ -76,36 +76,43 @@ macro_rules! match_ignore_ascii_case {
 ///
 /// fn color_rgb(input: &str) -> Option<(u8, u8, u8)> {
 ///     cssparser::ascii_case_insensitive_phf_map! {
-///         keyword -> (u8, u8, u8) = {
+///         keywords -> (u8, u8, u8) = {
 ///             "red" => (255, 0, 0),
 ///             "green" => (0, 255, 0),
 ///             "blue" => (0, 0, 255),
 ///         }
 ///     }
-///     keyword(input).cloned()
+///     keywords::get(input).cloned()
 /// }
+/// ```
+///
+/// You can also iterate over the map entries by using `keywords::entries()`.
 #[macro_export]
 macro_rules! ascii_case_insensitive_phf_map {
     ($name: ident -> $ValueType: ty = { $( $key: tt => $value: expr ),+ }) => {
         ascii_case_insensitive_phf_map!($name -> $ValueType = { $( $key => $value, )+ })
     };
     ($name: ident -> $ValueType: ty = { $( $key: tt => $value: expr, )+ }) => {
-        pub fn $name(input: &str) -> Option<&'static $ValueType> {
-            // This dummy module works around a feature gate,
-            // see comment on the similar module in `match_ignore_ascii_case!` above.
-            mod _cssparser_internal {
-                $crate::_cssparser_internal_max_len! {
-                    $( $key )+
-                }
-            }
+        mod $name {
             use $crate::_cssparser_internal_phf as phf;
+            $crate::_cssparser_internal_max_len! {
+                $( $key )+
+            }
             static MAP: phf::Map<&'static str, $ValueType> = phf::phf_map! {
                 $(
                     $key => $value,
                 )*
             };
-            $crate::_cssparser_internal_to_lowercase!(input, _cssparser_internal::MAX_LENGTH => lowercase);
-            lowercase.and_then(|s| MAP.get(s))
+
+            #[allow(dead_code)]
+            pub fn entries() -> impl Iterator<Item = (&'static &'static str, &'static $ValueType)> {
+                MAP.entries()
+            }
+
+            pub fn get(input: &str) -> Option<&'static $ValueType> {
+                $crate::_cssparser_internal_to_lowercase!(input, MAX_LENGTH => lowercase);
+                MAP.get(lowercase?)
+            }
         }
     }
 }
