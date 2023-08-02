@@ -1213,8 +1213,8 @@ fn procedural_masquerade_whitespace() {
             "  \t\n" => ()
         }
     }
-    assert_eq!(map("  \t\n"), Some(&()));
-    assert_eq!(map(" "), None);
+    assert_eq!(map::get("  \t\n"), Some(&()));
+    assert_eq!(map::get(" "), None);
 
     match_ignore_ascii_case! { "  \t\n",
         " " => panic!("1"),
