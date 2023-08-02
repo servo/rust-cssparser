@@ -93,24 +93,36 @@ macro_rules! ascii_case_insensitive_phf_map {
         ascii_case_insensitive_phf_map!($name -> $ValueType = { $( $key => $value, )+ })
     };
     ($name: ident -> $ValueType: ty = { $( $key: tt => $value: expr, )+ }) => {
-        mod $name {
-            use $crate::_cssparser_internal_phf as phf;
+        use $crate::_cssparser_internal_phf as phf;
+
+        // See macro above for context.
+        mod cssparser_internal {
             $crate::_cssparser_internal_max_len! {
                 $( $key )+
             }
-            static MAP: phf::Map<&'static str, $ValueType> = phf::phf_map! {
-                $(
-                    $key => $value,
-                )*
-            };
+        }
 
+        static MAP: phf::Map<&'static str, $ValueType> = phf::phf_map! {
+            $(
+                $key => $value,
+            )*
+        };
+
+        // While the obvious choice for this would be an inner module, it's not possible to
+        // reference from types from there, see:
+        // <https://github.com/rust-lang/rust/issues/114369>
+        //
+        // So we abuse a struct with static associated functions instead.
+        #[allow(non_camel_case_types)]
+        struct $name;
+        impl $name {
             #[allow(dead_code)]
-            pub fn entries() -> impl Iterator<Item = (&'static &'static str, &'static $ValueType)> {
+            fn entries() -> impl Iterator<Item = (&'static &'static str, &'static $ValueType)> {
                 MAP.entries()
             }
 
-            pub fn get(input: &str) -> Option<&'static $ValueType> {
-                $crate::_cssparser_internal_to_lowercase!(input, MAX_LENGTH => lowercase);
+            fn get(input: &str) -> Option<&'static $ValueType> {
+                $crate::_cssparser_internal_to_lowercase!(input, cssparser_internal::MAX_LENGTH => lowercase);
                 MAP.get(lowercase?)
             }
         }
