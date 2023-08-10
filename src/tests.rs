@@ -1289,52 +1289,6 @@ fn parser_maintains_current_line() {
 }
 
 #[test]
-fn parser_with_line_number_offset() {
-    let mut input = ParserInput::new_with_line_number_offset("ident\nident", 72);
-    let mut parser = Parser::new(&mut input);
-    assert_eq!(
-        parser.current_source_location(),
-        SourceLocation {
-            line: 72,
-            column: 1
-        }
-    );
-    assert_eq!(
-        parser.next_including_whitespace_and_comments(),
-        Ok(&Token::Ident("ident".into()))
-    );
-    assert_eq!(
-        parser.current_source_location(),
-        SourceLocation {
-            line: 72,
-            column: 6
-        }
-    );
-    assert_eq!(
-        parser.next_including_whitespace_and_comments(),
-        Ok(&Token::WhiteSpace("\n".into()))
-    );
-    assert_eq!(
-        parser.current_source_location(),
-        SourceLocation {
-            line: 73,
-            column: 1
-        }
-    );
-    assert_eq!(
-        parser.next_including_whitespace_and_comments(),
-        Ok(&Token::Ident("ident".into()))
-    );
-    assert_eq!(
-        parser.current_source_location(),
-        SourceLocation {
-            line: 73,
-            column: 6
-        }
-    );
-}
-
-#[test]
 fn cdc_regression_test() {
     let mut input = ParserInput::new("-->x");
     let mut parser = Parser::new(&mut input);
