@@ -230,16 +230,11 @@ enum SeenStatus {
 impl<'a> Tokenizer<'a> {
     #[inline]
     pub fn new(input: &str) -> Tokenizer {
-        Tokenizer::with_first_line_number(input, 0)
-    }
-
-    #[inline]
-    pub fn with_first_line_number(input: &str, first_line_number: u32) -> Tokenizer {
         Tokenizer {
             input,
             position: 0,
             current_line_start_position: 0,
-            current_line_number: first_line_number,
+            current_line_number: 0,
             var_or_env_functions: SeenStatus::DontCare,
             source_map_url: None,
             source_url: None,
@@ -541,7 +536,7 @@ impl SourcePosition {
 /// The line and column number for a given position within the input.
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct SourceLocation {
-    /// The line number, starting at 0 for the first line, unless `with_first_line_number` was used.
+    /// The line number, starting at 0 for the first line.
     pub line: u32,
 
     /// The column number within a line, starting at 1 for first the character of the line.
