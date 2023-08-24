@@ -274,6 +274,7 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     pub fn position(&self) -> SourcePosition {
+        debug_assert!(self.input.is_char_boundary(self.position));
         SourcePosition(self.position)
     }
 
@@ -313,24 +314,26 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn slice_from(&self, start_pos: SourcePosition) -> &'a str {
-        &self.input[start_pos.0..self.position]
+    pub(crate) fn slice_from(&self, start_pos: SourcePosition) -> &'a str {
+        self.slice(start_pos..self.position())
     }
 
     #[inline]
-    pub fn slice(&self, range: Range<SourcePosition>) -> &'a str {
-        &self.input[range.start.0..range.end.0]
+    pub(crate) fn slice(&self, range: Range<SourcePosition>) -> &'a str {
+        debug_assert!(self.input.is_char_boundary(range.start.0));
+        debug_assert!(self.input.is_char_boundary(range.end.0));
+        unsafe { self.input.get_unchecked(range.start.0..range.end.0) }
     }
 
     pub fn current_source_line(&self) -> &'a str {
-        let current = self.position;
-        let start = self.input[0..current]
+        let current = self.position();
+        let start = self.slice(SourcePosition(0)..current)
             .rfind(|c| matches!(c, '\r' | '\n' | '\x0C'))
             .map_or(0, |start| start + 1);
-        let end = self.input[current..]
+        let end = self.slice(current..SourcePosition(self.input.len()))
             .find(|c| matches!(c, '\r' | '\n' | '\x0C'))
-            .map_or(self.input.len(), |end| current + end);
-        &self.input[start..end]
+            .map_or(self.input.len(), |end| current.0 + end);
+        self.slice(SourcePosition(start)..SourcePosition(end))
     }
 
     #[inline]
@@ -426,7 +429,7 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn next_char(&self) -> char {
-        self.input[self.position..].chars().next().unwrap()
+        unsafe { self.input.get_unchecked(self.position().0..) }.chars().next().unwrap()
     }
 
     // Given that a newline has been seen, advance over the newline
