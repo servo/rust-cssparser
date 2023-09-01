@@ -669,14 +669,17 @@ pub enum NumberOrPercentage {
 }
 
 impl NumberOrPercentage {
-    fn unit_value(&self) -> f32 {
+    /// Return the value as a percentage.
+    pub fn unit_value(&self) -> f32 {
         match *self {
             NumberOrPercentage::Number { value } => value,
             NumberOrPercentage::Percentage { unit_value } => unit_value,
         }
     }
 
-    fn value(&self, percentage_basis: f32) -> f32 {
+    /// Return the value as a number with a percentage adjusted to the
+    /// `percentage_basis`.
+    pub fn value(&self, percentage_basis: f32) -> f32 {
         match *self {
             Self::Number { value } => value,
             Self::Percentage { unit_value } => unit_value * percentage_basis,
@@ -699,7 +702,9 @@ pub enum AngleOrNumber {
 }
 
 impl AngleOrNumber {
-    fn degrees(&self) -> f32 {
+    /// Return the angle in degrees. `AngleOrNumber::Number` is returned as
+    /// degrees, because it is the canonical unit.
+    pub fn degrees(&self) -> f32 {
         match *self {
             AngleOrNumber::Number { value } => value,
             AngleOrNumber::Angle { degrees } => degrees,
