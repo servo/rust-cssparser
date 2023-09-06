@@ -347,7 +347,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     #[inline]
     pub fn new(input: &'t mut ParserInput<'i>) -> Parser<'i, 't> {
         Parser {
-            input: input,
+            input,
             at_start_of: None,
             stop_before: Delimiter::None,
         }
