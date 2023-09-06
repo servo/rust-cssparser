@@ -39,6 +39,28 @@ impl ParserState {
     }
 }
 
+/// When parsing until a given token, sometimes the caller knows that parsing is going to restart
+/// at some earlier point, and consuming until we find a top level delimiter is just wasted work.
+///
+/// In that case, callers can pass ParseUntilErrorBehavior::Stop to avoid doing all that wasted
+/// work.
+///
+/// This is important for things like CSS nesting, where something like:
+///
+///   foo:is(..) {
+///     ...
+///   }
+///
+/// Would need to scan the whole {} block to find a semicolon, only for parsing getting restarted
+/// as a qualified rule later.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ParseUntilErrorBehavior {
+    /// Consume until we see the relevant delimiter or the end of the stream.
+    Consume,
+    /// Eagerly error.
+    Stop,
+}
+
 /// Details about a `BasicParseError`
 #[derive(Clone, Debug, PartialEq)]
 pub enum BasicParseErrorKind<'i> {
@@ -767,7 +789,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     where
         F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>>,
     {
-        parse_until_before(self, delimiters, parse)
+        parse_until_before(self, delimiters, ParseUntilErrorBehavior::Consume, parse)
     }
 
     /// Like `parse_until_before`, but also consume the delimiter token.
@@ -784,7 +806,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     where
         F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>>,
     {
-        parse_until_after(self, delimiters, parse)
+        parse_until_after(self, delimiters, ParseUntilErrorBehavior::Consume, parse)
     }
 
     /// Parse a <whitespace-token> and return its value.
@@ -1014,6 +1036,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
 pub fn parse_until_before<'i: 't, 't, F, T, E>(
     parser: &mut Parser<'i, 't>,
     delimiters: Delimiters,
+    error_behavior: ParseUntilErrorBehavior,
     parse: F,
 ) -> Result<T, ParseError<'i, E>>
 where
@@ -1029,6 +1052,9 @@ where
             stop_before: delimiters,
         };
         result = delimited_parser.parse_entirely(parse);
+        if error_behavior == ParseUntilErrorBehavior::Stop && result.is_err() {
+            return result;
+        }
         if let Some(block_type) = delimited_parser.at_start_of {
             consume_until_end_of_block(block_type, &mut delimited_parser.input.tokenizer);
         }
@@ -1052,12 +1078,16 @@ where
 pub fn parse_until_after<'i: 't, 't, F, T, E>(
     parser: &mut Parser<'i, 't>,
     delimiters: Delimiters,
+    error_behavior: ParseUntilErrorBehavior,
     parse: F,
 ) -> Result<T, ParseError<'i, E>>
 where
     F: for<'tt> FnOnce(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>>,
 {
-    let result = parser.parse_until_before(delimiters, parse);
+    let result = parse_until_before(parser, delimiters, error_behavior, parse);
+    if error_behavior == ParseUntilErrorBehavior::Stop && result.is_err() {
+        return result;
+    }
     let next_byte = parser.input.tokenizer.next_byte();
     if next_byte.is_some()
         && !parser
