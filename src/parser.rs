@@ -314,14 +314,15 @@ impl Delimiters {
 
     #[inline]
     fn from_byte(byte: Option<u8>) -> Delimiters {
-        match byte {
-            Some(b';') => Delimiter::Semicolon,
-            Some(b'!') => Delimiter::Bang,
-            Some(b',') => Delimiter::Comma,
-            Some(b'{') => Delimiter::CurlyBracketBlock,
-            Some(b'}') => ClosingDelimiter::CloseCurlyBracket,
-            Some(b']') => ClosingDelimiter::CloseSquareBracket,
-            Some(b')') => ClosingDelimiter::CloseParenthesis,
+        let Some(b) = byte else { return Delimiter::None };
+        crate::match_byte! { b,
+            b';' => Delimiter::Semicolon,
+            b'!' => Delimiter::Bang,
+            b',' => Delimiter::Comma,
+            b'{' => Delimiter::CurlyBracketBlock,
+            b'}' => ClosingDelimiter::CloseCurlyBracket,
+            b']' => ClosingDelimiter::CloseSquareBracket,
+            b')' => ClosingDelimiter::CloseParenthesis,
             _ => Delimiter::None,
         }
     }
