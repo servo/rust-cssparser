@@ -314,15 +314,21 @@ impl Delimiters {
 
     #[inline]
     fn from_byte(byte: Option<u8>) -> Delimiters {
+        const TABLE: [Delimiters; 256] = {
+            let mut table = [Delimiter::None; 256];
+            table[b';' as usize] = Delimiter::Semicolon;
+            table[b'!' as usize] = Delimiter::Bang;
+            table[b',' as usize] = Delimiter::Comma;
+            table[b'{' as usize] = Delimiter::CurlyBracketBlock;
+            table[b'}' as usize] = ClosingDelimiter::CloseCurlyBracket;
+            table[b']' as usize] = ClosingDelimiter::CloseSquareBracket;
+            table[b')' as usize] = ClosingDelimiter::CloseParenthesis;
+            table
+        };
+
         match byte {
-            Some(b';') => Delimiter::Semicolon,
-            Some(b'!') => Delimiter::Bang,
-            Some(b',') => Delimiter::Comma,
-            Some(b'{') => Delimiter::CurlyBracketBlock,
-            Some(b'}') => ClosingDelimiter::CloseCurlyBracket,
-            Some(b']') => ClosingDelimiter::CloseSquareBracket,
-            Some(b')') => ClosingDelimiter::CloseParenthesis,
-            _ => Delimiter::None,
+            None => Delimiter::None,
+            Some(b) => TABLE[b as usize],
         }
     }
 }
