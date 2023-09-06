@@ -454,7 +454,7 @@ where
     P: AtRuleParser<'i, Error = E>,
 {
     let delimiters = Delimiter::Semicolon | Delimiter::CurlyBracketBlock;
-    let result = parse_until_before(input, delimiters, |input| parser.parse_prelude(name, input));
+    let result = input.parse_until_before(delimiters, |input| parser.parse_prelude(name, input));
     match result {
         Ok(prelude) => {
             let result = match input.next() {
@@ -488,7 +488,7 @@ fn parse_qualified_rule<'i, 't, P, E>(
 where
     P: QualifiedRuleParser<'i, Error = E>,
 {
-    let prelude = parse_until_before(input, delimiters, |input| parser.parse_prelude(input));
+    let prelude = input.parse_until_before(delimiters, |input| parser.parse_prelude(input));
     input.expect_curly_bracket_block()?;
     // Do this here so that we consume the `{` even if the prelude is `Err`.
     let prelude = prelude?;
