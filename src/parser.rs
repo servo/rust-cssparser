@@ -313,7 +313,7 @@ impl Delimiters {
     }
 
     #[inline]
-    fn from_byte(byte: Option<u8>) -> Delimiters {
+    pub(crate) fn from_byte(byte: Option<u8>) -> Delimiters {
         const TABLE: [Delimiters; 256] = {
             let mut table = [Delimiter::None; 256];
             table[b';' as usize] = Delimiter::Semicolon;
