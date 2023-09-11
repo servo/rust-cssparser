@@ -51,6 +51,14 @@ jobs:
         run: cargo build
         working-directory: macros
 
+      - name: Color build
+        run: cargo build
+        working-directory: color
+
+      - name: Color test
+        run: cargo test
+        working-directory: color
+
       - name: Cargo miri test
         if: "matrix.toolchain == 'nightly'"
         run: cargo miri test --features skip_long_tests ${{ matrix.features }}
