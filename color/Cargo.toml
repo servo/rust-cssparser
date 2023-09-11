@@ -12,7 +12,7 @@ edition = "2021"
 path = "lib.rs"
 
 [dependencies]
-cssparser = { path = ".." }
+cssparser = { version = "0.33", path = ".." }
 
 [dev-dependencies]
 serde_json = "1.0"
