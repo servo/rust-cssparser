@@ -1,0 +1,20 @@
+[package]
+name = "cssparser-color"
+version = "0.1.0"
+authors = ["Emilio Cobos Álvarez <emilio@crisal.io>"]
+description = "Color implementation based on cssparser"
+documentation = "https://docs.rs/cssparser-color/"
+repository = "https://github.com/servo/rust-cssparser"
+license = "MPL-2.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+cssparser = { path = ".." }
+
+[dev-dependencies]
+serde_json = "1.0"
+difference = "2.0"
+encoding_rs = "0.8"
