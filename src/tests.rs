@@ -9,7 +9,7 @@ use encoding_rs;
 use serde_json::{self, json, Map, Value};
 
 use crate::color::{parse_color_with, FromParsedColor};
-use crate::{ColorParser, PredefinedColorSpace};
+use crate::{ColorParser, PredefinedColorSpace, Delimiters};
 
 #[cfg(feature = "bench")]
 use self::test::Bencher;
@@ -920,6 +920,18 @@ impl<'a> ToJson for CowRcStr<'a> {
         let s: &str = &*self;
         s.to_json()
     }
+}
+
+#[bench]
+#[cfg(feature = "bench")]
+fn delimiter_from_byte(b: &mut Bencher) {
+    b.iter(|| {
+        for _ in 0..1000 {
+            for i in 0..256 {
+                std::hint::black_box(Delimiters::from_byte(Some(i as u8)));
+            }
+        }
+    })
 }
 
 #[cfg(feature = "bench")]
