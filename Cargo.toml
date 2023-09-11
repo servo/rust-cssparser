@@ -34,4 +34,4 @@ dummy_match_byte = []
 skip_long_tests = []
 
 [workspace]
-members = [".", "./macros", "./procedural-masquerade"]
+members = [".", "./macros"]
