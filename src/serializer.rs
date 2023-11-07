@@ -470,6 +470,10 @@ pub enum TokenSerializationType {
 
 impl TokenSerializationType {
     /// Return a value that represents the absence of a token, e.g. before the start of the input.
+    #[deprecated(
+        since = "0.32.1",
+        note = "use TokenSerializationType::Nothing or TokenSerializationType::default() instead"
+    )]
     pub fn nothing() -> TokenSerializationType {
         Default::default()
     }
