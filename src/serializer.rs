@@ -378,9 +378,10 @@ impl_tocss_for_float!(f32);
 impl_tocss_for_float!(f64);
 
 /// A category of token. See the `needs_separator_when_before` method.
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
 pub enum TokenSerializationType {
     /// No token serialization type.
+    #[default]
     Nothing,
 
     /// The [`<whitespace-token>`](https://drafts.csswg.org/css-syntax/#whitespace-token-diagram)
@@ -470,7 +471,7 @@ pub enum TokenSerializationType {
 impl TokenSerializationType {
     /// Return a value that represents the absence of a token, e.g. before the start of the input.
     pub fn nothing() -> TokenSerializationType {
-        TokenSerializationType::Nothing
+        Default::default()
     }
 
     /// If this value is `TokenSerializationType::Nothing`, set it to the given value instead.
