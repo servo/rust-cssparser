@@ -117,7 +117,10 @@ fn one_component_value() {
         include_str!("css-parsing-tests/one_component_value.json"),
         |input| {
             let result: Result<Value, ParseError<()>> = input.parse_entirely(|input| {
-                Ok(one_component_value_to_json(input.next()?.clone(), input))
+                Ok(one_component_value_to_json(
+                    input.try_next()?.clone(),
+                    input,
+                ))
             });
             result.unwrap_or(JArray!["error", "invalid"])
         },
@@ -279,7 +282,7 @@ fn outer_block_end_consumed() {
             .map_err(Into::<ParseError<()>>::into))
         .is_ok());
     println!("{:?}", input.position());
-    assert!(input.next().is_err());
+    assert!(input.try_next().is_err());
 }
 
 /// https://github.com/servo/rust-cssparser/issues/174
@@ -287,7 +290,7 @@ fn outer_block_end_consumed() {
 fn bad_url_slice_out_of_bounds() {
     let mut input = ParserInput::new("url(\u{1}\\");
     let mut parser = Parser::new(&mut input);
-    let result = parser.next_including_whitespace_and_comments(); // This used to panic
+    let result = parser.try_next_including_whitespace_and_comments(); // This used to panic
     assert_eq!(result, Ok(&Token::BadUrl("\u{1}\\".into())));
 }
 
@@ -296,7 +299,7 @@ fn bad_url_slice_out_of_bounds() {
 fn bad_url_slice_not_at_char_boundary() {
     let mut input = ParserInput::new("url(9\n۰");
     let mut parser = Parser::new(&mut input);
-    let result = parser.next_including_whitespace_and_comments(); // This used to panic
+    let result = parser.try_next_including_whitespace_and_comments(); // This used to panic
     assert_eq!(result, Ok(&Token::BadUrl("9\n۰".into())));
 }
 
@@ -324,7 +327,7 @@ fn unquoted_url_escaping() {
          "
     );
     let mut input = ParserInput::new(&serialized);
-    assert_eq!(Parser::new(&mut input).next(), Ok(&token));
+    assert_eq!(Parser::new(&mut input).try_next(), Ok(&token));
 }
 
 #[test]
@@ -390,7 +393,7 @@ fn unicode_range() {
             if input.is_exhausted() {
                 Ok(result)
             } else {
-                while input.next().is_ok() {}
+                while input.try_next().is_ok() {}
                 Ok(None)
             }
         });
@@ -431,10 +434,10 @@ fn serializer(preserve_comments: bool) {
             ) {
                 while let Ok(token) = if preserve_comments {
                     input
-                        .next_including_whitespace_and_comments()
+                        .try_next_including_whitespace_and_comments()
                         .map(|t| t.clone())
                 } else {
-                    input.next_including_whitespace().map(|t| t.clone())
+                    input.try_next_including_whitespace().map(|t| t.clone())
                 } {
                     let token_type = token.serialization_type();
                     if !preserve_comments && previous_token.needs_separator_when_before(token_type)
@@ -480,19 +483,19 @@ fn serialize_bad_tokens() {
     let mut input = ParserInput::new("url(foo\\) b\\)ar)'ba\\'\"z\n4");
     let mut parser = Parser::new(&mut input);
 
-    let token = parser.next().unwrap().clone();
+    let token = parser.try_next().unwrap().clone();
     assert!(matches!(token, Token::BadUrl(_)));
     assert_eq!(token.to_css_string(), "url(foo\\) b\\)ar)");
 
-    let token = parser.next().unwrap().clone();
+    let token = parser.try_next().unwrap().clone();
     assert!(matches!(token, Token::BadString(_)));
     assert_eq!(token.to_css_string(), "\"ba'\\\"z");
 
-    let token = parser.next().unwrap().clone();
+    let token = parser.try_next().unwrap().clone();
     assert!(matches!(token, Token::Number { .. }));
     assert_eq!(token.to_css_string(), "4");
 
-    assert!(parser.next().is_err());
+    assert!(parser.try_next().is_err());
 }
 
 #[test]
@@ -513,7 +516,7 @@ fn line_numbers() {
         SourceLocation { line: 0, column: 1 }
     );
     assert_eq!(
-        input.next_including_whitespace(),
+        input.try_next_including_whitespace(),
         Ok(&Token::Ident("fo00o".into()))
     );
     assert_eq!(
@@ -521,7 +524,7 @@ fn line_numbers() {
         SourceLocation { line: 1, column: 3 }
     );
     assert_eq!(
-        input.next_including_whitespace(),
+        input.try_next_including_whitespace(),
         Ok(&Token::WhiteSpace(" "))
     );
     assert_eq!(
@@ -529,7 +532,7 @@ fn line_numbers() {
         SourceLocation { line: 1, column: 4 }
     );
     assert_eq!(
-        input.next_including_whitespace(),
+        input.try_next_including_whitespace(),
         Ok(&Token::Ident("bar".into()))
     );
     assert_eq!(
@@ -537,7 +540,7 @@ fn line_numbers() {
         SourceLocation { line: 1, column: 7 }
     );
     assert_eq!(
-        input.next_including_whitespace_and_comments(),
+        input.try_next_including_whitespace_and_comments(),
         Ok(&Token::Comment("\n"))
     );
     assert_eq!(
@@ -545,7 +548,7 @@ fn line_numbers() {
         SourceLocation { line: 2, column: 3 }
     );
     assert_eq!(
-        input.next_including_whitespace(),
+        input.try_next_including_whitespace(),
         Ok(&Token::Ident("baz".into()))
     );
     assert_eq!(
@@ -555,7 +558,7 @@ fn line_numbers() {
     let state = input.state();
 
     assert_eq!(
-        input.next_including_whitespace(),
+        input.try_next_including_whitespace(),
         Ok(&Token::WhiteSpace("\r\n\n"))
     );
     assert_eq!(
@@ -569,7 +572,7 @@ fn line_numbers() {
     );
 
     assert_eq!(
-        input.next_including_whitespace(),
+        input.try_next_including_whitespace(),
         Ok(&Token::UnquotedUrl("u".into()))
     );
     assert_eq!(
@@ -578,14 +581,14 @@ fn line_numbers() {
     );
 
     assert_eq!(
-        input.next_including_whitespace(),
+        input.try_next_including_whitespace(),
         Ok(&Token::QuotedString("ab".into()))
     );
     assert_eq!(
         input.current_source_location(),
         SourceLocation { line: 7, column: 3 }
     );
-    assert!(input.next_including_whitespace().is_err());
+    assert!(input.try_next_including_whitespace().is_err());
 }
 
 #[test]
@@ -645,15 +648,15 @@ fn overflow() {
 fn line_delimited() {
     let mut input = ParserInput::new(" { foo ; bar } baz;,");
     let mut input = Parser::new(&mut input);
-    assert_eq!(input.next(), Ok(&Token::CurlyBracketBlock));
+    assert_eq!(input.try_next(), Ok(&Token::CurlyBracketBlock));
     assert!({
         let result: Result<_, ParseError<()>> =
             input.parse_until_after(Delimiter::Semicolon, |_| Ok(42));
         result
     }
     .is_err());
-    assert_eq!(input.next(), Ok(&Token::Comma));
-    assert!(input.next().is_err());
+    assert_eq!(input.try_next(), Ok(&Token::Comma));
+    assert!(input.try_next().is_err());
 }
 
 #[test]
@@ -840,7 +843,7 @@ fn no_stack_overflow_multiple_nested_blocks() {
     }
     let mut input = ParserInput::new(&input);
     let mut input = Parser::new(&mut input);
-    while input.next().is_ok() {}
+    while input.try_next().is_ok() {}
 }
 
 impl<'i> DeclarationParser<'i> for JsonParser {
@@ -856,7 +859,7 @@ impl<'i> DeclarationParser<'i> for JsonParser {
         let mut important = false;
         loop {
             let start = input.state();
-            if let Ok(mut token) = input.next_including_whitespace().map(|t| t.clone()) {
+            if let Ok(mut token) = input.try_next_including_whitespace().map(|t| t.clone()) {
                 // Hack to deal with css-parsing-tests assuming that
                 // `!important` in the middle of a declaration value is OK.
                 // This can never happen per spec
@@ -868,7 +871,7 @@ impl<'i> DeclarationParser<'i> for JsonParser {
                         break;
                     }
                     input.reset(&start);
-                    token = input.next_including_whitespace().unwrap().clone();
+                    token = input.try_next_including_whitespace().unwrap().clone();
                 }
                 value.push(one_component_value_to_json(token, input));
             } else {
@@ -959,7 +962,7 @@ impl<'i> RuleBodyItemParser<'i, Value, ()> for JsonParser {
 
 fn component_values_to_json(input: &mut Parser) -> Vec<Value> {
     let mut values = vec![];
-    while let Ok(token) = input.next_including_whitespace().map(|t| t.clone()) {
+    while let Ok(token) = input.try_next_including_whitespace().map(|t| t.clone()) {
         values.push(one_component_value_to_json(token, input));
     }
     values
@@ -1125,8 +1128,8 @@ fn parse_until_before_stops_at_delimiter_or_end_of_input() {
                 let _ = ix.parse_until_before::<_, _, ()>(equivalent.0, |ix| {
                     iy.parse_until_before::<_, _, ()>(equivalent.0, |iy| {
                         loop {
-                            let ox = ix.next();
-                            let oy = iy.next();
+                            let ox = ix.try_next();
+                            let oy = iy.try_next();
                             assert_eq!(ox, oy);
                             if ox.is_err() {
                                 break;
@@ -1145,17 +1148,17 @@ fn parser_maintains_current_line() {
     let mut input = ParserInput::new("ident ident;\nident ident ident;\nident");
     let mut parser = Parser::new(&mut input);
     assert_eq!(parser.current_line(), "ident ident;");
-    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
-    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
-    assert_eq!(parser.next(), Ok(&Token::Semicolon));
+    assert_eq!(parser.try_next(), Ok(&Token::Ident("ident".into())));
+    assert_eq!(parser.try_next(), Ok(&Token::Ident("ident".into())));
+    assert_eq!(parser.try_next(), Ok(&Token::Semicolon));
 
-    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
+    assert_eq!(parser.try_next(), Ok(&Token::Ident("ident".into())));
     assert_eq!(parser.current_line(), "ident ident ident;");
-    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
-    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
-    assert_eq!(parser.next(), Ok(&Token::Semicolon));
+    assert_eq!(parser.try_next(), Ok(&Token::Ident("ident".into())));
+    assert_eq!(parser.try_next(), Ok(&Token::Ident("ident".into())));
+    assert_eq!(parser.try_next(), Ok(&Token::Semicolon));
 
-    assert_eq!(parser.next(), Ok(&Token::Ident("ident".into())));
+    assert_eq!(parser.try_next(), Ok(&Token::Ident("ident".into())));
     assert_eq!(parser.current_line(), "ident");
 }
 
@@ -1164,9 +1167,9 @@ fn cdc_regression_test() {
     let mut input = ParserInput::new("-->x");
     let mut parser = Parser::new(&mut input);
     parser.skip_cdc_and_cdo();
-    assert_eq!(parser.next(), Ok(&Token::Ident("x".into())));
+    assert_eq!(parser.try_next(), Ok(&Token::Ident("x".into())));
     assert_eq!(
-        parser.next(),
+        parser.try_next(),
         Err(BasicParseError {
             kind: BasicParseErrorKind::EndOfInput,
             location: SourceLocation { line: 0, column: 5 }
@@ -1214,7 +1217,7 @@ fn parse_sourcemapping_comments() {
     for test in tests {
         let mut input = ParserInput::new(test.0);
         let mut parser = Parser::new(&mut input);
-        while parser.next_including_whitespace().is_ok() {}
+        while parser.try_next_including_whitespace().is_ok() {}
         assert_eq!(parser.current_source_map_url(), test.1);
     }
 }
@@ -1238,7 +1241,7 @@ fn parse_sourceurl_comments() {
     for test in tests {
         let mut input = ParserInput::new(test.0);
         let mut parser = Parser::new(&mut input);
-        while parser.next_including_whitespace().is_ok() {}
+        while parser.try_next_including_whitespace().is_ok() {}
         assert_eq!(parser.current_source_url(), test.1);
     }
 }
@@ -1249,7 +1252,7 @@ fn roundtrip_percentage_token() {
     fn test_roundtrip(value: &str) {
         let mut input = ParserInput::new(value);
         let mut parser = Parser::new(&mut input);
-        let token = parser.next().unwrap();
+        let token = parser.try_next().unwrap();
         assert_eq!(token.to_css_string(), value);
     }
     // Test simple number serialization
@@ -1304,7 +1307,7 @@ fn utf16_columns() {
 
         // Read all tokens.
         loop {
-            match parser.next() {
+            match parser.try_next() {
                 Err(BasicParseError {
                     kind: BasicParseErrorKind::EndOfInput,
                     ..

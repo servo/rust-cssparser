@@ -9,7 +9,7 @@ use super::{BasicParseError, Parser, ParserInput, Token};
 /// in which case the caller needs to check if the arguments’ parser is exhausted.
 /// Return `Ok((A, B))`, or `Err(())` for a syntax error.
 pub fn parse_nth<'i>(input: &mut Parser<'i, '_>) -> Result<(i32, i32), BasicParseError<'i>> {
-    match *input.next()? {
+    match *input.try_next()? {
         Token::Number {
             int_value: Some(b), ..
         } => Ok((0, b)),
@@ -55,7 +55,7 @@ pub fn parse_nth<'i>(input: &mut Parser<'i, '_>) -> Result<(i32, i32), BasicPars
                 }
             }
         }
-        Token::Delim('+') => match *input.next_including_whitespace()? {
+        Token::Delim('+') => match *input.try_next_including_whitespace()? {
             Token::Ident(ref value) => {
                 match_ignore_ascii_case! { value,
                     "n" => parse_b(input, 1),
@@ -83,7 +83,7 @@ pub fn parse_nth<'i>(input: &mut Parser<'i, '_>) -> Result<(i32, i32), BasicPars
 
 fn parse_b<'i>(input: &mut Parser<'i, '_>, a: i32) -> Result<(i32, i32), BasicParseError<'i>> {
     let start = input.state();
-    match input.next() {
+    match input.try_next() {
         Ok(&Token::Delim('+')) => parse_signless_b(input, a, 1),
         Ok(&Token::Delim('-')) => parse_signless_b(input, a, -1),
         Ok(&Token::Number {
@@ -104,7 +104,7 @@ fn parse_signless_b<'i>(
     b_sign: i32,
 ) -> Result<(i32, i32), BasicParseError<'i>> {
     // FIXME: remove .clone() when lifetimes are non-lexical.
-    match input.next()?.clone() {
+    match input.try_next()?.clone() {
         Token::Number {
             has_sign: false,
             int_value: Some(b),
@@ -132,7 +132,7 @@ fn parse_number_saturate(string: &str) -> Result<i32, ()> {
     let int = if let Ok(&Token::Number {
         int_value: Some(int),
         ..
-    }) = parser.next_including_whitespace_and_comments()
+    }) = parser.try_next_including_whitespace_and_comments()
     {
         int
     } else {

@@ -360,7 +360,7 @@ macro_rules! expect {
     ($parser: ident, $($branches: tt)+) => {
         {
             let start_location = $parser.current_source_location();
-            match *$parser.next()? {
+            match *$parser.try_next()? {
                 $($branches)+
                 ref token => {
                     return Err(start_location.new_basic_unexpected_token_error(token.clone()))
@@ -401,7 +401,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     #[inline]
     pub fn expect_exhausted(&mut self) -> Result<(), BasicParseError<'i>> {
         let start = self.state();
-        let result = match self.next() {
+        let result = match self.try_next() {
             Err(BasicParseError {
                 kind: BasicParseErrorKind::EndOfInput,
                 ..
@@ -486,7 +486,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// Create a new unexpected token or EOF ParseError at the current location
     #[inline]
     pub fn new_error_for_next_token<E>(&mut self) -> ParseError<'i, E> {
-        let token = match self.next() {
+        let token = match self.try_next() {
             Ok(token) => token.clone(),
             Err(e) => return e.into(),
         };
@@ -606,15 +606,15 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// See the `Parser::parse_nested_block` method to parse the content of functions or blocks.
     ///
     /// This only returns a closing token when it is unmatched (and therefore an error).
-    pub fn next(&mut self) -> Result<&Token<'i>, BasicParseError<'i>> {
+    pub fn try_next(&mut self) -> Result<&Token<'i>, BasicParseError<'i>> {
         self.skip_whitespace();
-        self.next_including_whitespace_and_comments()
+        self.try_next_including_whitespace_and_comments()
     }
 
     /// Same as `Parser::next`, but does not skip whitespace tokens.
-    pub fn next_including_whitespace(&mut self) -> Result<&Token<'i>, BasicParseError<'i>> {
+    pub fn try_next_including_whitespace(&mut self) -> Result<&Token<'i>, BasicParseError<'i>> {
         loop {
-            match self.next_including_whitespace_and_comments() {
+            match self.try_next_including_whitespace_and_comments() {
                 Err(e) => return Err(e),
                 Ok(&Token::Comment(_)) => {}
                 _ => break,
@@ -629,7 +629,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// where comments are preserved.
     /// When parsing higher-level values, per the CSS Syntax specification,
     /// comments should always be ignored between tokens.
-    pub fn next_including_whitespace_and_comments(
+    pub fn try_next_including_whitespace_and_comments(
         &mut self,
     ) -> Result<&Token<'i>, BasicParseError<'i>> {
         if let Some(block_type) = self.at_start_of.take() {
@@ -749,7 +749,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
                 Err(e) if !ignore_errors => return Err(e),
                 Err(_) => {}
             }
-            match self.next() {
+            match self.try_next() {
                 Err(_) => return Ok(values),
                 Ok(&Token::Comma) => continue,
                 Ok(_) => unreachable!(),
@@ -817,7 +817,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     #[inline]
     pub fn expect_whitespace(&mut self) -> Result<&'i str, BasicParseError<'i>> {
         let start_location = self.current_source_location();
-        match *self.next_including_whitespace()? {
+        match *self.try_next_including_whitespace()? {
             Token::WhiteSpace(value) => Ok(value),
             ref t => Err(start_location.new_basic_unexpected_token_error(t.clone())),
         }
@@ -1016,7 +1016,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     #[inline]
     pub fn expect_no_error_token(&mut self) -> Result<(), BasicParseError<'i>> {
         loop {
-            match self.next_including_whitespace_and_comments() {
+            match self.try_next_including_whitespace_and_comments() {
                 Ok(&Token::Function(_))
                 | Ok(&Token::ParenthesisBlock)
                 | Ok(&Token::SquareBracketBlock)
