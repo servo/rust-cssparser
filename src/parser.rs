@@ -116,7 +116,7 @@ impl<'i, T> From<BasicParseError<'i>> for ParseError<'i, T> {
 impl SourceLocation {
     /// Create a new BasicParseError at this location for an unexpected token
     #[inline]
-    pub fn new_basic_unexpected_token_error<'i>(self, token: Token<'i>) -> BasicParseError<'i> {
+    pub fn new_basic_unexpected_token_error(self, token: Token<'_>) -> BasicParseError<'_> {
         BasicParseError {
             kind: BasicParseErrorKind::UnexpectedToken(token),
             location: self,
@@ -125,7 +125,7 @@ impl SourceLocation {
 
     /// Create a new ParseError at this location for an unexpected token
     #[inline]
-    pub fn new_unexpected_token_error<'i, E>(self, token: Token<'i>) -> ParseError<'i, E> {
+    pub fn new_unexpected_token_error<E>(self, token: Token<'_>) -> ParseError<'_, E> {
         ParseError {
             kind: ParseErrorKind::Basic(BasicParseErrorKind::UnexpectedToken(token)),
             location: self,
@@ -652,9 +652,8 @@ impl<'i: 't, 't> Parser<'i, 't> {
         let token = if using_cached_token {
             let cached_token = self.input.cached_token.as_ref().unwrap();
             self.input.tokenizer.reset(&cached_token.end_state);
-            match cached_token.token {
-                Token::Function(ref name) => self.input.tokenizer.see_function(name),
-                _ => {}
+            if let Token::Function(ref name) = cached_token.token {
+                self.input.tokenizer.see_function(name)
             }
             &cached_token.token
         } else {
@@ -748,7 +747,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
             match self.parse_until_before(Delimiter::Comma, &mut parse_one) {
                 Ok(v) => values.push(v),
                 Err(e) if !ignore_errors => return Err(e),
-                Err(_) => {},
+                Err(_) => {}
             }
             match self.next() {
                 Err(_) => return Ok(values),
