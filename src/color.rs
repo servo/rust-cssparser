@@ -77,6 +77,8 @@ pub fn serialize_color_alpha(
 /// A Predefined color space specified in:
 /// <https://drafts.csswg.org/css-color-4/#predefined>
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum PredefinedColorSpace {
     /// <https://drafts.csswg.org/css-color-4/#predefined-sRGB>
     Srgb,
