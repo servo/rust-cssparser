@@ -58,9 +58,9 @@ impl UnicodeRange {
 }
 
 fn parse_tokens<'i>(input: &mut Parser<'i, '_>) -> Result<(), BasicParseError<'i>> {
-    match input.next_including_whitespace()?.clone() {
+    match input.try_next_including_whitespace()?.clone() {
         Token::Delim('+') => {
-            match *input.next_including_whitespace()? {
+            match *input.try_next_including_whitespace()? {
                 Token::Ident(_) => {}
                 Token::Delim('?') => {}
                 ref t => {
@@ -73,7 +73,7 @@ fn parse_tokens<'i>(input: &mut Parser<'i, '_>) -> Result<(), BasicParseError<'i
         Token::Dimension { .. } => parse_question_marks(input),
         Token::Number { .. } => {
             let after_number = input.state();
-            match input.next_including_whitespace() {
+            match input.try_next_including_whitespace() {
                 Ok(&Token::Delim('?')) => parse_question_marks(input),
                 Ok(&Token::Dimension { .. }) => {}
                 Ok(&Token::Number { .. }) => {}
@@ -89,7 +89,7 @@ fn parse_tokens<'i>(input: &mut Parser<'i, '_>) -> Result<(), BasicParseError<'i
 fn parse_question_marks(input: &mut Parser) {
     loop {
         let start = input.state();
-        match input.next_including_whitespace() {
+        match input.try_next_including_whitespace() {
             Ok(&Token::Delim('?')) => {}
             _ => {
                 input.reset(&start);
