@@ -706,27 +706,6 @@ macro_rules! impl_lab_like {
             }
         }
 
-        #[cfg(feature = "serde")]
-        impl Serialize for $cls {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: Serializer,
-            {
-                (self.lightness, self.a, self.b, self.alpha).serialize(serializer)
-            }
-        }
-
-        #[cfg(feature = "serde")]
-        impl<'de> Deserialize<'de> for $cls {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
-                let (lightness, a, b, alpha) = Deserialize::deserialize(deserializer)?;
-                Ok(Self::new(lightness, a, b, alpha))
-            }
-        }
-
         impl ToCss for $cls {
             fn to_css<W>(&self, dest: &mut W) -> fmt::Result
             where
@@ -796,27 +775,6 @@ macro_rules! impl_lch_like {
                     hue,
                     alpha,
                 }
-            }
-        }
-
-        #[cfg(feature = "serde")]
-        impl Serialize for $cls {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: Serializer,
-            {
-                (self.lightness, self.chroma, self.hue, self.alpha).serialize(serializer)
-            }
-        }
-
-        #[cfg(feature = "serde")]
-        impl<'de> Deserialize<'de> for $cls {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
-                let (lightness, chroma, hue, alpha) = Deserialize::deserialize(deserializer)?;
-                Ok(Self::new(lightness, chroma, hue, alpha))
             }
         }
 
