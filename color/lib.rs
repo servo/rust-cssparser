@@ -16,8 +16,6 @@ use cssparser::color::{
     PredefinedColorSpace, OPAQUE,
 };
 use cssparser::{match_ignore_ascii_case, CowRcStr, ParseError, Parser, ToCss, Token};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::f32::consts::PI;
 use std::fmt;
 use std::str::FromStr;
@@ -55,10 +53,8 @@ where
     let token = input.next()?;
     match *token {
         Token::Hash(ref value) | Token::IDHash(ref value) => {
-            parse_hash_color(value.as_bytes()).map(|(r, g, b, a)| {
-                P::Output::from_rgba(r, g, b, a)
-            })
-        },
+            parse_hash_color(value.as_bytes()).map(|(r, g, b, a)| P::Output::from_rgba(r, g, b, a))
+        }
         Token::Ident(ref value) => parse_color_keyword(value),
         Token::Function(ref name) => {
             let name = name.clone();
@@ -506,6 +502,7 @@ fn normalize_hue(hue: f32) -> f32 {
 }
 
 /// A color with red, green, blue, and alpha components, in a byte each.
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct RgbaLegacy {
     /// The red component.
@@ -544,27 +541,6 @@ impl RgbaLegacy {
     }
 }
 
-#[cfg(feature = "serde")]
-impl Serialize for RgbaLegacy {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        (self.red, self.green, self.blue, self.alpha).serialize(serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for RgbaLegacy {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let (r, g, b, a) = Deserialize::deserialize(deserializer)?;
-        Ok(RgbaLegacy::new(r, g, b, a))
-    }
-}
-
 impl ToCss for RgbaLegacy {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result
     where
@@ -588,6 +564,7 @@ impl ToCss for RgbaLegacy {
 
 /// Color specified by hue, saturation and lightness components.
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Hsl {
     /// The hue component.
     pub hue: Option<f32>,
@@ -632,29 +609,9 @@ impl ToCss for Hsl {
     }
 }
 
-#[cfg(feature = "serde")]
-impl Serialize for Hsl {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        (self.hue, self.saturation, self.lightness, self.alpha).serialize(serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for Hsl {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let (lightness, a, b, alpha) = Deserialize::deserialize(deserializer)?;
-        Ok(Self::new(lightness, a, b, alpha))
-    }
-}
-
 /// Color specified by hue, whiteness and blackness components.
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Hwb {
     /// The hue component.
     pub hue: Option<f32>,
@@ -699,32 +656,12 @@ impl ToCss for Hwb {
     }
 }
 
-#[cfg(feature = "serde")]
-impl Serialize for Hwb {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        (self.hue, self.whiteness, self.blackness, self.alpha).serialize(serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for Hwb {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let (lightness, whiteness, blackness, alpha) = Deserialize::deserialize(deserializer)?;
-        Ok(Self::new(lightness, whiteness, blackness, alpha))
-    }
-}
-
 // NOTE: LAB and OKLAB is not declared inside the [impl_lab_like] macro,
 // because it causes cbindgen to ignore them.
 
 /// Color specified by lightness, a- and b-axis components.
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Lab {
     /// The lightness component.
     pub lightness: Option<f32>,
@@ -738,6 +675,7 @@ pub struct Lab {
 
 /// Color specified by lightness, a- and b-axis components.
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Oklab {
     /// The lightness component.
     pub lightness: Option<f32>,
@@ -816,6 +754,7 @@ impl_lab_like!(Oklab, "oklab");
 
 /// Color specified by lightness, chroma and hue components.
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Lch {
     /// The lightness component.
     pub lightness: Option<f32>,
@@ -829,6 +768,7 @@ pub struct Lch {
 
 /// Color specified by lightness, chroma and hue components.
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Oklch {
     /// The lightness component.
     pub lightness: Option<f32>,
@@ -905,6 +845,7 @@ impl_lch_like!(Oklch, "oklch");
 /// A color specified by the color() function.
 /// <https://drafts.csswg.org/css-color-4/#color-function>
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct ColorFunction {
     /// The color space for this color.
     pub color_space: PredefinedColorSpace,
@@ -966,6 +907,8 @@ impl ToCss for ColorFunction {
 ///
 /// <https://drafts.csswg.org/css-color-4/#color-type>
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum Color {
     /// The 'currentcolor' keyword.
     CurrentColor,

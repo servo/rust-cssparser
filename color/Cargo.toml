@@ -13,7 +13,7 @@ path = "lib.rs"
 
 [dependencies]
 cssparser = { path = ".." }
-serde = { version = "1.0", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
 
 [features]
 serde = ["cssparser/serde", "dep:serde"]
