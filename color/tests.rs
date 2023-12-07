@@ -3,25 +3,21 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use super::*;
-use crate::{ColorParser, PredefinedColorSpace, Color, RgbaLegacy};
-use cssparser::{Parser, ParserInput};
-use serde_json::{self, json, Value};
+use cssparser::ParserInput;
+use serde_json::{json, Value};
 
 fn almost_equals(a: &Value, b: &Value) -> bool {
     match (a, b) {
-        (&Value::Number(ref a), &Value::Number(ref b)) => {
+        (Value::Number(a), Value::Number(b)) => {
             let a = a.as_f64().unwrap();
             let b = b.as_f64().unwrap();
             (a - b).abs() <= a.abs() * 1e-6
         }
 
         (&Value::Bool(a), &Value::Bool(b)) => a == b,
-        (&Value::String(ref a), &Value::String(ref b)) => a == b,
-        (&Value::Array(ref a), &Value::Array(ref b)) => {
-            a.len() == b.len()
-                && a.iter()
-                    .zip(b.iter())
-                    .all(|(ref a, ref b)| almost_equals(*a, *b))
+        (Value::String(a), Value::String(b)) => a == b,
+        (Value::Array(a), Value::Array(b)) => {
+            a.len() == b.len() && a.iter().zip(b.iter()).all(|(a, b)| almost_equals(a, b))
         }
         (&Value::Object(_), &Value::Object(_)) => panic!("Not implemented"),
         (&Value::Null, &Value::Null) => true,
@@ -43,8 +39,7 @@ fn assert_json_eq(results: Value, expected: Value, message: &str) {
     }
 }
 
-
-fn run_raw_json_tests<F: Fn(Value, Value) -> ()>(json_data: &str, run: F) {
+fn run_raw_json_tests<F: Fn(Value, Value)>(json_data: &str, run: F) {
     let items = match serde_json::from_str(json_data) {
         Ok(Value::Array(items)) => items,
         other => panic!("Invalid JSON: {:?}", other),
@@ -92,11 +87,14 @@ fn color3() {
 #[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
 #[test]
 fn color3_hsl() {
-    run_color_tests(include_str!("../src/css-parsing-tests/color3_hsl.json"), |c| {
-        c.ok()
-            .map(|v| v.to_css_string().to_json())
-            .unwrap_or(Value::Null)
-    })
+    run_color_tests(
+        include_str!("../src/css-parsing-tests/color3_hsl.json"),
+        |c| {
+            c.ok()
+                .map(|v| v.to_css_string().to_json())
+                .unwrap_or(Value::Null)
+        },
+    )
 }
 
 /// color3_keywords.json is different: R, G and B are in 0..255 rather than 0..1
@@ -115,11 +113,14 @@ fn color3_keywords() {
 #[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
 #[test]
 fn color4_hwb() {
-    run_color_tests(include_str!("../src/css-parsing-tests/color4_hwb.json"), |c| {
-        c.ok()
-            .map(|v| v.to_css_string().to_json())
-            .unwrap_or(Value::Null)
-    })
+    run_color_tests(
+        include_str!("../src/css-parsing-tests/color4_hwb.json"),
+        |c| {
+            c.ok()
+                .map(|v| v.to_css_string().to_json())
+                .unwrap_or(Value::Null)
+        },
+    )
 }
 
 #[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
@@ -355,7 +356,7 @@ fn generic_parser() {
     ];
 
     for (input, expected) in TESTS {
-        let mut input = ParserInput::new(*input);
+        let mut input = ParserInput::new(input);
         let mut input = Parser::new(&mut input);
 
         let actual: OutputType = parse_color_with(&TestColorParser, &mut input).unwrap();
