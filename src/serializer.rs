@@ -49,7 +49,8 @@ where
         dtoa_short::write(dest, value)?
     };
 
-    if int_value.is_none() && value.fract() == 0. && !notation.decimal_point && !notation.scientific {
+    if int_value.is_none() && value.fract() == 0. && !notation.decimal_point && !notation.scientific
+    {
         dest.write_str(".0")?;
     }
     Ok(())

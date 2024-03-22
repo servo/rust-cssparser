@@ -4,7 +4,7 @@
 
 use std::borrow::{Borrow, Cow};
 use std::rc::Rc;
-use std::{cmp, fmt, hash, marker, mem, ops, slice, str, ptr};
+use std::{cmp, fmt, hash, marker, mem, ops, ptr, slice, str};
 
 /// A string that is either shared (heap-allocated and reference-counted) or borrowed.
 ///

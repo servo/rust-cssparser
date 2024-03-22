@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use super::*;
-use crate::{ColorParser, PredefinedColorSpace, Color, RgbaLegacy};
+use crate::{Color, ColorParser, PredefinedColorSpace, RgbaLegacy};
 use cssparser::{Parser, ParserInput};
 use serde_json::{self, json, Value};
 
@@ -42,7 +42,6 @@ fn assert_json_eq(results: Value, expected: Value, message: &str) {
         panic!("{}", message)
     }
 }
-
 
 fn run_raw_json_tests<F: Fn(Value, Value) -> ()>(json_data: &str, run: F) {
     let items = match serde_json::from_str(json_data) {
@@ -92,11 +91,14 @@ fn color3() {
 #[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
 #[test]
 fn color3_hsl() {
-    run_color_tests(include_str!("../src/css-parsing-tests/color3_hsl.json"), |c| {
-        c.ok()
-            .map(|v| v.to_css_string().to_json())
-            .unwrap_or(Value::Null)
-    })
+    run_color_tests(
+        include_str!("../src/css-parsing-tests/color3_hsl.json"),
+        |c| {
+            c.ok()
+                .map(|v| v.to_css_string().to_json())
+                .unwrap_or(Value::Null)
+        },
+    )
 }
 
 /// color3_keywords.json is different: R, G and B are in 0..255 rather than 0..1
@@ -115,11 +117,14 @@ fn color3_keywords() {
 #[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
 #[test]
 fn color4_hwb() {
-    run_color_tests(include_str!("../src/css-parsing-tests/color4_hwb.json"), |c| {
-        c.ok()
-            .map(|v| v.to_css_string().to_json())
-            .unwrap_or(Value::Null)
-    })
+    run_color_tests(
+        include_str!("../src/css-parsing-tests/color4_hwb.json"),
+        |c| {
+            c.ok()
+                .map(|v| v.to_css_string().to_json())
+                .unwrap_or(Value::Null)
+        },
+    )
 }
 
 #[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]

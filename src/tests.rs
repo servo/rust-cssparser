@@ -5,7 +5,6 @@
 #[cfg(feature = "bench")]
 extern crate test;
 
-
 use serde_json::{self, json, Map, Value};
 
 #[cfg(feature = "bench")]
@@ -35,10 +34,7 @@ fn almost_equals(a: &Value, b: &Value) -> bool {
         (&Value::Bool(a), &Value::Bool(b)) => a == b,
         (Value::String(a), Value::String(b)) => a == b,
         (Value::Array(a), Value::Array(b)) => {
-            a.len() == b.len()
-                && a.iter()
-                    .zip(b.iter())
-                    .all(|(a, b)| almost_equals(a, b))
+            a.len() == b.len() && a.iter().zip(b.iter()).all(|(a, b)| almost_equals(a, b))
         }
         (&Value::Object(_), &Value::Object(_)) => panic!("Not implemented"),
         (&Value::Null, &Value::Null) => true,
@@ -433,8 +429,7 @@ fn serializer(preserve_comments: bool) {
                 preserve_comments: bool,
             ) {
                 while let Ok(token) = if preserve_comments {
-                    input
-                        .next_including_whitespace_and_comments().cloned()
+                    input.next_including_whitespace_and_comments().cloned()
                 } else {
                     input.next_including_whitespace().cloned()
                 } {
@@ -592,8 +587,6 @@ fn line_numbers() {
 
 #[test]
 fn overflow() {
-    
-
     let css = r"
          2147483646
          2147483647

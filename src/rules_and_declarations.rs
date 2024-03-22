@@ -253,10 +253,10 @@ where
             self.input.skip_whitespace();
             let start = self.input.state();
             match self.input.next_including_whitespace_and_comments().ok()? {
-                Token::CloseCurlyBracket |
-                Token::WhiteSpace(..) |
-                Token::Semicolon |
-                Token::Comment(..) => continue,
+                Token::CloseCurlyBracket
+                | Token::WhiteSpace(..)
+                | Token::Semicolon
+                | Token::Comment(..) => continue,
                 Token::AtKeyword(ref name) => {
                     let name = name.clone();
                     return Some(parse_at_rule(&start, name, self.input, &mut *self.parser));
@@ -294,7 +294,7 @@ where
                             &mut *self.parser,
                             Delimiter::Semicolon | Delimiter::CurlyBracketBlock,
                         ) {
-                            return Some(Ok(qual))
+                            return Some(Ok(qual));
                         }
                     }
 

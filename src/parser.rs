@@ -748,7 +748,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
             match self.parse_until_before(Delimiter::Comma, &mut parse_one) {
                 Ok(v) => values.push(v),
                 Err(e) if !ignore_errors => return Err(e),
-                Err(_) => {},
+                Err(_) => {}
             }
             match self.next() {
                 Err(_) => return Ok(values),

@@ -255,7 +255,9 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     pub fn see_function(&mut self, name: &str) {
-        if self.var_or_env_functions == SeenStatus::LookingForThem && (name.eq_ignore_ascii_case("var") || name.eq_ignore_ascii_case("env")) {
+        if self.var_or_env_functions == SeenStatus::LookingForThem
+            && (name.eq_ignore_ascii_case("var") || name.eq_ignore_ascii_case("env"))
+        {
             self.var_or_env_functions = SeenStatus::SeenAtLeastOne;
         }
     }
@@ -320,10 +322,12 @@ impl<'a> Tokenizer<'a> {
 
     pub fn current_source_line(&self) -> &'a str {
         let current = self.position();
-        let start = self.slice(SourcePosition(0)..current)
+        let start = self
+            .slice(SourcePosition(0)..current)
             .rfind(|c| matches!(c, '\r' | '\n' | '\x0C'))
             .map_or(0, |start| start + 1);
-        let end = self.slice(current..SourcePosition(self.input.len()))
+        let end = self
+            .slice(current..SourcePosition(self.input.len()))
             .find(|c| matches!(c, '\r' | '\n' | '\x0C'))
             .map_or(self.input.len(), |end| current.0 + end);
         self.slice(SourcePosition(start)..SourcePosition(end))
@@ -422,7 +426,10 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn next_char(&self) -> char {
-        unsafe { self.input.get_unchecked(self.position().0..) }.chars().next().unwrap()
+        unsafe { self.input.get_unchecked(self.position().0..) }
+            .chars()
+            .next()
+            .unwrap()
     }
 
     // Given that a newline has been seen, advance over the newline
@@ -1052,9 +1059,13 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 
     let mut value = sign * (integral_part + fractional_part);
 
-    if tokenizer.has_at_least(1) && matches!(tokenizer.next_byte_unchecked(), b'e' | b'E') && (tokenizer.byte_at(1).is_ascii_digit() || (tokenizer.has_at_least(2)
+    if tokenizer.has_at_least(1)
+        && matches!(tokenizer.next_byte_unchecked(), b'e' | b'E')
+        && (tokenizer.byte_at(1).is_ascii_digit()
+            || (tokenizer.has_at_least(2)
                 && matches!(tokenizer.byte_at(1), b'+' | b'-')
-                && tokenizer.byte_at(2).is_ascii_digit())) {
+                && tokenizer.byte_at(2).is_ascii_digit()))
+    {
         is_integer = false;
         tokenizer.advance(1);
         let (has_sign, sign) = match tokenizer.next_byte_unchecked() {

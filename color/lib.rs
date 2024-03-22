@@ -55,10 +55,8 @@ where
     let token = input.next()?;
     match *token {
         Token::Hash(ref value) | Token::IDHash(ref value) => {
-            parse_hash_color(value.as_bytes()).map(|(r, g, b, a)| {
-                P::Output::from_rgba(r, g, b, a)
-            })
-        },
+            parse_hash_color(value.as_bytes()).map(|(r, g, b, a)| P::Output::from_rgba(r, g, b, a))
+        }
         Token::Ident(ref value) => parse_color_keyword(value),
         Token::Function(ref name) => {
             let name = name.clone();
