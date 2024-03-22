@@ -5,7 +5,7 @@
 #[cfg(feature = "bench")]
 extern crate test;
 
-use encoding_rs;
+
 use serde_json::{self, json, Map, Value};
 
 #[cfg(feature = "bench")]
@@ -26,19 +26,19 @@ macro_rules! JArray {
 
 fn almost_equals(a: &Value, b: &Value) -> bool {
     match (a, b) {
-        (&Value::Number(ref a), &Value::Number(ref b)) => {
+        (Value::Number(a), Value::Number(b)) => {
             let a = a.as_f64().unwrap();
             let b = b.as_f64().unwrap();
             (a - b).abs() <= a.abs() * 1e-6
         }
 
         (&Value::Bool(a), &Value::Bool(b)) => a == b,
-        (&Value::String(ref a), &Value::String(ref b)) => a == b,
-        (&Value::Array(ref a), &Value::Array(ref b)) => {
+        (Value::String(a), Value::String(b)) => a == b,
+        (Value::Array(a), Value::Array(b)) => {
             a.len() == b.len()
                 && a.iter()
                     .zip(b.iter())
-                    .all(|(ref a, ref b)| almost_equals(*a, *b))
+                    .all(|(a, b)| almost_equals(a, b))
         }
         (&Value::Object(_), &Value::Object(_)) => panic!("Not implemented"),
         (&Value::Null, &Value::Null) => true,
@@ -77,7 +77,7 @@ fn assert_json_eq(results: Value, mut expected: Value, message: &str) {
     }
 }
 
-fn run_raw_json_tests<F: Fn(Value, Value) -> ()>(json_data: &str, run: F) {
+fn run_raw_json_tests<F: Fn(Value, Value)>(json_data: &str, run: F) {
     let items = match serde_json::from_str(json_data) {
         Ok(Value::Array(items)) => items,
         other => panic!("Invalid JSON: {:?}", other),
@@ -242,7 +242,7 @@ fn stylesheet_from_bytes() {
 
     fn get_string<'a>(map: &'a Map<String, Value>, key: &str) -> Option<&'a str> {
         match map.get(key) {
-            Some(&Value::String(ref s)) => Some(s),
+            Some(Value::String(s)) => Some(s),
             Some(&Value::Null) => None,
             None => None,
             _ => panic!("Unexpected JSON"),
@@ -393,7 +393,7 @@ fn unicode_range() {
             if input.is_exhausted() {
                 Ok(result)
             } else {
-                while let Ok(_) = input.next() {}
+                while input.next().is_ok() {}
                 Ok(None)
             }
         });
@@ -434,10 +434,9 @@ fn serializer(preserve_comments: bool) {
             ) {
                 while let Ok(token) = if preserve_comments {
                     input
-                        .next_including_whitespace_and_comments()
-                        .map(|t| t.clone())
+                        .next_including_whitespace_and_comments().cloned()
                 } else {
-                    input.next_including_whitespace().map(|t| t.clone())
+                    input.next_including_whitespace().cloned()
                 } {
                     let token_type = token.serialization_type();
                     if !preserve_comments && previous_token.needs_separator_when_before(token_type)
@@ -593,7 +592,7 @@ fn line_numbers() {
 
 #[test]
 fn overflow() {
-    use std::iter::repeat;
+    
 
     let css = r"
          2147483646
@@ -619,7 +618,7 @@ fn overflow() {
          -3.402824e+38
 
     "
-    .replace("{309 zeros}", &repeat('0').take(309).collect::<String>());
+    .replace("{309 zeros}", &"0".repeat(309));
     let mut input = ParserInput::new(&css);
     let mut input = Parser::new(&mut input);
 
@@ -637,12 +636,12 @@ fn overflow() {
     assert_eq!(input.expect_integer(), Ok(-2147483648));
     assert_eq!(input.expect_integer(), Ok(-2147483648));
 
-    assert_eq!(input.expect_number(), Ok(3.30282347e+38));
+    assert_eq!(input.expect_number(), Ok(3.302_823_5e38));
     assert_eq!(input.expect_number(), Ok(f32::MAX));
     assert_eq!(input.expect_number(), Ok(f32::INFINITY));
     assert!(f32::MAX != f32::INFINITY);
 
-    assert_eq!(input.expect_number(), Ok(-3.30282347e+38));
+    assert_eq!(input.expect_number(), Ok(-3.302_823_5e38));
     assert_eq!(input.expect_number(), Ok(f32::MIN));
     assert_eq!(input.expect_number(), Ok(f32::NEG_INFINITY));
     assert!(f32::MIN != f32::NEG_INFINITY);
@@ -784,7 +783,7 @@ where
 
 impl<'a> ToJson for CowRcStr<'a> {
     fn to_json(&self) -> Value {
-        let s: &str = &*self;
+        let s: &str = self;
         s.to_json()
     }
 }
@@ -847,7 +846,7 @@ fn no_stack_overflow_multiple_nested_blocks() {
     }
     let mut input = ParserInput::new(&input);
     let mut input = Parser::new(&mut input);
-    while let Ok(..) = input.next() {}
+    while input.next().is_ok() {}
 }
 
 impl<'i> DeclarationParser<'i> for JsonParser {
@@ -863,18 +862,16 @@ impl<'i> DeclarationParser<'i> for JsonParser {
         let mut important = false;
         loop {
             let start = input.state();
-            if let Ok(mut token) = input.next_including_whitespace().map(|t| t.clone()) {
+            if let Ok(mut token) = input.next_including_whitespace().cloned() {
                 // Hack to deal with css-parsing-tests assuming that
                 // `!important` in the middle of a declaration value is OK.
                 // This can never happen per spec
                 // (even CSS Variables forbid top-level `!`)
                 if token == Token::Delim('!') {
                     input.reset(&start);
-                    if parse_important(input).is_ok() {
-                        if input.is_exhausted() {
-                            important = true;
-                            break;
-                        }
+                    if parse_important(input).is_ok() && input.is_exhausted() {
+                        important = true;
+                        break;
                     }
                     input.reset(&start);
                     token = input.next_including_whitespace().unwrap().clone();
@@ -905,7 +902,7 @@ impl<'i> AtRuleParser<'i> for JsonParser {
         ];
         match_ignore_ascii_case! { &*name,
             "charset" => {
-                Err(input.new_error(BasicParseErrorKind::AtRuleInvalid(name.clone()).into()))
+                Err(input.new_error(BasicParseErrorKind::AtRuleInvalid(name.clone())))
             },
             _ => Ok(prelude),
         }
@@ -968,7 +965,7 @@ impl<'i> RuleBodyItemParser<'i, Value, ()> for JsonParser {
 
 fn component_values_to_json(input: &mut Parser) -> Vec<Value> {
     let mut values = vec![];
-    while let Ok(token) = input.next_including_whitespace().map(|t| t.clone()) {
+    while let Ok(token) = input.next_including_whitespace().cloned() {
         values.push(one_component_value_to_json(token, input));
     }
     values
@@ -978,9 +975,9 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Value {
     fn numeric(value: f32, int_value: Option<i32>, has_sign: bool) -> Vec<Value> {
         vec![
             Token::Number {
-                value: value,
-                int_value: int_value,
-                has_sign: has_sign,
+                value,
+                int_value,
+                has_sign,
             }
             .to_css_string()
             .to_json(),
@@ -1223,7 +1220,7 @@ fn parse_sourcemapping_comments() {
     for test in tests {
         let mut input = ParserInput::new(test.0);
         let mut parser = Parser::new(&mut input);
-        while let Ok(_) = parser.next_including_whitespace() {}
+        while parser.next_including_whitespace().is_ok() {}
         assert_eq!(parser.current_source_map_url(), test.1);
     }
 }
@@ -1247,7 +1244,7 @@ fn parse_sourceurl_comments() {
     for test in tests {
         let mut input = ParserInput::new(test.0);
         let mut parser = Parser::new(&mut input);
-        while let Ok(_) = parser.next_including_whitespace() {}
+        while parser.next_including_whitespace().is_ok() {}
         assert_eq!(parser.current_source_url(), test.1);
     }
 }

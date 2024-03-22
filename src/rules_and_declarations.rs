@@ -14,7 +14,7 @@ use crate::parser::{parse_nested_block, parse_until_after, ParseUntilErrorBehavi
 ///
 /// Typical usage is `input.try_parse(parse_important).is_ok()`
 /// at the end of a `DeclarationParser::parse_value` implementation.
-pub fn parse_important<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(), BasicParseError<'i>> {
+pub fn parse_important<'i>(input: &mut Parser<'i, '_>) -> Result<(), BasicParseError<'i>> {
     input.expect_delim('!')?;
     input.expect_ident_matching("important")
 }
@@ -367,7 +367,7 @@ where
             let start = self.input.state();
             let at_keyword = match self.input.next_byte()? {
                 b'@' => match self.input.next_including_whitespace_and_comments() {
-                    Ok(&Token::AtKeyword(ref name)) => Some(name.clone()),
+                    Ok(Token::AtKeyword(name)) => Some(name.clone()),
                     _ => {
                         self.input.reset(&start);
                         None
@@ -503,5 +503,5 @@ where
     input.expect_curly_bracket_block()?;
     // Do this here so that we consume the `{` even if the prelude is `Err`.
     let prelude = prelude?;
-    parse_nested_block(input, |input| parser.parse_block(prelude, &start, input))
+    parse_nested_block(input, |input| parser.parse_block(prelude, start, input))
 }

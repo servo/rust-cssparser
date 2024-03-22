@@ -4,7 +4,7 @@
 
 use crate::match_byte;
 use dtoa_short::{self, Notation};
-use itoa;
+
 use std::fmt::{self, Write};
 use std::str;
 
@@ -49,10 +49,8 @@ where
         dtoa_short::write(dest, value)?
     };
 
-    if int_value.is_none() && value.fract() == 0. {
-        if !notation.decimal_point && !notation.scientific {
-            dest.write_str(".0")?;
-        }
+    if int_value.is_none() && value.fract() == 0. && !notation.decimal_point && !notation.scientific {
+        dest.write_str(".0")?;
     }
     Ok(())
 }
@@ -63,10 +61,10 @@ impl<'a> ToCss for Token<'a> {
         W: fmt::Write,
     {
         match *self {
-            Token::Ident(ref value) => serialize_identifier(&**value, dest)?,
+            Token::Ident(ref value) => serialize_identifier(value, dest)?,
             Token::AtKeyword(ref value) => {
                 dest.write_str("@")?;
-                serialize_identifier(&**value, dest)?;
+                serialize_identifier(value, dest)?;
             }
             Token::Hash(ref value) => {
                 dest.write_str("#")?;
@@ -74,12 +72,12 @@ impl<'a> ToCss for Token<'a> {
             }
             Token::IDHash(ref value) => {
                 dest.write_str("#")?;
-                serialize_identifier(&**value, dest)?;
+                serialize_identifier(value, dest)?;
             }
-            Token::QuotedString(ref value) => serialize_string(&**value, dest)?,
+            Token::QuotedString(ref value) => serialize_string(value, dest)?,
             Token::UnquotedUrl(ref value) => {
                 dest.write_str("url(")?;
-                serialize_unquoted_url(&**value, dest)?;
+                serialize_unquoted_url(value, dest)?;
                 dest.write_str(")")?;
             }
             Token::Delim(value) => dest.write_char(value)?,
@@ -134,7 +132,7 @@ impl<'a> ToCss for Token<'a> {
             Token::CDC => dest.write_str("-->")?,
 
             Token::Function(ref name) => {
-                serialize_identifier(&**name, dest)?;
+                serialize_identifier(name, dest)?;
                 dest.write_str("(")?;
             }
             Token::ParenthesisBlock => dest.write_str("(")?,
@@ -167,7 +165,7 @@ fn hex_escape<W>(ascii_byte: u8, dest: &mut W) -> fmt::Result
 where
     W: fmt::Write,
 {
-    static HEX_DIGITS: &'static [u8; 16] = b"0123456789abcdef";
+    static HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
     let b3;
     let b4;
     let bytes = if ascii_byte > 0x0F {
@@ -179,7 +177,7 @@ where
         b3 = [b'\\', HEX_DIGITS[ascii_byte as usize], b' '];
         &b3[..]
     };
-    dest.write_str(unsafe { str::from_utf8_unchecked(&bytes) })
+    dest.write_str(unsafe { str::from_utf8_unchecked(bytes) })
 }
 
 fn char_escape<W>(ascii_byte: u8, dest: &mut W) -> fmt::Result
@@ -240,7 +238,7 @@ where
         dest.write_str(&value[chunk_start..i])?;
         if let Some(escaped) = escaped {
             dest.write_str(escaped)?;
-        } else if (b >= b'\x01' && b <= b'\x1F') || b == b'\x7F' {
+        } else if (b'\x01'..=b'\x1F').contains(&b) || b == b'\x7F' {
             hex_escape(b, dest)?;
         } else {
             char_escape(b, dest)?;
