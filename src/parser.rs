@@ -18,6 +18,7 @@ use std::ops::Range;
 pub struct ParserState {
     pub(crate) position: usize,
     pub(crate) current_line_start_position: usize,
+    pub(crate) current_position: usize,
     pub(crate) current_line_number: u32,
     pub(crate) at_start_of: Option<BlockType>,
 }
@@ -36,6 +37,12 @@ impl ParserState {
             line: self.current_line_number,
             column: (self.position - self.current_line_start_position + 1) as u32,
         }
+    }
+
+    /// The position from the start of the input, counted in UTF-16 code units
+    #[inline]
+    pub fn utf16_position(&self) -> u32 {
+        self.current_position as u32
     }
 }
 
