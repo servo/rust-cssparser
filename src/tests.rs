@@ -5,7 +5,7 @@
 #[cfg(feature = "bench")]
 extern crate test;
 
-use serde_json::{self, json, Map, Value};
+use serde_json::{json, Map, Value};
 
 #[cfg(feature = "bench")]
 use self::test::Bencher;

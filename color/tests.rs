@@ -3,9 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use super::*;
-use crate::{Color, ColorParser, PredefinedColorSpace, RgbaLegacy};
-use cssparser::{Parser, ParserInput};
-use serde_json::{self, json, Value};
+use cssparser::ParserInput;
+use serde_json::{json, Value};
 
 fn almost_equals(a: &Value, b: &Value) -> bool {
     match (a, b) {
