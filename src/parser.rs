@@ -834,7 +834,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// expect_ident, but clone the CowRcStr
     #[inline]
     pub fn expect_ident_cloned(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
-        self.expect_ident().map(|s| s.clone())
+        self.expect_ident().cloned()
     }
 
     /// Parse a <ident-token> whose unescaped value is an ASCII-insensitive match for the given value.
@@ -859,7 +859,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// expect_string, but clone the CowRcStr
     #[inline]
     pub fn expect_string_cloned(&mut self) -> Result<CowRcStr<'i>, BasicParseError<'i>> {
-        self.expect_string().map(|s| s.clone())
+        self.expect_string().cloned()
     }
 
     /// Parse either a <ident-token> or a <string-token>, and return the unescaped value.
@@ -878,7 +878,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
             Token::UnquotedUrl(ref value) => Ok(value.clone()),
             Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {
                 self.parse_nested_block(|input| {
-                    input.expect_string().map_err(Into::into).map(|s| s.clone())
+                    input.expect_string().map_err(Into::into).cloned()
                 })
                 .map_err(ParseError::<()>::basic)
             }
@@ -893,7 +893,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
             Token::QuotedString(ref value) => Ok(value.clone()),
             Token::Function(ref name) if name.eq_ignore_ascii_case("url") => {
                 self.parse_nested_block(|input| {
-                    input.expect_string().map_err(Into::into).map(|s| s.clone())
+                    input.expect_string().map_err(Into::into).cloned()
                 })
                 .map_err(ParseError::<()>::basic)
             }

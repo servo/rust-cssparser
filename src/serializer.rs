@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::match_byte;
-use dtoa_short::{self, Notation};
+use dtoa_short::Notation;
 use std::fmt::{self, Write};
 use std::str;
 
