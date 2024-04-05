@@ -826,7 +826,7 @@ fn numeric(b: &mut Bencher) {
         for _ in 0..1000000 {
             let mut input = ParserInput::new("10px");
             let mut input = Parser::new(&mut input);
-            let _ = test::black_box(input.next());
+            let _ = test::black_box(input.try_next());
         }
     })
 }
