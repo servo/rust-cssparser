@@ -1,6 +1,6 @@
 [package]
 name = "cssparser-color"
-version = "0.2.0"
+version = "0.1.0"
 authors = ["Emilio Cobos Álvarez <emilio@crisal.io>"]
 description = "Color implementation based on cssparser"
 documentation = "https://docs.rs/cssparser-color/"

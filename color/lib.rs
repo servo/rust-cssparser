@@ -50,7 +50,7 @@ where
     P: ColorParser<'i>,
 {
     let location = input.current_source_location();
-    let token = input.try_next()?;
+    let token = input.next()?;
     match *token {
         Token::Hash(ref value) | Token::IDHash(ref value) => {
             parse_hash_color(value.as_bytes()).map(|(r, g, b, a)| P::Output::from_rgba(r, g, b, a))
@@ -991,7 +991,7 @@ pub trait ColorParser<'i> {
         input: &mut Parser<'i, 't>,
     ) -> Result<AngleOrNumber, ParseError<'i, Self::Error>> {
         let location = input.current_source_location();
-        Ok(match *input.try_next()? {
+        Ok(match *input.next()? {
             Token::Number { value, .. } => AngleOrNumber::Number { value },
             Token::Dimension {
                 value: v, ref unit, ..
@@ -1036,7 +1036,7 @@ pub trait ColorParser<'i> {
         input: &mut Parser<'i, 't>,
     ) -> Result<NumberOrPercentage, ParseError<'i, Self::Error>> {
         let location = input.current_source_location();
-        Ok(match *input.try_next()? {
+        Ok(match *input.next()? {
             Token::Number { value, .. } => NumberOrPercentage::Number { value },
             Token::Percentage { unit_value, .. } => NumberOrPercentage::Percentage { unit_value },
             ref t => return Err(location.new_unexpected_token_error(t.clone())),

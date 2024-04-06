@@ -252,11 +252,7 @@ where
         loop {
             self.input.skip_whitespace();
             let start = self.input.state();
-            match self
-                .input
-                .try_next_including_whitespace_and_comments()
-                .ok()?
-            {
+            match self.input.next_including_whitespace_and_comments().ok()? {
                 Token::CloseCurlyBracket
                 | Token::WhiteSpace(..)
                 | Token::Semicolon
@@ -370,7 +366,7 @@ where
             self.input.skip_cdc_and_cdo();
             let start = self.input.state();
             let at_keyword = match self.input.next_byte()? {
-                b'@' => match self.input.try_next_including_whitespace_and_comments() {
+                b'@' => match self.input.next_including_whitespace_and_comments() {
                     Ok(Token::AtKeyword(name)) => Some(name.clone()),
                     _ => {
                         self.input.reset(&start);
@@ -440,7 +436,7 @@ where
         input.skip_whitespace();
         let start = input.state();
         let at_keyword = if input.next_byte() == Some(b'@') {
-            match *input.try_next_including_whitespace_and_comments()? {
+            match *input.next_including_whitespace_and_comments()? {
                 Token::AtKeyword(ref name) => Some(name.clone()),
                 _ => {
                     input.reset(&start);
@@ -472,7 +468,7 @@ where
     let result = input.parse_until_before(delimiters, |input| parser.parse_prelude(name, input));
     match result {
         Ok(prelude) => {
-            let result = match input.try_next() {
+            let result = match input.next() {
                 Ok(&Token::Semicolon) | Err(_) => parser
                     .rule_without_block(prelude, start)
                     .map_err(|()| input.new_unexpected_token_error(Token::Semicolon)),
@@ -485,7 +481,7 @@ where
         }
         Err(error) => {
             let end_position = input.position();
-            match input.try_next() {
+            match input.next() {
                 Ok(&Token::CurlyBracketBlock) | Ok(&Token::Semicolon) | Err(_) => {}
                 _ => unreachable!(),
             };
