@@ -677,7 +677,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     }
 
     /// Have the given closure parse something, then check the the input is exhausted.
-    /// The result is overridden to `Err(())` if some input remains.
+    /// The result is overridden to an `Err(..)` if some input remains.
     ///
     /// This can help tell e.g. `color: green;` from `color: green 4px;`
     #[inline]
@@ -767,7 +767,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// The given closure is called with a "delimited" parser
     /// that stops at the end of the block or function (at the matching closing token).
     ///
-    /// The result is overridden to `Err(())` if the closure leaves some input before that point.
+    /// The result is overridden to an `Err(..)` if the closure leaves some input before that point.
     #[inline]
     pub fn parse_nested_block<F, T, E>(&mut self, parse: F) -> Result<T, ParseError<'i, E>>
     where
@@ -783,7 +783,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// that stops before the first character at this block/function nesting level
     /// that matches the given set of delimiters, or at the end of the input.
     ///
-    /// The result is overridden to `Err(())` if the closure leaves some input before that point.
+    /// The result is overridden to an `Err(..)` if the closure leaves some input before that point.
     #[inline]
     pub fn parse_until_before<F, T, E>(
         &mut self,
