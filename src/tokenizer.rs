@@ -209,11 +209,11 @@ impl<'a> Token<'a> {
 pub struct Tokenizer<'a> {
     input: &'a str,
     /// Counted in bytes, not code points. From 0.
-    position: usize,
+    current_position: std::slice::Iter<'a, u8>,
     /// The position at the start of the current line; but adjusted to
     /// ensure that computing the column will give the result in units
     /// of UTF-16 characters.
-    current_line_start_position: usize,
+    current_line_start_position: SourcePosition,
     current_line_number: u32,
     var_or_env_functions: SeenStatus,
     source_map_url: Option<&'a str>,
@@ -232,8 +232,8 @@ impl<'a> Tokenizer<'a> {
     pub fn new(input: &str) -> Tokenizer {
         Tokenizer {
             input,
-            position: 0,
-            current_line_start_position: 0,
+            current_position: input.as_bytes().iter(),
+            current_line_start_position: SourcePosition(0),
             current_line_number: 0,
             var_or_env_functions: SeenStatus::DontCare,
             source_map_url: None,
@@ -269,15 +269,19 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     pub fn position(&self) -> SourcePosition {
-        debug_assert!(self.input.is_char_boundary(self.position));
-        SourcePosition(self.position)
+        let offset = unsafe {
+            self.current_position.as_slice().as_ptr().offset_from(self.input.as_ptr())
+        };
+        debug_assert!(offset >= 0, "{}", "current_position should always point to input: {offset}");
+        debug_assert!(self.input.is_char_boundary(offset as usize));
+        SourcePosition(offset as usize)
     }
 
     #[inline]
     pub fn current_source_location(&self) -> SourceLocation {
         SourceLocation {
             line: self.current_line_number,
-            column: (self.position - self.current_line_start_position + 1) as u32,
+            column: (self.position().0 - self.current_line_start_position.0 + 1) as u32,
         }
     }
 
@@ -294,7 +298,7 @@ impl<'a> Tokenizer<'a> {
     #[inline]
     pub fn state(&self) -> ParserState {
         ParserState {
-            position: self.position,
+            position: self.position(),
             current_line_start_position: self.current_line_start_position,
             current_line_number: self.current_line_number,
             at_start_of: None,
@@ -303,7 +307,7 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     pub fn reset(&mut self, state: &ParserState) {
-        self.position = state.position;
+        self.current_position = self.input.as_bytes()[state.position.0..].iter();
         self.current_line_start_position = state.current_line_start_position;
         self.current_line_number = state.current_line_number;
     }
@@ -338,7 +342,7 @@ impl<'a> Tokenizer<'a> {
         if self.is_eof() {
             None
         } else {
-            Some(self.input.as_bytes()[self.position])
+            Some(self.byte_at(0))
         }
     }
 
@@ -352,25 +356,48 @@ impl<'a> Tokenizer<'a> {
     // That is, `tokenizer.char_at(n)` will not panic.
     #[inline]
     fn has_at_least(&self, n: usize) -> bool {
-        self.position + n < self.input.len()
+        self.current_position.len() > n
     }
 
-    // Advance over N bytes in the input.  This function can advance
-    // over ASCII bytes (excluding newlines), or UTF-8 sequence
-    // leaders (excluding leaders for 4-byte sequences).
+    #[cfg(debug_assertions)]
+    fn check_before_advance(&self, n: usize) {
+        // Each byte must either be an ASCII byte or a sequence leader, but not a 4-byte
+        // leader; also newlines are rejected.
+        for i in 0..n {
+            let b = self.byte_at(i);
+            debug_assert!(b.is_ascii() || (b & 0xF0 != 0xF0 && b & 0xC0 != 0x80));
+            debug_assert!(b != b'\r' && b != b'\n' && b != b'\x0C');
+        }
+    }
+
+    #[inline]
+    pub fn advance_one(&mut self) {
+        #[cfg(debug_assertions)]
+        self.check_before_advance(1);
+        self.advance_one_unchecked();
+    }
+
+    // Advance over N bytes in the input.  This function can advance over ASCII bytes (excluding
+    // newlines), or UTF-8 sequence leaders (excluding leaders for 4-byte sequences).
     #[inline]
     pub fn advance(&mut self, n: usize) {
-        if cfg!(debug_assertions) {
-            // Each byte must either be an ASCII byte or a sequence
-            // leader, but not a 4-byte leader; also newlines are
-            // rejected.
-            for i in 0..n {
-                let b = self.byte_at(i);
-                debug_assert!(b.is_ascii() || (b & 0xF0 != 0xF0 && b & 0xC0 != 0x80));
-                debug_assert!(b != b'\r' && b != b'\n' && b != b'\x0C');
-            }
-        }
-        self.position += n
+        #[cfg(debug_assertions)]
+        self.check_before_advance(n);
+        self.advance_unchecked(n);
+    }
+
+    // Version of advance() that doesn't assert about newlines and co. Used for very specific cases
+    // that deal with them properly on their own.
+    #[inline]
+    pub(crate) fn advance_unchecked(&mut self, n: usize) {
+        self.current_position = self.current_position.as_slice()[n..].iter();
+    }
+
+    // As above, but for advance_one
+    #[inline]
+    pub(crate) fn advance_one_unchecked(&mut self) {
+        let byte = self.current_position.next();
+        debug_assert_ne!(byte, None, "Advanced past EOF");
     }
 
     // Assumes non-EOF
@@ -381,46 +408,41 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     fn byte_at(&self, offset: usize) -> u8 {
-        self.input.as_bytes()[self.position + offset]
+        self.current_position.as_slice()[offset]
     }
 
-    // Advance over a single byte; the byte must be a UTF-8 sequence
-    // leader for a 4-byte sequence.
+    // Advance over a single byte; the byte must be a UTF-8 sequence leader for a 4-byte sequence.
     #[inline]
     fn consume_4byte_intro(&mut self) {
         debug_assert!(self.next_byte_unchecked() & 0xF0 == 0xF0);
-        // This takes two UTF-16 characters to represent, so we
-        // actually have an undercount.
-        self.current_line_start_position = self.current_line_start_position.wrapping_sub(1);
-        self.position += 1;
+        // This takes two UTF-16 characters to represent, so we actually have an undercount.
+        self.current_line_start_position.0 = self.current_line_start_position.0.wrapping_sub(1);
+        self.advance_one_unchecked();
     }
 
-    // Advance over a single byte; the byte must be a UTF-8
-    // continuation byte.
+    // Advance over a single byte; the byte must be a UTF-8 continuation byte.
     #[inline]
     fn consume_continuation_byte(&mut self) {
         debug_assert!(self.next_byte_unchecked() & 0xC0 == 0x80);
-        // Continuation bytes contribute to column overcount.  Note
-        // that due to the special case for the 4-byte sequence intro,
-        // we must use wrapping add here.
-        self.current_line_start_position = self.current_line_start_position.wrapping_add(1);
-        self.position += 1;
+        // Continuation bytes contribute to column overcount.  Note that due to the special case
+        // for the 4-byte sequence intro, we must use wrapping add here.
+        self.current_line_start_position.0 = self.current_line_start_position.0.wrapping_add(1);
+        self.advance_one_unchecked();
     }
 
     // Advance over any kind of byte, excluding newlines.
     #[inline(never)]
     fn consume_known_byte(&mut self, byte: u8) {
         debug_assert!(byte != b'\r' && byte != b'\n' && byte != b'\x0C');
-        self.position += 1;
+        self.advance_one_unchecked();
         // Continuation bytes contribute to column overcount.
         if byte & 0xF0 == 0xF0 {
-            // This takes two UTF-16 characters to represent, so we
-            // actually have an undercount.
-            self.current_line_start_position = self.current_line_start_position.wrapping_sub(1);
+            // This takes two UTF-16 characters to represent, so we actually have an undercount.
+            self.current_line_start_position.0 = self.current_line_start_position.0.wrapping_sub(1);
         } else if byte & 0xC0 == 0x80 {
-            // Note that due to the special case for the 4-byte
-            // sequence intro, we must use wrapping add here.
-            self.current_line_start_position = self.current_line_start_position.wrapping_add(1);
+            // Note that due to the special case for the 4-byte sequence intro, we must use
+            // wrapping add here.
+            self.current_line_start_position.0 = self.current_line_start_position.0.wrapping_add(1);
         }
     }
 
@@ -438,43 +460,42 @@ impl<'a> Tokenizer<'a> {
     fn consume_newline(&mut self) {
         let byte = self.next_byte_unchecked();
         debug_assert!(byte == b'\r' || byte == b'\n' || byte == b'\x0C');
-        self.position += 1;
+        self.advance_one_unchecked();
         if byte == b'\r' && self.next_byte() == Some(b'\n') {
-            self.position += 1;
+            self.advance_one_unchecked();
         }
-        self.current_line_start_position = self.position;
+        self.current_line_start_position = self.position();
         self.current_line_number += 1;
     }
 
     #[inline]
     fn has_newline_at(&self, offset: usize) -> bool {
-        self.position + offset < self.input.len()
-            && matches!(self.byte_at(offset), b'\n' | b'\r' | b'\x0C')
+        self.has_at_least(offset) && matches!(self.byte_at(offset), b'\n' | b'\r' | b'\x0C')
     }
 
     #[inline]
     fn consume_char(&mut self) -> char {
         let c = self.next_char();
         let len_utf8 = c.len_utf8();
-        self.position += len_utf8;
+        self.advance_unchecked(len_utf8);
         // Note that due to the special case for the 4-byte sequence
         // intro, we must use wrapping add here.
-        self.current_line_start_position = self
-            .current_line_start_position
+        self.current_line_start_position.0 = self
+            .current_line_start_position.0
             .wrapping_add(len_utf8 - c.len_utf16());
         c
     }
 
     #[inline]
     fn starts_with(&self, needle: &[u8]) -> bool {
-        self.input.as_bytes()[self.position..].starts_with(needle)
+        self.current_position.as_slice().starts_with(needle)
     }
 
     pub fn skip_whitespace(&mut self) {
         while !self.is_eof() {
             match_byte! { self.next_byte_unchecked(),
                 b' ' | b'\t' => {
-                    self.advance(1)
+                    self.advance_one()
                 },
                 b'\n' | b'\x0C' | b'\r' => {
                     self.consume_newline();
@@ -495,7 +516,7 @@ impl<'a> Tokenizer<'a> {
         while !self.is_eof() {
             match_byte! { self.next_byte_unchecked(),
                 b' ' | b'\t' => {
-                    self.advance(1)
+                    self.advance_one()
                 },
                 b'\n' | b'\x0C' | b'\r' => {
                     self.consume_newline();
@@ -564,7 +585,7 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
         b'\n' | b'\x0C' | b'\r' => consume_whitespace(tokenizer, true),
         b'"' => consume_string(tokenizer, false),
         b'#' => {
-            tokenizer.advance(1);
+            tokenizer.advance_one();
             if is_ident_start(tokenizer) { IDHash(consume_name(tokenizer)) }
             else if !tokenizer.is_eof() && match tokenizer.next_byte_unchecked() {
                 // Any other valid case here already resulted in IDHash.
@@ -575,14 +596,14 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
         },
         b'$' => {
             if tokenizer.starts_with(b"$=") { tokenizer.advance(2); SuffixMatch }
-            else { tokenizer.advance(1); Delim('$') }
+            else { tokenizer.advance_one(); Delim('$') }
         },
         b'\'' => consume_string(tokenizer, true),
-        b'(' => { tokenizer.advance(1); ParenthesisBlock },
-        b')' => { tokenizer.advance(1); CloseParenthesis },
+        b'(' => { tokenizer.advance_one(); ParenthesisBlock },
+        b')' => { tokenizer.advance_one(); CloseParenthesis },
         b'*' => {
             if tokenizer.starts_with(b"*=") { tokenizer.advance(2); SubstringMatch }
-            else { tokenizer.advance(1); Delim('*') }
+            else { tokenizer.advance_one(); Delim('*') }
         },
         b'+' => {
             if (
@@ -595,11 +616,11 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
             ) {
                 consume_numeric(tokenizer)
             } else {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 Delim('+')
             }
         },
-        b',' => { tokenizer.advance(1); Comma },
+        b',' => { tokenizer.advance_one(); Comma },
         b'-' => {
             if (
                 tokenizer.has_at_least(1)
@@ -616,7 +637,7 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
             } else if is_ident_start(tokenizer) {
                 consume_ident_like(tokenizer)
             } else {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 Delim('-')
             }
         },
@@ -625,7 +646,7 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
                 && tokenizer.byte_at(1).is_ascii_digit() {
                 consume_numeric(tokenizer)
             } else {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 Delim('.')
             }
         }
@@ -633,53 +654,53 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
             if tokenizer.starts_with(b"/*") {
                 Comment(consume_comment(tokenizer))
             } else {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 Delim('/')
             }
         }
         b'0'..=b'9' => consume_numeric(tokenizer),
-        b':' => { tokenizer.advance(1); Colon },
-        b';' => { tokenizer.advance(1); Semicolon },
+        b':' => { tokenizer.advance_one(); Colon },
+        b';' => { tokenizer.advance_one(); Semicolon },
         b'<' => {
             if tokenizer.starts_with(b"<!--") {
                 tokenizer.advance(4);
                 CDO
             } else {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 Delim('<')
             }
         },
         b'@' => {
-            tokenizer.advance(1);
+            tokenizer.advance_one();
             if is_ident_start(tokenizer) { AtKeyword(consume_name(tokenizer)) }
             else { Delim('@') }
         },
         b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'\0' => consume_ident_like(tokenizer),
-        b'[' => { tokenizer.advance(1); SquareBracketBlock },
+        b'[' => { tokenizer.advance_one(); SquareBracketBlock },
         b'\\' => {
             if !tokenizer.has_newline_at(1) { consume_ident_like(tokenizer) }
-            else { tokenizer.advance(1); Delim('\\') }
+            else { tokenizer.advance_one(); Delim('\\') }
         },
-        b']' => { tokenizer.advance(1); CloseSquareBracket },
+        b']' => { tokenizer.advance_one(); CloseSquareBracket },
         b'^' => {
             if tokenizer.starts_with(b"^=") { tokenizer.advance(2); PrefixMatch }
-            else { tokenizer.advance(1); Delim('^') }
+            else { tokenizer.advance_one(); Delim('^') }
         },
-        b'{' => { tokenizer.advance(1); CurlyBracketBlock },
+        b'{' => { tokenizer.advance_one(); CurlyBracketBlock },
         b'|' => {
             if tokenizer.starts_with(b"|=") { tokenizer.advance(2); DashMatch }
-            else { tokenizer.advance(1); Delim('|') }
+            else { tokenizer.advance_one(); Delim('|') }
         },
-        b'}' => { tokenizer.advance(1); CloseCurlyBracket },
+        b'}' => { tokenizer.advance_one(); CloseCurlyBracket },
         b'~' => {
             if tokenizer.starts_with(b"~=") { tokenizer.advance(2); IncludeMatch }
-            else { tokenizer.advance(1); Delim('~') }
+            else { tokenizer.advance_one(); Delim('~') }
         },
         _ => {
             if !b.is_ascii() {
                 consume_ident_like(tokenizer)
             } else {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 Delim(b as char)
             }
         },
@@ -692,13 +713,13 @@ fn consume_whitespace<'a>(tokenizer: &mut Tokenizer<'a>, newline: bool) -> Token
     if newline {
         tokenizer.consume_newline();
     } else {
-        tokenizer.advance(1);
+        tokenizer.advance_one();
     }
     while !tokenizer.is_eof() {
         let b = tokenizer.next_byte_unchecked();
         match_byte! { b,
             b' ' | b'\t' => {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
             }
             b'\n' | b'\x0C' | b'\r' => {
                 tokenizer.consume_newline();
@@ -744,9 +765,9 @@ fn consume_comment<'a>(tokenizer: &mut Tokenizer<'a>) -> &'a str {
         match_byte! { tokenizer.next_byte_unchecked(),
             b'*' => {
                 let end_position = tokenizer.position();
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 if tokenizer.next_byte() == Some(b'/') {
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     let contents = tokenizer.slice(start_position..end_position);
                     check_for_source_map(tokenizer, contents);
                     return contents
@@ -759,7 +780,7 @@ fn consume_comment<'a>(tokenizer: &mut Tokenizer<'a>) -> &'a str {
             b'\xF0'..=b'\xFF' => { tokenizer.consume_4byte_intro(); }
             _ => {
                 // ASCII or other leading byte.
-                tokenizer.advance(1);
+                tokenizer.advance_one();
             }
         }
     }
@@ -780,7 +801,7 @@ fn consume_quoted_string<'a>(
     tokenizer: &mut Tokenizer<'a>,
     single_quote: bool,
 ) -> Result<CowRcStr<'a>, CowRcStr<'a>> {
-    tokenizer.advance(1); // Skip the initial quote
+    tokenizer.advance_one(); // Skip the initial quote
                           // start_pos is at code point boundary, after " or '
     let start_pos = tokenizer.position();
     let mut string_bytes;
@@ -792,18 +813,18 @@ fn consume_quoted_string<'a>(
             b'"' => {
                 if !single_quote {
                     let value = tokenizer.slice_from(start_pos);
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     return Ok(value.into())
                 }
-                tokenizer.advance(1);
+                tokenizer.advance_one();
             }
             b'\'' => {
                 if single_quote {
                     let value = tokenizer.slice_from(start_pos);
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     return Ok(value.into())
                 }
-                tokenizer.advance(1);
+                tokenizer.advance_one();
             }
             b'\\' | b'\0' => {
                 // * The tokenizer’s input is UTF-8 since it’s `&str`.
@@ -821,7 +842,7 @@ fn consume_quoted_string<'a>(
             b'\xF0'..=b'\xFF' => { tokenizer.consume_4byte_intro(); }
             _ => {
                 // ASCII or other leading byte.
-                tokenizer.advance(1);
+                tokenizer.advance_one();
             }
         }
     }
@@ -838,19 +859,19 @@ fn consume_quoted_string<'a>(
                 );
             }
             b'"' => {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 if !single_quote {
                     break;
                 }
             }
             b'\'' => {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 if single_quote {
                     break;
                 }
             }
             b'\\' => {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 if !tokenizer.is_eof() {
                     match tokenizer.next_byte_unchecked() {
                         // Escaped newline
@@ -865,7 +886,7 @@ fn consume_quoted_string<'a>(
                 continue;
             }
             b'\0' => {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 string_bytes.extend("\u{FFFD}".as_bytes());
                 continue;
             }
@@ -873,7 +894,7 @@ fn consume_quoted_string<'a>(
             b'\xF0'..=b'\xFF' => { tokenizer.consume_4byte_intro(); }
             _ => {
                 // ASCII or other leading byte.
-                tokenizer.advance(1);
+                tokenizer.advance_one();
             },
         }
 
@@ -910,7 +931,7 @@ fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
 fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     let value = consume_name(tokenizer);
     if !tokenizer.is_eof() && tokenizer.next_byte_unchecked() == b'(' {
-        tokenizer.advance(1);
+        tokenizer.advance_one();
         if value.eq_ignore_ascii_case("url") {
             consume_unquoted_url(tokenizer).unwrap_or(Function(value))
         } else {
@@ -931,7 +952,7 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowRcStr<'a> {
             return tokenizer.slice_from(start_pos).into();
         }
         match_byte! { tokenizer.next_byte_unchecked(),
-            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-' => tokenizer.advance(1),
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-' => tokenizer.advance_one(),
             b'\\' | b'\0' => {
                 // * The tokenizer’s input is UTF-8 since it’s `&str`.
                 // * start_pos is at a code point boundary
@@ -942,7 +963,7 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowRcStr<'a> {
                 break
             }
             b'\x80'..=b'\xBF' => { tokenizer.consume_continuation_byte(); }
-            b'\xC0'..=b'\xEF' => { tokenizer.advance(1); }
+            b'\xC0'..=b'\xEF' => { tokenizer.advance_one(); }
             b'\xF0'..=b'\xFF' => { tokenizer.consume_4byte_intro(); }
             _b => {
                 return tokenizer.slice_from(start_pos).into();
@@ -954,17 +975,17 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowRcStr<'a> {
         let b = tokenizer.next_byte_unchecked();
         match_byte! { b,
             b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-'  => {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 value_bytes.push(b)  // ASCII
             }
             b'\\' => {
                 if tokenizer.has_newline_at(1) { break }
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 // This pushes one well-formed code point
                 consume_escape_and_write(tokenizer, &mut value_bytes)
             }
             b'\0' => {
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 value_bytes.extend("\u{FFFD}".as_bytes());
             },
             b'\x80'..=b'\xBF' => {
@@ -976,7 +997,7 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowRcStr<'a> {
             b'\xC0'..=b'\xEF' => {
                 // This byte *is* part of a multi-byte code point,
                 // we’ll end up copying the whole code point before this loop does something else.
-                tokenizer.advance(1);
+                tokenizer.advance_one();
                 value_bytes.push(b)
             }
             b'\xF0'..=b'\xFF' => {
@@ -1025,13 +1046,13 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         _ => (false, 1.),
     };
     if has_sign {
-        tokenizer.advance(1);
+        tokenizer.advance_one();
     }
 
     let mut integral_part: f64 = 0.;
     while let Some(digit) = byte_to_decimal_digit(tokenizer.next_byte_unchecked()) {
         integral_part = integral_part * 10. + digit as f64;
-        tokenizer.advance(1);
+        tokenizer.advance_one();
         if tokenizer.is_eof() {
             break;
         }
@@ -1045,12 +1066,12 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
         && tokenizer.byte_at(1).is_ascii_digit()
     {
         is_integer = false;
-        tokenizer.advance(1); // Consume '.'
+        tokenizer.advance_one(); // Consume '.'
         let mut factor = 0.1;
         while let Some(digit) = byte_to_decimal_digit(tokenizer.next_byte_unchecked()) {
             fractional_part += digit as f64 * factor;
             factor *= 0.1;
-            tokenizer.advance(1);
+            tokenizer.advance_one();
             if tokenizer.is_eof() {
                 break;
             }
@@ -1067,19 +1088,19 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
                 && tokenizer.byte_at(2).is_ascii_digit()))
     {
         is_integer = false;
-        tokenizer.advance(1);
+        tokenizer.advance_one();
         let (has_sign, sign) = match tokenizer.next_byte_unchecked() {
             b'-' => (true, -1.),
             b'+' => (true, 1.),
             _ => (false, 1.),
         };
         if has_sign {
-            tokenizer.advance(1);
+            tokenizer.advance_one();
         }
         let mut exponent: f64 = 0.;
         while let Some(digit) = byte_to_decimal_digit(tokenizer.next_byte_unchecked()) {
             exponent = exponent * 10. + digit as f64;
-            tokenizer.advance(1);
+            tokenizer.advance_one();
             if tokenizer.is_eof() {
                 break;
             }
@@ -1100,7 +1121,7 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
     };
 
     if !tokenizer.is_eof() && tokenizer.next_byte_unchecked() == b'%' {
-        tokenizer.advance(1);
+        tokenizer.advance_one();
         return Percentage {
             unit_value: (value / 100.) as f32,
             int_value,
@@ -1136,43 +1157,44 @@ unsafe fn from_utf8_release_unchecked(string_bytes: Vec<u8>) -> String {
 
 fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
     // This is only called after "url(", so the current position is a code point boundary.
-    let start_position = tokenizer.position;
-    let from_start = &tokenizer.input[tokenizer.position..];
+    let start_position = tokenizer.position();
+    let from_start = tokenizer.current_position.as_slice();
     let mut newlines = 0;
     let mut last_newline = 0;
     let mut found_printable_char = false;
-    let mut iter = from_start.bytes().enumerate();
+    let mut iter = from_start.iter().enumerate();
     loop {
         let (offset, b) = match iter.next() {
             Some(item) => item,
             None => {
-                tokenizer.position = tokenizer.input.len();
+                // Advance to end of input.
+                tokenizer.advance_unchecked(tokenizer.current_position.len());
                 break;
             }
         };
-        match_byte! { b,
+        match_byte! { *b,
             b' ' | b'\t' => {},
             b'\n' | b'\x0C' => {
                 newlines += 1;
                 last_newline = offset;
             }
             b'\r' => {
-                if from_start.as_bytes().get(offset + 1) != Some(&b'\n') {
+                if from_start.get(offset + 1) != Some(&b'\n') {
                     newlines += 1;
                     last_newline = offset;
                 }
             }
             b'"' | b'\'' => return Err(()),  // Do not advance
             b')' => {
-                // Don't use advance, because we may be skipping
-                // newlines here, and we want to avoid the assert.
-                tokenizer.position += offset + 1;
+                // Don't use advance, because we may be skipping newlines here, and we want to
+                // avoid the assert.
+                tokenizer.advance_unchecked(offset + 1);
                 break
             }
             _ => {
-                // Don't use advance, because we may be skipping
-                // newlines here, and we want to avoid the assert.
-                tokenizer.position += offset;
+                // Don't use advance, because we may be skipping newlines here, and we want to
+                // avoid the assert.
+                tokenizer.advance_unchecked(offset);
                 found_printable_char = true;
                 break
             }
@@ -1183,7 +1205,7 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
         tokenizer.current_line_number += newlines;
         // No need for wrapping_add here, because there's no possible
         // way to wrap.
-        tokenizer.current_line_start_position = start_position + last_newline + 1;
+        tokenizer.current_line_start_position.0 = start_position.0 + last_newline + 1;
     }
 
     if found_printable_char {
@@ -1209,12 +1231,12 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
                 }
                 b')' => {
                     let value = tokenizer.slice_from(start_pos);
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     return UnquotedUrl(value.into())
                 }
                 b'\x01'..=b'\x08' | b'\x0B' | b'\x0E'..=b'\x1F' | b'\x7F'  // non-printable
                     | b'"' | b'\'' | b'(' => {
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     return consume_bad_url(tokenizer, start_pos)
                 },
                 b'\\' | b'\0' => {
@@ -1230,7 +1252,7 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
                 b'\xF0'..=b'\xFF' => { tokenizer.consume_4byte_intro(); }
                 _ => {
                     // ASCII or other leading byte.
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                 }
             }
         }
@@ -1243,16 +1265,16 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
                     return consume_url_end(tokenizer, start_pos, string)
                 }
                 b')' => {
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     break;
                 }
                 b'\x01'..=b'\x08' | b'\x0B' | b'\x0E'..=b'\x1F' | b'\x7F'  // non-printable
                     | b'"' | b'\'' | b'(' => {
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     return consume_bad_url(tokenizer, start_pos);
                 }
                 b'\\' => {
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     if tokenizer.has_newline_at(0) {
                         return consume_bad_url(tokenizer, start_pos)
                     }
@@ -1261,7 +1283,7 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
                     consume_escape_and_write(tokenizer, &mut string_bytes)
                 },
                 b'\0' => {
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     string_bytes.extend("\u{FFFD}".as_bytes());
                 }
                 b'\x80'..=b'\xBF' => {
@@ -1280,7 +1302,7 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
                 // we’ll end up copying the whole code point before this loop does something else.
                 b => {
                     // ASCII or other leading byte.
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     string_bytes.push(b)
                 }
             }
@@ -1299,10 +1321,10 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
         while !tokenizer.is_eof() {
             match_byte! { tokenizer.next_byte_unchecked(),
                 b')' => {
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     break
                 }
-                b' ' | b'\t' => { tokenizer.advance(1); }
+                b' ' | b'\t' => { tokenizer.advance_one(); }
                 b'\n' | b'\x0C' | b'\r' => {
                     tokenizer.consume_newline();
                 }
@@ -1321,13 +1343,13 @@ fn consume_unquoted_url<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, 
             match_byte! { tokenizer.next_byte_unchecked(),
                 b')' => {
                     let contents = tokenizer.slice_from(start_pos).into();
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     return BadUrl(contents)
                 }
                 b'\\' => {
-                    tokenizer.advance(1);
+                    tokenizer.advance_one();
                     if matches!(tokenizer.next_byte(), Some(b')') | Some(b'\\')) {
-                        tokenizer.advance(1); // Skip an escaped ')' or '\'
+                        tokenizer.advance_one(); // Skip an escaped ')' or '\'
                     }
                 }
                 b'\n' | b'\x0C' | b'\r' => {
@@ -1351,7 +1373,7 @@ fn consume_hex_digits(tokenizer: &mut Tokenizer<'_>) -> (u32, u32) {
             Some(digit) => {
                 value = value * 16 + digit;
                 digits += 1;
-                tokenizer.advance(1);
+                tokenizer.advance_one();
             }
             None => break,
         }
@@ -1382,7 +1404,7 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
             if !tokenizer.is_eof() {
                 match_byte! { tokenizer.next_byte_unchecked(),
                     b' ' | b'\t' => {
-                        tokenizer.advance(1)
+                        tokenizer.advance_one()
                     }
                     b'\n' | b'\x0C' | b'\r' => {
                         tokenizer.consume_newline();
@@ -1399,7 +1421,7 @@ fn consume_escape(tokenizer: &mut Tokenizer) -> char {
             }
         },
         b'\0' => {
-            tokenizer.advance(1);
+            tokenizer.advance_one();
             '\u{FFFD}'
         }
         _ => tokenizer.consume_char(),
