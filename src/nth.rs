@@ -7,7 +7,7 @@ use super::{BasicParseError, Parser, ParserInput, Token};
 /// Parse the *An+B* notation, as found in the `:nth-child()` selector.
 /// The input is typically the arguments of a function,
 /// in which case the caller needs to check if the arguments’ parser is exhausted.
-/// Return `Ok((A, B))`, or `Err(())` for a syntax error.
+/// Return `Ok((A, B))`, or an `Err(..)` for a syntax error.
 pub fn parse_nth<'i>(input: &mut Parser<'i, '_>) -> Result<(i32, i32), BasicParseError<'i>> {
     match *input.next()? {
         Token::Number {
