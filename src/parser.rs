@@ -16,8 +16,8 @@ use std::ops::Range;
 /// Should only be used with the `Parser` instance it came from.
 #[derive(Debug, Clone)]
 pub struct ParserState {
-    pub(crate) position: usize,
-    pub(crate) current_line_start_position: usize,
+    pub(crate) position: SourcePosition,
+    pub(crate) current_line_start_position: SourcePosition,
     pub(crate) current_line_number: u32,
     pub(crate) at_start_of: Option<BlockType>,
 }
@@ -26,7 +26,7 @@ impl ParserState {
     /// The position from the start of the input, counted in UTF-8 bytes.
     #[inline]
     pub fn position(&self) -> SourcePosition {
-        SourcePosition(self.position)
+        self.position
     }
 
     /// The line number and column number
@@ -34,7 +34,7 @@ impl ParserState {
     pub fn source_location(&self) -> SourceLocation {
         SourceLocation {
             line: self.current_line_number,
-            column: (self.position - self.current_line_start_position + 1) as u32,
+            column: (self.position.0 - self.current_line_start_position.0 + 1) as u32,
         }
     }
 }
