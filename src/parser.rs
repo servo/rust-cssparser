@@ -698,7 +698,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     ///
     /// Successful results are accumulated in a vector.
     ///
-    /// This method returns `Err(())` the first time that a closure call does,
+    /// This method returns an`Err(..)` the first time that a closure call does,
     /// or if a closure call leaves some input before the next comma or the end
     /// of the input.
     #[inline]

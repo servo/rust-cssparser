@@ -34,7 +34,7 @@ pub trait DeclarationParser<'i> {
     ///
     /// Return the finished representation for the declaration
     /// as returned by `DeclarationListParser::next`,
-    /// or `Err(())` to ignore the entire declaration as invalid.
+    /// or an `Err(..)` to ignore the entire declaration as invalid.
     ///
     /// Declaration name matching should be case-insensitive in the ASCII range.
     /// This can be done with `std::ascii::Ascii::eq_ignore_ascii_case`,
@@ -78,7 +78,7 @@ pub trait AtRuleParser<'i> {
     /// Parse the prelude of an at-rule with the given `name`.
     ///
     /// Return the representation of the prelude and the type of at-rule,
-    /// or `Err(())` to ignore the entire at-rule as invalid.
+    /// or an `Err(..)` to ignore the entire at-rule as invalid.
     ///
     /// The prelude is the part after the at-keyword
     /// and before the `;` semicolon or `{ /* ... */ }` block.
@@ -122,7 +122,7 @@ pub trait AtRuleParser<'i> {
     ///
     /// Return the finished representation of the at-rule
     /// as returned by `RuleListParser::next` or `DeclarationListParser::next`,
-    /// or `Err(())` to ignore the entire at-rule as invalid.
+    /// or an `Err(..)` to ignore the entire at-rule as invalid.
     ///
     /// This is only called when `parse_prelude` returned `WithBlock`, and a block
     /// was indeed found following the prelude.
@@ -161,7 +161,7 @@ pub trait QualifiedRuleParser<'i> {
     /// Parse the prelude of a qualified rule. For style rules, this is as Selector list.
     ///
     /// Return the representation of the prelude,
-    /// or `Err(())` to ignore the entire at-rule as invalid.
+    /// or an `Err(..)` to ignore the entire at-rule as invalid.
     ///
     /// The prelude is the part before the `{ /* ... */ }` block.
     ///
@@ -180,7 +180,7 @@ pub trait QualifiedRuleParser<'i> {
     ///
     /// Return the finished representation of the qualified rule
     /// as returned by `RuleListParser::next`,
-    /// or `Err(())` to ignore the entire at-rule as invalid.
+    /// or an `Err(..)` to ignore the entire at-rule as invalid.
     fn parse_block<'t>(
         &mut self,
         prelude: Self::Prelude,
@@ -353,7 +353,7 @@ where
     }
 }
 
-/// `RuleListParser` is an iterator that yields `Ok(_)` for a rule or `Err(())` for an invalid one.
+/// `RuleListParser` is an iterator that yields `Ok(_)` for a rule or an `Err(..)` for an invalid one.
 impl<'i, 't, 'a, R, P, E: 'i> Iterator for StyleSheetParser<'i, 't, 'a, P>
 where
     P: QualifiedRuleParser<'i, QualifiedRule = R, Error = E>
