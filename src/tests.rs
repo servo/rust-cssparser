@@ -828,6 +828,41 @@ fn numeric(b: &mut Bencher) {
     })
 }
 
+#[cfg(feature = "bench")]
+const BOOTSTRAP: &'static str = include_str!("bootstrap.min.css");
+
+#[cfg(feature = "bench")]
+fn tokenize_recursive<'i>(input: &mut Parser<'i, '_>) -> Result<(), ParseError<'i, ()>> {
+    while !input.is_exhausted() {
+        match input.next()? {
+            Token::ParenthesisBlock |
+            Token::SquareBracketBlock |
+            Token::CurlyBracketBlock |
+            Token::Function(..) => {
+                input.parse_nested_block(|input| tokenize_recursive(input))?;
+            },
+            _ => {},
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "bench")]
+#[bench]
+fn bootstrap(b: &mut Bencher) {
+    b.iter(|| {
+        let mut input = ParserInput::new(BOOTSTRAP);
+        let mut input = Parser::new(&mut input);
+        input.look_for_var_or_env_functions();
+
+        let result = tokenize_recursive(&mut input);
+
+        assert!(result.is_ok());
+
+        (result.is_ok(), input.seen_var_or_env_functions())
+    })
+}
+
 struct JsonParser;
 
 #[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]

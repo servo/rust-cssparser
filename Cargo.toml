@@ -12,7 +12,7 @@ license = "MPL-2.0"
 edition = "2018"
 rust-version = "1.63"
 
-exclude = ["src/css-parsing-tests/**", "src/big-data-url.css"]
+exclude = ["src/css-parsing-tests/**", "src/big-data-url.css", "src/bootstrap.min.css"]
 
 [dev-dependencies]
 serde_json = "1.0.25"
