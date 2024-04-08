@@ -338,7 +338,7 @@ where
 
 macro_rules! impl_tocss_for_int {
     ($T: ty) => {
-        impl<'a> ToCss for $T {
+        impl ToCss for $T {
             fn to_css<W>(&self, dest: &mut W) -> fmt::Result
             where
                 W: fmt::Write,
@@ -361,7 +361,7 @@ impl_tocss_for_int!(u64);
 
 macro_rules! impl_tocss_for_float {
     ($T: ty) => {
-        impl<'a> ToCss for $T {
+        impl ToCss for $T {
             fn to_css<W>(&self, dest: &mut W) -> fmt::Result
             where
                 W: fmt::Write,

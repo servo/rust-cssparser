@@ -25,6 +25,7 @@ use std::str::FromStr;
 /// Matching is case-insensitive in the ASCII range.
 /// CSS escaping (if relevant) should be resolved before calling this function.
 /// (For example, the value of an `Ident` token is fine.)
+#[allow(clippy::result_unit_err)]
 #[inline]
 pub fn parse_color_keyword<Output>(ident: &str) -> Result<Output, ()>
 where

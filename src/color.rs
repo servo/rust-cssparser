@@ -76,7 +76,7 @@ pub fn serialize_color_alpha(
 
 /// A Predefined color space specified in:
 /// <https://drafts.csswg.org/css-color-4/#predefined>
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum PredefinedColorSpace {
@@ -143,6 +143,7 @@ impl ToCss for PredefinedColorSpace {
 }
 
 /// Parse a color hash, without the leading '#' character.
+#[allow(clippy::result_unit_err)]
 #[inline]
 pub fn parse_hash_color(value: &[u8]) -> Result<(u8, u8, u8, f32), ()> {
     Ok(match value.len() {
@@ -330,6 +331,7 @@ ascii_case_insensitive_phf_map! {
 
 /// Returns the named color with the given name.
 /// <https://drafts.csswg.org/css-color-4/#typedef-named-color>
+#[allow(clippy::result_unit_err)]
 #[inline]
 pub fn parse_named_color(ident: &str) -> Result<(u8, u8, u8), ()> {
     named_colors::get(ident).copied().ok_or(())

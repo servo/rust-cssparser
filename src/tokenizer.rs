@@ -566,11 +566,11 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
         b'#' => {
             tokenizer.advance(1);
             if is_ident_start(tokenizer) { IDHash(consume_name(tokenizer)) }
-            else if !tokenizer.is_eof() && match tokenizer.next_byte_unchecked() {
+            else if !tokenizer.is_eof() &&
+                matches!(tokenizer.next_byte_unchecked(), b'0'..=b'9' | b'-') {
                 // Any other valid case here already resulted in IDHash.
-                b'0'..=b'9' | b'-' => true,
-                _ => false,
-            } { Hash(consume_name(tokenizer)) }
+                Hash(consume_name(tokenizer))
+            }
             else { Delim('#') }
         },
         b'$' => {

@@ -430,11 +430,9 @@ fn serializer(preserve_comments: bool) {
                 preserve_comments: bool,
             ) {
                 while let Ok(token) = if preserve_comments {
-                    input
-                        .next_including_whitespace_and_comments()
-                        .map(|t| t.clone())
+                    input.next_including_whitespace_and_comments().cloned()
                 } else {
-                    input.next_including_whitespace().map(|t| t.clone())
+                    input.next_including_whitespace().cloned()
                 } {
                     let token_type = token.serialization_type();
                     if !preserve_comments && previous_token.needs_separator_when_before(token_type)
@@ -856,7 +854,7 @@ impl<'i> DeclarationParser<'i> for JsonParser {
         let mut important = false;
         loop {
             let start = input.state();
-            if let Ok(mut token) = input.next_including_whitespace().map(|t| t.clone()) {
+            if let Ok(mut token) = input.next_including_whitespace().cloned() {
                 // Hack to deal with css-parsing-tests assuming that
                 // `!important` in the middle of a declaration value is OK.
                 // This can never happen per spec
@@ -959,7 +957,7 @@ impl<'i> RuleBodyItemParser<'i, Value, ()> for JsonParser {
 
 fn component_values_to_json(input: &mut Parser) -> Vec<Value> {
     let mut values = vec![];
-    while let Ok(token) = input.next_including_whitespace().map(|t| t.clone()) {
+    while let Ok(token) = input.next_including_whitespace().cloned() {
         values.push(one_component_value_to_json(token, input));
     }
     values

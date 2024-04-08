@@ -53,7 +53,7 @@ impl ParserState {
 ///
 /// Would need to scan the whole {} block to find a semicolon, only for parsing getting restarted
 /// as a qualified rule later.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParseUntilErrorBehavior {
     /// Consume until we see the relevant delimiter or the end of the stream.
     Consume,
@@ -606,6 +606,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// See the `Parser::parse_nested_block` method to parse the content of functions or blocks.
     ///
     /// This only returns a closing token when it is unmatched (and therefore an error).
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Result<&Token<'i>, BasicParseError<'i>> {
         self.skip_whitespace();
         self.next_including_whitespace_and_comments()
