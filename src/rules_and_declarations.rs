@@ -106,6 +106,7 @@ pub trait AtRuleParser<'i> {
     /// This is only called when `parse_prelude` returned `WithoutBlock`, and
     /// either the `;` semicolon indeed follows the prelude, or parser is at
     /// the end of the input.
+    #[allow(clippy::result_unit_err)]
     fn rule_without_block(
         &mut self,
         prelude: Self::Prelude,

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   merge_group:
     types: [checks_requested]
-    
+
 jobs:
   linux-ci:
     name: Linux
@@ -36,7 +36,10 @@ jobs:
           profile: minimal
           toolchain: ${{ matrix.toolchain }}
           override: true
-          components: ${{ matrix.toolchain == 'nightly' && 'miri,rust-src' || '' }}
+          components: rustfmt, clippy, ${{ matrix.toolchain == 'nightly' && 'miri,rust-src' || '' }}
+
+      - name: Cargo format & lint
+        run: cargo fmt --check && cargo clippy -- -Dwarnings
 
       - name: Cargo build
         run: cargo build ${{ matrix.features }}
