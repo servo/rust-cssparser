@@ -215,7 +215,7 @@ impl ToJson for Color {
             Color::Oklab(ref c) => json!([c.lightness, c.a, c.b, c.alpha]),
             Color::Oklch(ref c) => json!([c.lightness, c.chroma, c.hue, c.alpha]),
             Color::ColorFunction(ref c) => {
-                json!([c.color_space.as_str(), c.c1, c.c2, c.c3, c.alpha])
+                json!([c.color_space.to_css_string(), c.c1, c.c2, c.c3, c.alpha])
             }
         }
     }

@@ -18,7 +18,6 @@ use cssparser::color::{
 use cssparser::{match_ignore_ascii_case, CowRcStr, ParseError, Parser, ToCss, Token};
 use std::f32::consts::PI;
 use std::fmt;
-use std::str::FromStr;
 
 /// Return the named color with the given name.
 ///
@@ -402,13 +401,7 @@ fn parse_color_with_color_space<'i, 't, P>(
 where
     P: ColorParser<'i>,
 {
-    let color_space = {
-        let location = arguments.current_source_location();
-
-        let ident = arguments.expect_ident()?;
-        PredefinedColorSpace::from_str(ident)
-            .map_err(|_| location.new_unexpected_token_error(Token::Ident(ident.clone())))?
-    };
+    let color_space = PredefinedColorSpace::parse(arguments)?;
 
     let (c1, c2, c3, alpha) = parse_components(
         color_parser,
