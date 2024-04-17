@@ -4,9 +4,7 @@
 
 // https://drafts.csswg.org/css-syntax/#parsing
 
-use super::{
-    BasicParseError, BasicParseErrorKind, Delimiter, Delimiters, ParseError, Parser, Token,
-};
+use super::{BasicParseError, BasicParseErrorKind, Delimiter, ParseError, Parser, Token};
 use crate::cow_rc_str::CowRcStr;
 use crate::parser::{parse_nested_block, parse_until_after, ParseUntilErrorBehavior, ParserState};
 
@@ -293,7 +291,7 @@ where
                             &start,
                             self.input,
                             &mut *self.parser,
-                            Delimiter::Semicolon | Delimiter::CurlyBracketBlock,
+                            /* nested = */ true,
                         ) {
                             return Some(Ok(qual));
                         }
@@ -304,12 +302,8 @@ where
                 token => {
                     let result = if self.parser.parse_qualified() {
                         self.input.reset(&start);
-                        let delimiters = if self.parser.parse_declarations() {
-                            Delimiter::Semicolon | Delimiter::CurlyBracketBlock
-                        } else {
-                            Delimiter::CurlyBracketBlock
-                        };
-                        parse_qualified_rule(&start, self.input, &mut *self.parser, delimiters)
+                        let nested = self.parser.parse_declarations();
+                        parse_qualified_rule(&start, self.input, &mut *self.parser, nested)
                     } else {
                         let token = token.clone();
                         self.input.parse_until_after(Delimiter::Semicolon, |_| {
@@ -398,7 +392,7 @@ where
                     &start,
                     self.input,
                     &mut *self.parser,
-                    Delimiter::CurlyBracketBlock,
+                    /* nested = */ false,
                 );
                 return Some(result.map_err(|e| (e, self.input.slice_from(start.position()))));
             }
@@ -451,7 +445,7 @@ where
         if let Some(name) = at_keyword {
             parse_at_rule(&start, name, input, parser).map_err(|e| e.0)
         } else {
-            parse_qualified_rule(&start, input, parser, Delimiter::CurlyBracketBlock)
+            parse_qualified_rule(&start, input, parser, /* nested = */ false)
         }
     })
 }
@@ -491,16 +485,52 @@ where
     }
 }
 
+//  If the first two non-<whitespace-token> values of rule’s prelude are an <ident-token> whose
+//  value starts with "--" followed by a <colon-token>, then...
+fn looks_like_a_custom_property(input: &mut Parser) -> bool {
+    let ident = match input.expect_ident() {
+        Ok(i) => i,
+        Err(..) => return false,
+    };
+    ident.starts_with("--") && input.expect_colon().is_ok()
+}
+
+// https://drafts.csswg.org/css-syntax/#consume-a-qualified-rule
 fn parse_qualified_rule<'i, 't, P, E>(
     start: &ParserState,
     input: &mut Parser<'i, 't>,
     parser: &mut P,
-    delimiters: Delimiters,
+    nested: bool,
 ) -> Result<<P as QualifiedRuleParser<'i>>::QualifiedRule, ParseError<'i, E>>
 where
     P: QualifiedRuleParser<'i, Error = E>,
 {
-    let prelude = input.parse_until_before(delimiters, |input| parser.parse_prelude(input));
+    input.skip_whitespace();
+    let prelude = {
+        let state = input.state();
+        if looks_like_a_custom_property(input) {
+            // If nested is true, consume the remnants of a bad declaration from input, with
+            // nested set to true, and return nothing.
+            // If nested is false, consume a block from input, and return nothing.
+            let delimiters = if nested {
+                Delimiter::Semicolon
+            } else {
+                Delimiter::CurlyBracketBlock
+            };
+            let _: Result<(), ParseError<()>> = input.parse_until_after(delimiters, |_| Ok(()));
+            return Err(state
+                .source_location()
+                .new_error(BasicParseErrorKind::QualifiedRuleInvalid));
+        }
+        let delimiters = if nested {
+            Delimiter::Semicolon | Delimiter::CurlyBracketBlock
+        } else {
+            Delimiter::CurlyBracketBlock
+        };
+        input.reset(&state);
+        input.parse_until_before(delimiters, |input| parser.parse_prelude(input))
+    };
+
     input.expect_curly_bracket_block()?;
     // Do this here so that we consume the `{` even if the prelude is `Err`.
     let prelude = prelude?;

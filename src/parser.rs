@@ -117,8 +117,14 @@ impl SourceLocation {
     /// Create a new BasicParseError at this location for an unexpected token
     #[inline]
     pub fn new_basic_unexpected_token_error(self, token: Token<'_>) -> BasicParseError<'_> {
+        self.new_basic_error(BasicParseErrorKind::UnexpectedToken(token))
+    }
+
+    /// Create a new BasicParseError at this location
+    #[inline]
+    pub fn new_basic_error(self, kind: BasicParseErrorKind<'_>) -> BasicParseError<'_> {
         BasicParseError {
-            kind: BasicParseErrorKind::UnexpectedToken(token),
+            kind,
             location: self,
         }
     }
@@ -126,8 +132,14 @@ impl SourceLocation {
     /// Create a new ParseError at this location for an unexpected token
     #[inline]
     pub fn new_unexpected_token_error<E>(self, token: Token<'_>) -> ParseError<'_, E> {
+        self.new_error(BasicParseErrorKind::UnexpectedToken(token))
+    }
+
+    /// Create a new basic ParseError at the current location
+    #[inline]
+    pub fn new_error<E>(self, kind: BasicParseErrorKind<'_>) -> ParseError<'_, E> {
         ParseError {
-            kind: ParseErrorKind::Basic(BasicParseErrorKind::UnexpectedToken(token)),
+            kind: ParseErrorKind::Basic(kind),
             location: self,
         }
     }
@@ -450,19 +462,13 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// Create a new BasicParseError at the current location
     #[inline]
     pub fn new_basic_error(&self, kind: BasicParseErrorKind<'i>) -> BasicParseError<'i> {
-        BasicParseError {
-            kind,
-            location: self.current_source_location(),
-        }
+        self.current_source_location().new_basic_error(kind)
     }
 
     /// Create a new basic ParseError at the current location
     #[inline]
     pub fn new_error<E>(&self, kind: BasicParseErrorKind<'i>) -> ParseError<'i, E> {
-        ParseError {
-            kind: ParseErrorKind::Basic(kind),
-            location: self.current_source_location(),
-        }
+        self.current_source_location().new_error(kind)
     }
 
     /// Create a new custom BasicParseError at the current location
