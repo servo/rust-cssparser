@@ -211,6 +211,10 @@ where
             hex_escape(digit, dest)?;
             value = &value[1..];
         }
+        if b'*' == value.as_bytes()[0] {
+            dest.write_str("*")?;
+            value = &value[1..];
+        }
         serialize_name(value, dest)
     }
 }

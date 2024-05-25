@@ -250,6 +250,7 @@ where
     type Item = Result<I, (ParseError<'i, E>, &'i str)>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let mut parsing_lagacy_star_hack = false;
         loop {
             self.input.skip_whitespace();
             let start = self.input.state();
@@ -266,7 +267,7 @@ where
                 // keep parsing as a qualified rule if the token is not an ident, so we implement
                 // that in a slightly more straight-forward way
                 Token::Ident(ref name) if self.parser.parse_declarations() => {
-                    let name = name.clone();
+                    let mut name = name.clone();
                     let parse_qualified = self.parser.parse_qualified();
                     let result = {
                         let error_behavior = if parse_qualified {
@@ -281,6 +282,10 @@ where
                             error_behavior,
                             |input| {
                                 input.expect_colon()?;
+                                if parsing_lagacy_star_hack {
+                                    name = format!("*{name}").into();
+                                    parsing_lagacy_star_hack = false;
+                                }
                                 parser.parse_value(name, input)
                             },
                         )
@@ -302,6 +307,10 @@ where
                     return Some(result.map_err(|e| (e, self.input.slice_from(start.position()))));
                 }
                 token => {
+                    if *token == Token::Delim('*') {
+                        parsing_lagacy_star_hack = true;
+                        continue;
+                    }
                     let result = if self.parser.parse_qualified() {
                         self.input.reset(&start);
                         let delimiters = if self.parser.parse_declarations() {
