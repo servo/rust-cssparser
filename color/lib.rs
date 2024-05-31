@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-
+#![cfg_attr(not(test), no_std)]
 #![deny(missing_docs)]
 
 //! Fairly complete css-color implementation.
@@ -11,13 +11,13 @@
 #[cfg(test)]
 mod tests;
 
+use core::f32::consts::PI;
+use core::fmt;
 use cssparser::color::{
     clamp_floor_256_f32, clamp_unit_f32, parse_hash_color, serialize_color_alpha,
     PredefinedColorSpace, OPAQUE,
 };
 use cssparser::{match_ignore_ascii_case, CowRcStr, ParseError, Parser, ToCss, Token};
-use std::f32::consts::PI;
-use std::fmt;
 
 /// Return the named color with the given name.
 ///

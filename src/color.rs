@@ -15,7 +15,7 @@
 pub const OPAQUE: f32 = 1.0;
 
 use crate::{BasicParseError, Parser, ToCss, Token};
-use std::fmt;
+use core::fmt;
 
 /// Clamp a 0..1 number to a 0..255 range to u8.
 ///

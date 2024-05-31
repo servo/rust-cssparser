@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-
+#![cfg_attr(not(feature = "std"), no_std)]
 #![crate_name = "cssparser"]
 #![crate_type = "rlib"]
 #![cfg_attr(feature = "bench", feature(test))]
@@ -66,6 +66,8 @@ fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
 */
 
 #![recursion_limit = "200"] // For color::parse_color_keyword
+
+extern crate alloc;
 
 pub use crate::cow_rc_str::CowRcStr;
 pub use crate::from_bytes::{stylesheet_encoding, EncodingSupport};
