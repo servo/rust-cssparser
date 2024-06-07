@@ -41,7 +41,7 @@ pub fn clamp_unit_f32(val: f32) -> u8 {
 /// Round and clamp a single number to a u8.
 #[inline]
 pub fn clamp_floor_256_f32(val: f32) -> u8 {
-    val.round().clamp(0., 255.) as u8
+    crate::math::f32_round(val).clamp(0., 255.) as u8
 }
 
 /// Serialize the alpha copmonent of a color according to the specification.
@@ -65,9 +65,9 @@ pub fn serialize_color_alpha(
     dest.write_str(if legacy_syntax { ", " } else { " / " })?;
 
     // Try first with two decimal places, then with three.
-    let mut rounded_alpha = (alpha * 100.).round() / 100.;
+    let mut rounded_alpha = crate::math::f32_round(alpha * 100.) / 100.;
     if clamp_unit_f32(rounded_alpha) != clamp_unit_f32(alpha) {
-        rounded_alpha = (alpha * 1000.).round() / 1000.;
+        rounded_alpha = crate::math::f32_round(alpha * 1000.) / 1000.;
     }
 
     rounded_alpha.to_css(dest)

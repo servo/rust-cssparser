@@ -103,6 +103,7 @@ mod nth;
 mod parser;
 mod serializer;
 mod unicode_range;
+mod math;
 
 #[cfg(test)]
 mod size_of_tests;

@@ -23,9 +23,10 @@ encoding_rs = "0.8"
 cssparser-macros = { path = "./macros", version = "0.6.1" }
 dtoa-short = "0.3"
 itoa = "1.0"
-phf = { version = "0.11.2", features = ["macros"] }
+phf = { version = "0.11.2", features = ["macros"], default-features = false }
 serde = { version = "1.0", features = ["derive"], optional = true }
 smallvec = "1.0"
+libm = "0.2.8"
 
 [profile.profiling]
 inherits = "release"
@@ -37,7 +38,7 @@ bench = []
 dummy_match_byte = []
 # Useful for skipping tests when execution is slow, e.g., under miri
 skip_long_tests = []
-std = []
+std = ["phf/std"]
 
 [workspace]
 members = [".", "./macros", "./color"]

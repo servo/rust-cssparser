@@ -1083,7 +1083,7 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
                 break;
             }
         }
-        value *= f64::powf(10., sign * exponent);
+        value *= crate::math::f64_pow(10., sign * exponent);
     }
 
     let int_value = if is_integer {
