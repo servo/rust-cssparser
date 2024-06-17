@@ -488,11 +488,18 @@ impl<'a> ToCss for ModernComponent<'a> {
     }
 }
 
+fn f32_floor(val: f32) -> f32 {
+    #[cfg(feature = "std")]
+    { val.floor() }
+    #[cfg(not(feature = "std"))]
+    { libm::floorf(val) }
+}
+
 // Guaratees hue in [0..360)
 fn normalize_hue(hue: f32) -> f32 {
     // <https://drafts.csswg.org/css-values/#angles>
     // Subtract an integer before rounding, to avoid some rounding errors:
-    hue - 360.0 * (hue / 360.0).floor()
+    hue - 360.0 * f32_floor(hue / 360.0)
 }
 
 /// A color with red, green, blue, and alpha components, in a byte each.
