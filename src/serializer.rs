@@ -3,9 +3,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::match_byte;
+use alloc::string::String;
+use core::fmt::{self, Write};
+use core::str;
 use dtoa_short::Notation;
-use std::fmt::{self, Write};
-use std::str;
 
 use super::Token;
 
@@ -48,7 +49,7 @@ where
         dtoa_short::write(dest, value)?
     };
 
-    if int_value.is_none() && value.fract() == 0. && !notation.decimal_point && !notation.scientific
+    if int_value.is_none() && value == crate::math::f32_trunc(value) && !notation.decimal_point && !notation.scientific
     {
         dest.write_str(".0")?;
     }

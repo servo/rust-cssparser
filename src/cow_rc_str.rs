@@ -2,9 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::borrow::{Borrow, Cow};
-use std::rc::Rc;
-use std::{cmp, fmt, hash, marker, mem, ops, ptr, slice, str};
+use alloc::borrow::{Borrow, Cow};
+use alloc::rc::Rc;
+use alloc::string::String;
+use core::{cmp, fmt, hash, marker, mem, ops, ptr, slice, str};
 
 /// A string that is either shared (heap-allocated and reference-counted) or borrowed.
 ///

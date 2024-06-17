@@ -4,10 +4,11 @@
 
 use crate::cow_rc_str::CowRcStr;
 use crate::tokenizer::{SourceLocation, SourcePosition, Token, Tokenizer};
+use alloc::vec::Vec;
+use core::fmt;
+use core::ops::BitOr;
+use core::ops::Range;
 use smallvec::SmallVec;
-use std::fmt;
-use std::ops::BitOr;
-use std::ops::Range;
 
 /// A capture of the internal state of a `Parser` (including the position within the input),
 /// obtained from the `Parser::position` method.
@@ -224,6 +225,7 @@ impl<'i, E: fmt::Display> fmt::Display for ParseError<'i, E> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'i, E: fmt::Display + fmt::Debug> std::error::Error for ParseError<'i, E> {}
 
 /// The owned input for a parser.

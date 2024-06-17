@@ -6,8 +6,8 @@
 
 use crate::tokenizer::Token;
 use crate::{BasicParseError, Parser, ToCss};
-use std::char;
-use std::fmt;
+use core::char;
+use core::fmt;
 
 /// One contiguous range of code points.
 ///

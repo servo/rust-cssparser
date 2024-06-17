@@ -9,7 +9,7 @@ macro_rules! size_of_test {
     ($testname: ident, $t: ty, $expected_min_size: expr, $expected_max_size: expr) => {
         #[test]
         fn $testname() {
-            let new = ::std::mem::size_of::<$t>();
+            let new = ::core::mem::size_of::<$t>();
             if new < $expected_min_size {
                 panic!(
                     "Your changes have decreased the stack size of {} from {} to {}. \
@@ -39,7 +39,7 @@ macro_rules! size_of_test {
 
 // Some of these assume 64-bit
 size_of_test!(token, Token, 32);
-size_of_test!(std_cow_str, std::borrow::Cow<'static, str>, 24, 32);
+size_of_test!(std_cow_str, alloc::borrow::Cow<'static, str>, 24, 32);
 size_of_test!(cow_rc_str, CowRcStr, 16);
 
 size_of_test!(tokenizer, crate::tokenizer::Tokenizer, 72);
