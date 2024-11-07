@@ -214,6 +214,8 @@ pub struct Tokenizer<'a> {
     /// ensure that computing the column will give the result in units
     /// of UTF-16 characters.
     current_line_start_position: usize,
+    position_difference: u16,
+    current_line_start_difference: u16,
     current_line_number: u32,
     var_or_env_functions: SeenStatus,
     source_map_url: Option<&'a str>,
@@ -234,7 +236,9 @@ impl<'a> Tokenizer<'a> {
             input,
             position: 0,
             current_line_start_position: 0,
+            current_line_start_difference: 0,
             current_line_number: 0,
+            position_difference: 0,
             var_or_env_functions: SeenStatus::DontCare,
             source_map_url: None,
             source_url: None,
@@ -277,7 +281,12 @@ impl<'a> Tokenizer<'a> {
     pub fn current_source_location(&self) -> SourceLocation {
         SourceLocation {
             line: self.current_line_number,
-            column: (self.position - self.current_line_start_position + 1) as u32,
+            column: (
+                self.position -
+                self.current_line_start_position -
+                (self.position_difference - self.current_line_start_difference) as usize
+                + 1
+            ) as u32,
         }
     }
 
@@ -296,6 +305,8 @@ impl<'a> Tokenizer<'a> {
         ParserState {
             position: self.position,
             current_line_start_position: self.current_line_start_position,
+            current_line_start_difference: self.current_line_start_difference,
+            position_difference: self.position_difference,
             current_line_number: self.current_line_number,
             at_start_of: None,
         }
@@ -305,6 +316,8 @@ impl<'a> Tokenizer<'a> {
     pub fn reset(&mut self, state: &ParserState) {
         self.position = state.position;
         self.current_line_start_position = state.current_line_start_position;
+        self.current_line_start_difference = state.current_line_start_difference;
+        self.position_difference = state.position_difference;
         self.current_line_number = state.current_line_number;
     }
 
@@ -391,7 +404,7 @@ impl<'a> Tokenizer<'a> {
         debug_assert!(self.next_byte_unchecked() & 0xF0 == 0xF0);
         // This takes two UTF-16 characters to represent, so we
         // actually have an undercount.
-        self.current_line_start_position = self.current_line_start_position.wrapping_sub(1);
+        self.position_difference = self.position_difference.wrapping_sub(1);
         self.position += 1;
     }
 
@@ -403,7 +416,7 @@ impl<'a> Tokenizer<'a> {
         // Continuation bytes contribute to column overcount.  Note
         // that due to the special case for the 4-byte sequence intro,
         // we must use wrapping add here.
-        self.current_line_start_position = self.current_line_start_position.wrapping_add(1);
+        self.position_difference = self.position_difference.wrapping_add(1);
         self.position += 1;
     }
 
@@ -416,11 +429,11 @@ impl<'a> Tokenizer<'a> {
         if byte & 0xF0 == 0xF0 {
             // This takes two UTF-16 characters to represent, so we
             // actually have an undercount.
-            self.current_line_start_position = self.current_line_start_position.wrapping_sub(1);
+            self.position_difference = self.position_difference.wrapping_sub(1);
         } else if byte & 0xC0 == 0x80 {
             // Note that due to the special case for the 4-byte
             // sequence intro, we must use wrapping add here.
-            self.current_line_start_position = self.current_line_start_position.wrapping_add(1);
+            self.position_difference = self.position_difference.wrapping_add(1);
         }
     }
 
@@ -443,6 +456,7 @@ impl<'a> Tokenizer<'a> {
             self.position += 1;
         }
         self.current_line_start_position = self.position;
+        self.current_line_start_difference = self.position_difference;
         self.current_line_number += 1;
     }
 
@@ -456,12 +470,13 @@ impl<'a> Tokenizer<'a> {
     fn consume_char(&mut self) -> char {
         let c = self.next_char();
         let len_utf8 = c.len_utf8();
+        let len_utf16 = c.len_utf16();
         self.position += len_utf8;
         // Note that due to the special case for the 4-byte sequence
         // intro, we must use wrapping add here.
-        self.current_line_start_position = self
-            .current_line_start_position
-            .wrapping_add(len_utf8 - c.len_utf16());
+        self.position_difference = self
+            .position_difference
+            .wrapping_add((len_utf8 - len_utf16) as u16);
         c
     }
 
