@@ -7,8 +7,11 @@
 use self::Token::*;
 use crate::cow_rc_str::CowRcStr;
 use crate::parser::ParserState;
-use std::char;
-use std::ops::Range;
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::char;
+use core::ops::Range;
 
 #[cfg(not(feature = "dummy_match_byte"))]
 use cssparser_macros::match_byte;
@@ -1080,7 +1083,7 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
                 break;
             }
         }
-        value *= f64::powf(10., sign * exponent);
+        value *= crate::math::f64_pow(10., sign * exponent);
     }
 
     let int_value = if is_integer {

@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::mem::MaybeUninit;
+use core::mem::MaybeUninit;
 
 /// Expands to a `match` expression with string patterns,
 /// matching case-insensitively in the ASCII range.
@@ -191,7 +191,7 @@ pub fn _cssparser_internal_to_lowercase<'a>(
         // `buffer` was initialized to a copy of `input`
         // (which is `&str` so well-formed UTF-8)
         // then ASCII-lowercased (which preserves UTF-8 well-formedness):
-        unsafe { ::std::str::from_utf8_unchecked(buffer) }
+        unsafe { ::core::str::from_utf8_unchecked(buffer) }
     }
 
     Some(

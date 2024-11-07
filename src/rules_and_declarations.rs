@@ -199,7 +199,7 @@ pub struct RuleBodyParser<'i, 't, 'a, P, I, E> {
     /// The parser given to `DeclarationListParser::new`
     pub parser: &'a mut P,
 
-    _phantom: std::marker::PhantomData<(I, E)>,
+    _phantom: core::marker::PhantomData<(I, E)>,
 }
 
 /// A parser for a rule body item.
@@ -235,7 +235,7 @@ impl<'i, 't, 'a, P, I, E> RuleBodyParser<'i, 't, 'a, P, I, E> {
         Self {
             input,
             parser,
-            _phantom: std::marker::PhantomData,
+            _phantom: core::marker::PhantomData,
         }
     }
 }
