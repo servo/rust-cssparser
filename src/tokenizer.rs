@@ -190,7 +190,7 @@ pub enum Token<'a> {
     CloseCurlyBracket,
 }
 
-impl<'a> Token<'a> {
+impl Token<'_> {
     /// Return whether this token represents a parse error.
     ///
     /// `BadUrl` and `BadString` are tokenizer-level parse errors.
@@ -324,11 +324,11 @@ impl<'a> Tokenizer<'a> {
         let current = self.position();
         let start = self
             .slice(SourcePosition(0)..current)
-            .rfind(|c| matches!(c, '\r' | '\n' | '\x0C'))
+            .rfind(['\r', '\n', '\x0C'])
             .map_or(0, |start| start + 1);
         let end = self
             .slice(current..SourcePosition(self.input.len()))
-            .find(|c| matches!(c, '\r' | '\n' | '\x0C'))
+            .find(['\r', '\n', '\x0C'])
             .map_or(self.input.len(), |end| current.0 + end);
         self.slice(SourcePosition(start)..SourcePosition(end))
     }
@@ -720,9 +720,7 @@ fn check_for_source_map<'a>(tokenizer: &mut Tokenizer<'a>, contents: &'a str) {
     // If there is a source map directive, extract the URL.
     if contents.starts_with(directive) || contents.starts_with(directive_old) {
         let contents = &contents[directive.len()..];
-        tokenizer.source_map_url = contents
-            .split(|c| c == ' ' || c == '\t' || c == '\x0C' || c == '\r' || c == '\n')
-            .next()
+        tokenizer.source_map_url = contents.split([' ', '\t', '\x0C', '\r', '\n']).next();
     }
 
     let directive = "# sourceURL=";
@@ -731,9 +729,7 @@ fn check_for_source_map<'a>(tokenizer: &mut Tokenizer<'a>, contents: &'a str) {
     // If there is a source map directive, extract the URL.
     if contents.starts_with(directive) || contents.starts_with(directive_old) {
         let contents = &contents[directive.len()..];
-        tokenizer.source_url = contents
-            .split(|c| c == ' ' || c == '\t' || c == '\x0C' || c == '\r' || c == '\n')
-            .next()
+        tokenizer.source_url = contents.split([' ', '\t', '\x0C', '\r', '\n']).next()
     }
 }
 
