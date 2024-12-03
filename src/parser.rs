@@ -360,10 +360,8 @@ impl Delimiters {
             table
         };
 
-        match byte {
-            None => Delimiter::None,
-            Some(b) => TABLE[b as usize],
-        }
+        assert_eq!(TABLE[0], Delimiter::None);
+        TABLE[byte.unwrap_or(0) as usize]
     }
 }
 
