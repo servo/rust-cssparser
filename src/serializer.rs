@@ -311,6 +311,36 @@ where
     }
 }
 
+fn handle_backslash(s: &str, i: usize) -> Option<&'static str> {
+    let bytes = s.as_bytes();
+    if i + 1 < s.len() {
+        match bytes[i + 1] {
+            b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F' => {
+                // If the character following the backslash is part of a Unicode escape sequence, preserve the entire sequence
+                let mut j = i + 1;
+                while j < s.len() && bytes[j].is_ascii_hexdigit() && j - i < 6 {
+                    j += 1;
+                }
+                if j - i > 1 {
+                    // Preserve the entire Unicode escape sequence
+                    Some("\\")
+                } else {
+                    // If it is not a valid Unicode escape sequence, escape the backslash itself
+                    Some("\\\\")
+                }
+            }
+            _ => {
+                // If the character following the backslash is any other character, escape the backslash itself
+                Some("\\\\")
+            }
+        }
+    } else {
+        // If the backslash is the last character, escape the backslash itself
+        Some("\\\\")
+    }
+}
+
+
 impl<W> fmt::Write for CssStringWriter<'_, W>
 where
     W: fmt::Write,
@@ -320,7 +350,7 @@ where
         for (i, b) in s.bytes().enumerate() {
             let escaped = match_byte! { b,
                 b'"' => Some("\\\""),
-                b'\\' => Some("\\\\"),
+                b'\\' => handle_backslash(s, i),
                 b'\0' => Some("\u{FFFD}"),
                 b'\x01'..=b'\x1F' | b'\x7F' => None,
                 _ => continue,
