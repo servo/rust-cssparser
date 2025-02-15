@@ -466,6 +466,9 @@ pub enum TokenSerializationType {
     Other,
 }
 
+#[cfg(feature = "malloc_size_of")]
+malloc_size_of::malloc_size_of_is_0!(TokenSerializationType);
+
 impl TokenSerializationType {
     /// Return a value that represents the absence of a token, e.g. before the start of the input.
     #[deprecated(

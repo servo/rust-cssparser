@@ -1,6 +1,6 @@
 [package]
 name = "cssparser"
-version = "0.34.0"
+version = "0.34.1"
 authors = ["Simon Sapin <simon.sapin@exyr.org>"]
 
 description = "Rust implementation of CSS Syntax Level 3"
@@ -25,6 +25,7 @@ dtoa-short = "0.3"
 itoa = "1.0"
 phf = { version = "0.11.2", features = ["macros"] }
 serde = { version = "1.0", features = ["derive"], optional = true }
+malloc_size_of = { version = "0.1", default-features = false, optional = true }
 smallvec = "1.0"
 
 [profile.profiling]

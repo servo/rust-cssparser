@@ -533,6 +533,9 @@ impl<'a> Tokenizer<'a> {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
 pub struct SourcePosition(pub(crate) usize);
 
+#[cfg(feature = "malloc_size_of")]
+malloc_size_of::malloc_size_of_is_0!(SourcePosition);
+
 impl SourcePosition {
     /// Returns the current byte index in the original input.
     #[inline]
@@ -551,6 +554,9 @@ pub struct SourceLocation {
     /// Column numbers are counted in UTF-16 code units.
     pub column: u32,
 }
+
+#[cfg(feature = "malloc_size_of")]
+malloc_size_of::malloc_size_of_is_0!(SourceLocation);
 
 fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
     if tokenizer.is_eof() {
