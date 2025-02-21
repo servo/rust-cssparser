@@ -849,6 +849,7 @@ impl<'i> DeclarationParser<'i> for JsonParser {
         &mut self,
         name: CowRcStr<'i>,
         input: &mut Parser<'i, 't>,
+        _declaration_start: &ParserState,
     ) -> Result<Value, ParseError<'i, ()>> {
         let mut value = vec![];
         let mut important = false;

@@ -49,6 +49,7 @@ pub trait DeclarationParser<'i> {
         &mut self,
         name: CowRcStr<'i>,
         input: &mut Parser<'i, 't>,
+        _declaration_start: &ParserState,
     ) -> Result<Self::Declaration, ParseError<'i, Self::Error>> {
         Err(input.new_error(BasicParseErrorKind::UnexpectedToken(Token::Ident(name))))
     }
@@ -279,7 +280,7 @@ where
                             error_behavior,
                             |input| {
                                 input.expect_colon()?;
-                                parser.parse_value(name, input)
+                                parser.parse_value(name, input, &start)
                             },
                         )
                     };
@@ -408,12 +409,13 @@ pub fn parse_one_declaration<'i, 't, P, E>(
 where
     P: DeclarationParser<'i, Error = E>,
 {
+    let start = input.state();
     let start_position = input.position();
     input
         .parse_entirely(|input| {
             let name = input.expect_ident()?.clone();
             input.expect_colon()?;
-            parser.parse_value(name, input)
+            parser.parse_value(name, input, &start)
         })
         .map_err(|e| (e, input.slice_from(start_position)))
 }
