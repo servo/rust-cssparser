@@ -22,6 +22,7 @@ jobs:
         features:
           -
           - --features dummy_match_byte
+          - --features malloc_size_of
         include:
           - toolchain: nightly
             features: --features bench
