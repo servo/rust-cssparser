@@ -794,7 +794,7 @@ fn delimiter_from_byte(b: &mut Bencher) {
 }
 
 #[cfg(feature = "bench")]
-const BACKGROUND_IMAGE: &'static str = include_str!("big-data-url.css");
+const BACKGROUND_IMAGE: &str = include_str!("big-data-url.css");
 
 #[cfg(feature = "bench")]
 #[bench]

@@ -80,11 +80,11 @@ impl fmt::Display for BasicParseErrorKind<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BasicParseErrorKind::UnexpectedToken(token) => {
-                write!(f, "unexpected token: {:?}", token)
+                write!(f, "unexpected token: {token:?}")
             }
             BasicParseErrorKind::EndOfInput => write!(f, "unexpected end of input"),
             BasicParseErrorKind::AtRuleInvalid(rule) => {
-                write!(f, "invalid @ rule encountered: '@{}'", rule)
+                write!(f, "invalid @ rule encountered: '@{rule}'")
             }
             BasicParseErrorKind::AtRuleBodyInvalid => write!(f, "invalid @ rule body encountered"),
             BasicParseErrorKind::QualifiedRuleInvalid => {
