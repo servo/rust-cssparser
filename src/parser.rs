@@ -295,7 +295,7 @@ impl BlockType {
 ///
 /// The union of two sets can be obtained with the `|` operator. Example:
 ///
-/// ```{rust,ignore}
+/// ```rust,ignore
 /// input.parse_until_before(Delimiter::CurlyBracketBlock | Delimiter::Semicolon)
 /// ```
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]

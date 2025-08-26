@@ -41,7 +41,7 @@ As a consequence, when calling another parsing function, either:
 
 Examples:
 
-```{rust,ignore}
+```rust,ignore
 // 'none' | <image>
 fn parse_background_image(context: &ParserContext, input: &mut Parser)
                                     -> Result<Option<Image>, ()> {
@@ -53,7 +53,7 @@ fn parse_background_image(context: &ParserContext, input: &mut Parser)
 }
 ```
 
-```{rust,ignore}
+```rust,ignore
 // [ <length> | <percentage> ] [ <length> | <percentage> ]?
 fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
                           -> Result<(LengthOrPercentage, LengthOrPercentage), ()> {

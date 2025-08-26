@@ -286,7 +286,7 @@ where
 ///
 /// Typical usage:
 ///
-/// ```{rust,ignore}
+/// ```rust,ignore
 /// fn write_foo<W>(foo: &Foo, dest: &mut W) -> fmt::Result where W: fmt::Write {
 ///     dest.write_str("\"")?;
 ///     {
