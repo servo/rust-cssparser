@@ -229,7 +229,7 @@ enum SeenStatus {
 
 impl<'a> Tokenizer<'a> {
     #[inline]
-    pub fn new(input: &str) -> Tokenizer {
+    pub fn new(input: &'a str) -> Self {
         Tokenizer {
             input,
             position: 0,

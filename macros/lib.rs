@@ -162,7 +162,7 @@ pub fn match_byte(input: TokenStream) -> TokenStream {
     for (i, ref arm) in arms.iter().enumerate() {
         let case_id = i + 1;
         let index = case_id as isize;
-        let name = syn::Ident::new(&format!("Case{}", case_id), arm.span());
+        let name = syn::Ident::new(&format!("Case{case_id}"), arm.span());
         let pat = &arm.pat;
         parse_pat_to_table(pat, case_id as u8, &mut wildcard, &mut table);
 
@@ -177,7 +177,7 @@ pub fn match_byte(input: TokenStream) -> TokenStream {
 
     let mut table_content = Vec::new();
     for entry in table.iter() {
-        let name: syn::Path = syn::parse_str(&format!("Case::Case{}", entry)).unwrap();
+        let name: syn::Path = syn::parse_str(&format!("Case::Case{entry}")).unwrap();
         table_content.push(name);
     }
     let table = quote::quote!(static __CASES: [Case; 256] = [#(#table_content),*];);
