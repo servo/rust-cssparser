@@ -1266,7 +1266,7 @@ fn roundtrip_percentage_token() {
 }
 
 #[test]
-fn utf16_columns() {
+fn utf16_columns_and_positions() {
     // This particular test serves two purposes.  First, it checks
     // that the column number computations are correct.  Second, it
     // checks that tokenizer code paths correctly differentiate
@@ -1277,24 +1277,26 @@ fn utf16_columns() {
     // the column is in units of UTF-16, the 4-byte sequence results
     // in two columns.
     let tests = vec![
-        ("", 1),
-        ("ascii", 6),
-        ("/*QΡ✈🆒*/", 10),
-        ("'QΡ✈🆒*'", 9),
-        ("\"\\\"'QΡ✈🆒*'", 12),
-        ("\\Q\\Ρ\\✈\\🆒", 10),
-        ("QΡ✈🆒", 6),
-        ("QΡ✈🆒\\Q\\Ρ\\✈\\🆒", 15),
-        ("newline\r\nQΡ✈🆒", 6),
-        ("url(QΡ✈🆒\\Q\\Ρ\\✈\\🆒)", 20),
-        ("url(QΡ✈🆒)", 11),
-        ("url(\r\nQΡ✈🆒\\Q\\Ρ\\✈\\🆒)", 16),
-        ("url(\r\nQΡ✈🆒\\Q\\Ρ\\✈\\🆒", 15),
-        ("url(\r\nQΡ✈🆒\\Q\\Ρ\\✈\\🆒 x", 17),
-        ("QΡ✈🆒()", 8),
+        ("", 1, 0),
+        ("ascii", 6, 5),
+        ("/*QΡ✈🆒*/", 10, 9),
+        ("/*QΡ✈\r\n🆒*/", 5, 11),
+        ("'QΡ✈🆒*'", 9, 8),
+        ("\"\\\"'QΡ✈🆒*'", 12, 11),
+        ("\\Q\\Ρ\\✈\\🆒", 10, 9),
+        ("QΡ✈🆒", 6, 5),
+        ("QΡ✈🆒\\Q\\Ρ\\✈\\🆒", 15, 14),
+        ("newline\r\nQΡ✈🆒", 6, 14),
+        ("url(QΡ✈🆒\\Q\\Ρ\\✈\\🆒)", 20, 19),
+        ("url(QΡ✈🆒)", 11, 10),
+        ("url(\r\nQΡ✈🆒\\Q\\Ρ\\✈\\🆒)", 16, 21),
+        ("url(\r\nQΡ✈🆒\\Q\\Ρ\\✈\\🆒", 15, 20),
+        ("url(\r\nQΡ✈🆒\\Q\\Ρ\\✈\\🆒 x", 17, 22),
+        ("url(  \tQ)", 10, 9),
+        ("QΡ✈🆒()", 8, 7),
         // Test that under/over-flow of current_line_start_position is
         // handled properly; see the special case in consume_4byte_intro.
-        ("🆒", 3),
+        ("🆒", 3, 2),
     ];
 
     for test in tests {
@@ -1320,6 +1322,7 @@ fn utf16_columns() {
 
         // Check the resulting column.
         assert_eq!(parser.current_source_location().column, test.1);
+        assert_eq!(parser.state().utf16_position(), test.2, "test: {}", test.0);
     }
 }
 
