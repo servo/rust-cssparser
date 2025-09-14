@@ -116,13 +116,13 @@ impl<'i, T> From<BasicParseError<'i>> for ParseError<'i, T> {
 impl SourceLocation {
     /// Create a new BasicParseError at this location for an unexpected token
     #[inline]
-    pub fn new_basic_unexpected_token_error(self, token: Token<'_>) -> BasicParseError<'_> {
+    pub const fn new_basic_unexpected_token_error(self, token: Token<'_>) -> BasicParseError<'_> {
         self.new_basic_error(BasicParseErrorKind::UnexpectedToken(token))
     }
 
     /// Create a new BasicParseError at this location
     #[inline]
-    pub fn new_basic_error(self, kind: BasicParseErrorKind<'_>) -> BasicParseError<'_> {
+    pub const fn new_basic_error(self, kind: BasicParseErrorKind<'_>) -> BasicParseError<'_> {
         BasicParseError {
             kind,
             location: self,
@@ -131,13 +131,13 @@ impl SourceLocation {
 
     /// Create a new ParseError at this location for an unexpected token
     #[inline]
-    pub fn new_unexpected_token_error<E>(self, token: Token<'_>) -> ParseError<'_, E> {
+    pub const fn new_unexpected_token_error<E>(self, token: Token<'_>) -> ParseError<'_, E> {
         self.new_error(BasicParseErrorKind::UnexpectedToken(token))
     }
 
     /// Create a new basic ParseError at the current location
     #[inline]
-    pub fn new_error<E>(self, kind: BasicParseErrorKind<'_>) -> ParseError<'_, E> {
+    pub const fn new_error<E>(self, kind: BasicParseErrorKind<'_>) -> ParseError<'_, E> {
         ParseError {
             kind: ParseErrorKind::Basic(kind),
             location: self,
@@ -240,7 +240,7 @@ struct CachedToken<'i> {
 
 impl<'i> ParserInput<'i> {
     /// Create a new input for a parser.
-    pub fn new(input: &'i str) -> ParserInput<'i> {
+    pub const fn new(input: &'i str) -> ParserInput<'i> {
         ParserInput {
             tokenizer: Tokenizer::new(input),
             cached_token: None,
@@ -383,7 +383,7 @@ macro_rules! expect {
 impl<'i: 't, 't> Parser<'i, 't> {
     /// Create a new parser
     #[inline]
-    pub fn new(input: &'t mut ParserInput<'i>) -> Parser<'i, 't> {
+    pub const fn new(input: &'t mut ParserInput<'i>) -> Parser<'i, 't> {
         Parser {
             input,
             at_start_of: None,
@@ -435,7 +435,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// The current line number and column number.
     #[inline]
-    pub fn current_source_location(&self) -> SourceLocation {
+    pub const fn current_source_location(&self) -> SourceLocation {
         self.input.tokenizer.current_source_location()
     }
 
@@ -459,13 +459,13 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// Create a new BasicParseError at the current location
     #[inline]
-    pub fn new_basic_error(&self, kind: BasicParseErrorKind<'i>) -> BasicParseError<'i> {
+    pub const fn new_basic_error(&self, kind: BasicParseErrorKind<'i>) -> BasicParseError<'i> {
         self.current_source_location().new_basic_error(kind)
     }
 
     /// Create a new basic ParseError at the current location
     #[inline]
-    pub fn new_error<E>(&self, kind: BasicParseErrorKind<'i>) -> ParseError<'i, E> {
+    pub const fn new_error<E>(&self, kind: BasicParseErrorKind<'i>) -> ParseError<'i, E> {
         self.current_source_location().new_error(kind)
     }
 
@@ -477,13 +477,13 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// Create a new unexpected token BasicParseError at the current location
     #[inline]
-    pub fn new_basic_unexpected_token_error(&self, token: Token<'i>) -> BasicParseError<'i> {
+    pub const fn new_basic_unexpected_token_error(&self, token: Token<'i>) -> BasicParseError<'i> {
         self.new_basic_error(BasicParseErrorKind::UnexpectedToken(token))
     }
 
     /// Create a new unexpected token ParseError at the current location
     #[inline]
-    pub fn new_unexpected_token_error<E>(&self, token: Token<'i>) -> ParseError<'i, E> {
+    pub const fn new_unexpected_token_error<E>(&self, token: Token<'i>) -> ParseError<'i, E> {
         self.new_error(BasicParseErrorKind::UnexpectedToken(token))
     }
 

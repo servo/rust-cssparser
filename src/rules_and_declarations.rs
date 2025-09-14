@@ -232,7 +232,7 @@ impl<'i, 't, 'a, P, I, E> RuleBodyParser<'i, 't, 'a, P, I, E> {
     /// The return type for finished declarations and at-rules also needs to be the same,
     /// since `<DeclarationListParser as Iterator>::next` can return either.
     /// It could be a custom enum.
-    pub fn new(input: &'a mut Parser<'i, 't>, parser: &'a mut P) -> Self {
+    pub const fn new(input: &'a mut Parser<'i, 't>, parser: &'a mut P) -> Self {
         Self {
             input,
             parser,
@@ -340,7 +340,7 @@ where
     ///
     /// The return type for finished qualified rules and at-rules also needs to be the same,
     /// since `<RuleListParser as Iterator>::next` can return either. It could be a custom enum.
-    pub fn new(input: &'a mut Parser<'i, 't>, parser: &'a mut P) -> Self {
+    pub const fn new(input: &'a mut Parser<'i, 't>, parser: &'a mut P) -> Self {
         Self {
             input,
             parser,

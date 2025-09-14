@@ -306,7 +306,7 @@ where
     W: fmt::Write,
 {
     /// Wrap a text writer to create a `CssStringWriter`.
-    pub fn new(inner: &'a mut W) -> CssStringWriter<'a, W> {
+    pub const fn new(inner: &'a mut W) -> CssStringWriter<'a, W> {
         CssStringWriter { inner }
     }
 }

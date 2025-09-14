@@ -572,7 +572,7 @@ pub struct Hsl {
 
 impl Hsl {
     /// Construct a new HSL color from it's components.
-    pub fn new(
+    pub const fn new(
         hue: Option<f32>,
         saturation: Option<f32>,
         lightness: Option<f32>,
@@ -619,7 +619,7 @@ pub struct Hwb {
 
 impl Hwb {
     /// Construct a new HWB color from it's components.
-    pub fn new(
+    pub const fn new(
         hue: Option<f32>,
         whiteness: Option<f32>,
         blackness: Option<f32>,
@@ -685,7 +685,7 @@ macro_rules! impl_lab_like {
     ($cls:ident, $fname:literal) => {
         impl $cls {
             /// Construct a new Lab color format with lightness, a, b and alpha components.
-            pub fn new(
+            pub const fn new(
                 lightness: Option<f32>,
                 a: Option<f32>,
                 b: Option<f32>,
@@ -757,7 +757,7 @@ macro_rules! impl_lch_like {
     ($cls:ident, $fname:literal) => {
         impl $cls {
             /// Construct a new color with lightness, chroma and hue components.
-            pub fn new(
+            pub const fn new(
                 lightness: Option<f32>,
                 chroma: Option<f32>,
                 hue: Option<f32>,
@@ -814,7 +814,7 @@ pub struct ColorFunction {
 impl ColorFunction {
     /// Construct a new color function definition with the given color space and
     /// color components.
-    pub fn new(
+    pub const fn new(
         color_space: PredefinedColorSpace,
         c1: Option<f32>,
         c2: Option<f32>,

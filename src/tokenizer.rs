@@ -229,7 +229,7 @@ enum SeenStatus {
 
 impl<'a> Tokenizer<'a> {
     #[inline]
-    pub fn new(input: &'a str) -> Self {
+    pub const fn new(input: &'a str) -> Self {
         Tokenizer {
             input,
             position: 0,
@@ -274,7 +274,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     #[inline]
-    pub fn current_source_location(&self) -> SourceLocation {
+    pub const fn current_source_location(&self) -> SourceLocation {
         SourceLocation {
             line: self.current_line_number,
             column: (self.position - self.current_line_start_position + 1) as u32,
