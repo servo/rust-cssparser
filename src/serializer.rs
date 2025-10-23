@@ -45,7 +45,15 @@ where
             scientific: false,
         }
     } else {
-        dtoa_short::write(dest, value)?
+        if let Some(int_val) = int_value {
+            write!(dest, "{}", int_val)?;
+            Notation {
+                decimal_point: false,
+                scientific: false,
+            }
+        } else {
+            dtoa_short::write(dest, value)?
+        }
     };
 
     if int_value.is_none() && value.fract() == 0. && !notation.decimal_point && !notation.scientific
