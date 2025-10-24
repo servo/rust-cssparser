@@ -891,7 +891,7 @@ fn consume_quoted_string<'a>(
 }
 
 #[inline]
-fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
+fn is_ident_start(tokenizer: &Tokenizer) -> bool {
     !tokenizer.is_eof()
         && match_byte! { tokenizer.next_byte_unchecked(),
             b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'\0' => true,
