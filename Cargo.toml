@@ -10,7 +10,7 @@ readme = "README.md"
 keywords = ["css", "syntax", "parser"]
 license = "MPL-2.0"
 edition = "2018"
-rust-version = "1.66"
+rust-version = "1.68"
 
 exclude = ["src/css-parsing-tests/**", "src/big-data-url.css"]
 
