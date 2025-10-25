@@ -85,6 +85,8 @@ pub enum PredefinedColorSpace {
     SrgbLinear,
     /// <https://drafts.csswg.org/css-color-4/#predefined-display-p3>
     DisplayP3,
+    /// <https://drafts.csswg.org/css-color-4/#predefined-display-p3-linear>
+    DisplayP3Linear,
     /// <https://drafts.csswg.org/css-color-4/#predefined-a98-rgb>
     A98Rgb,
     /// <https://drafts.csswg.org/css-color-4/#predefined-prophoto-rgb>
@@ -107,6 +109,7 @@ impl PredefinedColorSpace {
             "srgb" => Self::Srgb,
             "srgb-linear" => Self::SrgbLinear,
             "display-p3" => Self::DisplayP3,
+            "display-p3-linear" => Self::DisplayP3Linear,
             "a98-rgb" => Self::A98Rgb,
             "prophoto-rgb" => Self::ProphotoRgb,
             "rec2020" => Self::Rec2020,
@@ -126,6 +129,7 @@ impl ToCss for PredefinedColorSpace {
             Self::Srgb => "srgb",
             Self::SrgbLinear => "srgb-linear",
             Self::DisplayP3 => "display-p3",
+            Self::DisplayP3Linear => "display-p3-linear",
             Self::A98Rgb => "a98-rgb",
             Self::ProphotoRgb => "prophoto-rgb",
             Self::Rec2020 => "rec2020",
