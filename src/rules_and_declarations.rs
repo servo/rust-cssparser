@@ -121,7 +121,7 @@ pub trait AtRuleParser<'i> {
     /// The location passed in is source location of the start of the prelude.
     ///
     /// Return the finished representation of the at-rule
-    /// as returned by `RuleListParser::next` or `DeclarationListParser::next`,
+    /// as returned by `StyleSheetParser::next` or `DeclarationListParser::next`,
     /// or an `Err(..)` to ignore the entire at-rule as invalid.
     ///
     /// This is only called when `parse_prelude` returned `WithBlock`, and a block
@@ -146,7 +146,7 @@ pub trait AtRuleParser<'i> {
 ///
 /// Default implementations that reject all qualified rules are provided, so that
 /// `impl QualifiedRuleParser<(), ()> for ... {}` can be used for example for using
-/// `RuleListParser` to parse a rule list with only at-rules (such as inside
+/// `StyleSheetParser` to parse a rule list with only at-rules (such as inside
 /// `@font-feature-values`).
 pub trait QualifiedRuleParser<'i> {
     /// The intermediate representation of a qualified rule prelude.
@@ -179,7 +179,7 @@ pub trait QualifiedRuleParser<'i> {
     /// The location passed in is source location of the start of the prelude.
     ///
     /// Return the finished representation of the qualified rule
-    /// as returned by `RuleListParser::next`,
+    /// as returned by `StyleSheetParser::next`,
     /// or an `Err(..)` to ignore the entire at-rule as invalid.
     fn parse_block<'t>(
         &mut self,
@@ -339,7 +339,7 @@ where
     /// implementations of their methods.
     ///
     /// The return type for finished qualified rules and at-rules also needs to be the same,
-    /// since `<RuleListParser as Iterator>::next` can return either. It could be a custom enum.
+    /// since `<StyleSheetParser as Iterator>::next` can return either. It could be a custom enum.
     pub fn new(input: &'a mut Parser<'i, 't>, parser: &'a mut P) -> Self {
         Self {
             input,
@@ -349,7 +349,7 @@ where
     }
 }
 
-/// `RuleListParser` is an iterator that yields `Ok(_)` for a rule or an `Err(..)` for an invalid one.
+/// `StyleSheetParser` is an iterator that yields `Ok(_)` for a rule or an `Err(..)` for an invalid one.
 impl<'i, R, P, E: 'i> Iterator for StyleSheetParser<'i, '_, '_, P>
 where
     P: QualifiedRuleParser<'i, QualifiedRule = R, Error = E>
