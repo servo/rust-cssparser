@@ -31,7 +31,7 @@ pub trait DeclarationParser<'i> {
     /// Parse the value of a declaration with the given `name`.
     ///
     /// Return the finished representation for the declaration
-    /// as returned by `DeclarationListParser::next`,
+    /// as returned by `RuleBodyParser::next`,
     /// or an `Err(..)` to ignore the entire declaration as invalid.
     ///
     /// Declaration name matching should be case-insensitive in the ASCII range.
@@ -63,7 +63,7 @@ pub trait DeclarationParser<'i> {
 ///
 /// Default implementations that reject all at-rules are provided,
 /// so that `impl AtRuleParser<(), ()> for ... {}` can be used
-/// for using `DeclarationListParser` to parse a declarations list with only qualified rules.
+/// for using `RuleBodyParser` to parse a declarations list with only qualified rules.
 pub trait AtRuleParser<'i> {
     /// The intermediate representation of prelude of an at-rule.
     type Prelude;
@@ -121,7 +121,7 @@ pub trait AtRuleParser<'i> {
     /// The location passed in is source location of the start of the prelude.
     ///
     /// Return the finished representation of the at-rule
-    /// as returned by `StyleSheetParser::next` or `DeclarationListParser::next`,
+    /// as returned by `StyleSheetParser::next` or `RuleBodyParser::next`,
     /// or an `Err(..)` to ignore the entire at-rule as invalid.
     ///
     /// This is only called when `parse_prelude` returned `WithBlock`, and a block
@@ -197,7 +197,7 @@ pub trait QualifiedRuleParser<'i> {
 pub struct RuleBodyParser<'i, 't, 'a, P, I, E> {
     /// The input given to the parser.
     pub input: &'a mut Parser<'i, 't>,
-    /// The parser given to `DeclarationListParser::new`
+    /// The parser given to `RuleBodyParser::new`
     pub parser: &'a mut P,
 
     _phantom: std::marker::PhantomData<(I, E)>,
@@ -218,7 +218,7 @@ pub trait RuleBodyItemParser<'i, DeclOrRule, Error: 'i>:
 }
 
 impl<'i, 't, 'a, P, I, E> RuleBodyParser<'i, 't, 'a, P, I, E> {
-    /// Create a new `DeclarationListParser` for the given `input` and `parser`.
+    /// Create a new `RuleBodyParser` for the given `input` and `parser`.
     ///
     /// Note that all CSS declaration lists can on principle contain at-rules.
     /// Even if no such valid at-rule exists (yet),
@@ -230,7 +230,7 @@ impl<'i, 't, 'a, P, I, E> RuleBodyParser<'i, 't, 'a, P, I, E> {
     /// since `AtRuleParser` provides default implementations of its methods.
     ///
     /// The return type for finished declarations and at-rules also needs to be the same,
-    /// since `<DeclarationListParser as Iterator>::next` can return either.
+    /// since `<RuleBodyParser as Iterator>::next` can return either.
     /// It could be a custom enum.
     pub fn new(input: &'a mut Parser<'i, 't>, parser: &'a mut P) -> Self {
         Self {
