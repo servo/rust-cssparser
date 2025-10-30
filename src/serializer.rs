@@ -44,6 +44,12 @@ where
             decimal_point: false,
             scientific: false,
         }
+    } else if let Some(int_val) = int_value {
+        write!(dest, "{}", int_val)?;
+        Notation {
+            decimal_point: false,
+            scientific: false,
+        }
     } else {
         dtoa_short::write(dest, value)?
     };
