@@ -24,7 +24,7 @@ macro_rules! JArray {
 }
 
 fn almost_equals(a: &Value, b: &Value) -> bool {
-    let var_name = match (a, b) {
+    match (a, b) {
         (Value::Number(a), Value::Number(b)) => {
             let a = a.as_f64().unwrap();
             let b = b.as_f64().unwrap();
@@ -39,8 +39,7 @@ fn almost_equals(a: &Value, b: &Value) -> bool {
         (&Value::Object(_), &Value::Object(_)) => panic!("Not implemented"),
         (&Value::Null, &Value::Null) => true,
         _ => false,
-    };
-    var_name
+    }
 }
 
 fn normalize(json: &mut Value) {
