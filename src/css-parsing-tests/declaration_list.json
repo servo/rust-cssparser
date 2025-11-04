@@ -51,8 +51,6 @@
     ],
     ["declaration", "a", [["ident", "b"]], false],
     ["at-rule", "media", [" ", ["ident", "print"]], [["ident", "div"], ["{}"]]]
-],
-
-"", []
+]
 
 ]
