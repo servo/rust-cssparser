@@ -215,7 +215,7 @@ pub struct Tokenizer<'a> {
     /// of UTF-16 characters.
     current_line_start_position: usize,
     current_line_number: u32,
-    var_or_env_functions: SeenStatus,
+    var_env_or_attr_functions: SeenStatus,
     source_map_url: Option<&'a str>,
     source_url: Option<&'a str>,
 }
@@ -235,30 +235,30 @@ impl<'a> Tokenizer<'a> {
             position: 0,
             current_line_start_position: 0,
             current_line_number: 0,
-            var_or_env_functions: SeenStatus::DontCare,
+            var_env_or_attr_functions: SeenStatus::DontCare,
             source_map_url: None,
             source_url: None,
         }
     }
 
     #[inline]
-    pub fn look_for_var_or_env_functions(&mut self) {
-        self.var_or_env_functions = SeenStatus::LookingForThem;
+    pub fn look_for_var_env_or_attr_functions(&mut self) {
+        self.var_env_or_attr_functions = SeenStatus::LookingForThem;
     }
 
     #[inline]
-    pub fn seen_var_or_env_functions(&mut self) -> bool {
-        let seen = self.var_or_env_functions == SeenStatus::SeenAtLeastOne;
-        self.var_or_env_functions = SeenStatus::DontCare;
+    pub fn seen_var_env_or_attr_functions(&mut self) -> bool {
+        let seen = self.var_env_or_attr_functions == SeenStatus::SeenAtLeastOne;
+        self.var_env_or_attr_functions = SeenStatus::DontCare;
         seen
     }
 
     #[inline]
     pub fn see_function(&mut self, name: &str) {
-        if self.var_or_env_functions == SeenStatus::LookingForThem
-            && (name.eq_ignore_ascii_case("var") || name.eq_ignore_ascii_case("env"))
+        if self.var_env_or_attr_functions == SeenStatus::LookingForThem
+            && (name.eq_ignore_ascii_case("var") || name.eq_ignore_ascii_case("env") || name.eq_ignore_ascii_case("attr"))
         {
-            self.var_or_env_functions = SeenStatus::SeenAtLeastOne;
+            self.var_env_or_attr_functions = SeenStatus::SeenAtLeastOne;
         }
     }
 

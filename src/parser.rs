@@ -550,7 +550,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// `.seen_var_or_env_functions()` method.)
     #[inline]
     pub fn look_for_var_or_env_functions(&mut self) {
-        self.input.tokenizer.look_for_var_or_env_functions()
+        self.input.tokenizer.look_for_var_env_or_attr_functions()
     }
 
     /// Return whether a `var()` or `env()` function has been seen by the
@@ -558,7 +558,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
     /// stop looking.
     #[inline]
     pub fn seen_var_or_env_functions(&mut self) -> bool {
-        self.input.tokenizer.seen_var_or_env_functions()
+        self.input.tokenizer.seen_var_env_or_attr_functions()
     }
 
     /// The old name of `try_parse`, which requires raw identifiers in the Rust 2018 edition.
