@@ -380,6 +380,10 @@ macro_rules! expect {
     }
 }
 
+/// A list of arbitrary substitution functions. Should be lowercase ascii.
+/// See https://drafts.csswg.org/css-values-5/#arbitrary-substitution
+pub type ArbitrarySubstitutionFunctions<'a> = &'a [&'static str];
+
 impl<'i: 't, 't> Parser<'i, 't> {
     /// Create a new parser
     #[inline]
@@ -546,19 +550,23 @@ impl<'i: 't, 't> Parser<'i, 't> {
         self.at_start_of = state.at_start_of;
     }
 
-    /// Start looking for `var()` / `env()` functions. (See the
-    /// `.seen_var_or_env_functions()` method.)
+    /// Start looking for arbitrary substitution functions like `var()` / `env()` functions.
+    /// (See the `.seen_arbitrary_substitution_functions()` method.)
     #[inline]
-    pub fn look_for_var_or_env_functions(&mut self) {
-        self.input.tokenizer.look_for_var_or_env_functions()
+    pub fn look_for_arbitrary_substitution_functions(
+        &mut self,
+        fns: ArbitrarySubstitutionFunctions<'i>,
+    ) {
+        self.input
+            .tokenizer
+            .look_for_arbitrary_substitution_functions(fns)
     }
 
-    /// Return whether a `var()` or `env()` function has been seen by the
-    /// tokenizer since either `look_for_var_or_env_functions` was called, and
-    /// stop looking.
+    /// Return whether a relevant function has been seen by the tokenizer since
+    /// `look_for_arbitrary_substitution_functions` was called, and stop looking.
     #[inline]
-    pub fn seen_var_or_env_functions(&mut self) -> bool {
-        self.input.tokenizer.seen_var_or_env_functions()
+    pub fn seen_arbitrary_substitution_functions(&mut self) -> bool {
+        self.input.tokenizer.seen_arbitrary_substitution_functions()
     }
 
     /// The old name of `try_parse`, which requires raw identifiers in the Rust 2018 edition.

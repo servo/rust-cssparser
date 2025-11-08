@@ -8,6 +8,9 @@ extern crate test;
 use serde_json::{json, Map, Value};
 
 #[cfg(feature = "bench")]
+use crate::parser::ArbitrarySubstitutionFunctions;
+
+#[cfg(feature = "bench")]
 use self::test::Bencher;
 
 use super::{
@@ -796,19 +799,24 @@ fn delimiter_from_byte(b: &mut Bencher) {
 const BACKGROUND_IMAGE: &str = include_str!("big-data-url.css");
 
 #[cfg(feature = "bench")]
+const ARBITRARY_SUBSTITUTION_FUNCTIONS: ArbitrarySubstitutionFunctions = &["var", "env"];
+
+#[cfg(feature = "bench")]
 #[bench]
 fn unquoted_url(b: &mut Bencher) {
     b.iter(|| {
         let mut input = ParserInput::new(BACKGROUND_IMAGE);
         let mut input = Parser::new(&mut input);
-        input.look_for_var_or_env_functions();
+        input.look_for_arbitrary_substitution_functions(ARBITRARY_SUBSTITUTION_FUNCTIONS);
 
         let result = input.try_parse(|input| input.expect_url());
 
         assert!(result.is_ok());
 
-        input.seen_var_or_env_functions();
-        (result.is_ok(), input.seen_var_or_env_functions())
+        (
+            result.is_ok(),
+            input.seen_arbitrary_substitution_functions(),
+        )
     })
 }
 
