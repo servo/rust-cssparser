@@ -102,7 +102,7 @@ mod parser;
 mod serializer;
 mod unicode_range;
 
-#[cfg(all(test,target_pointer_width = "64"))]
+#[cfg(all(test, target_pointer_width = "64"))]
 mod size_of_tests;
 #[cfg(test)]
 mod tests;
