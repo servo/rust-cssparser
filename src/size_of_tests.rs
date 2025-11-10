@@ -42,8 +42,8 @@ size_of_test!(token, Token, 32);
 size_of_test!(std_cow_str, std::borrow::Cow<'static, str>, 24, 32);
 size_of_test!(cow_rc_str, CowRcStr, 16);
 
-size_of_test!(tokenizer, crate::tokenizer::Tokenizer, 72);
-size_of_test!(parser_input, crate::parser::ParserInput, 136);
+size_of_test!(tokenizer, crate::tokenizer::Tokenizer, 96);
+size_of_test!(parser_input, crate::parser::ParserInput, 160);
 size_of_test!(parser, crate::parser::Parser, 16);
 size_of_test!(source_position, crate::SourcePosition, 8);
 size_of_test!(parser_state, crate::ParserState, 24);

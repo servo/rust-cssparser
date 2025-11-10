@@ -6,7 +6,7 @@
 
 use self::Token::*;
 use crate::cow_rc_str::CowRcStr;
-use crate::parser::ParserState;
+use crate::parser::{ArbitrarySubstitutionFunctions, ParserState};
 use std::char;
 use std::ops::Range;
 
@@ -215,15 +215,15 @@ pub struct Tokenizer<'a> {
     /// of UTF-16 characters.
     current_line_start_position: usize,
     current_line_number: u32,
-    var_or_env_functions: SeenStatus,
+    arbitrary_substitution_functions: SeenStatus<'a>,
     source_map_url: Option<&'a str>,
     source_url: Option<&'a str>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-enum SeenStatus {
+enum SeenStatus<'a> {
     DontCare,
-    LookingForThem,
+    LookingForThem(ArbitrarySubstitutionFunctions<'a>),
     SeenAtLeastOne,
 }
 
@@ -235,30 +235,33 @@ impl<'a> Tokenizer<'a> {
             position: 0,
             current_line_start_position: 0,
             current_line_number: 0,
-            var_or_env_functions: SeenStatus::DontCare,
+            arbitrary_substitution_functions: SeenStatus::DontCare,
             source_map_url: None,
             source_url: None,
         }
     }
 
     #[inline]
-    pub fn look_for_var_or_env_functions(&mut self) {
-        self.var_or_env_functions = SeenStatus::LookingForThem;
+    pub fn look_for_arbitrary_substitution_functions(
+        &mut self,
+        fns: ArbitrarySubstitutionFunctions<'a>,
+    ) {
+        self.arbitrary_substitution_functions = SeenStatus::LookingForThem(fns);
     }
 
     #[inline]
-    pub fn seen_var_or_env_functions(&mut self) -> bool {
-        let seen = self.var_or_env_functions == SeenStatus::SeenAtLeastOne;
-        self.var_or_env_functions = SeenStatus::DontCare;
+    pub fn seen_arbitrary_substitution_functions(&mut self) -> bool {
+        let seen = self.arbitrary_substitution_functions == SeenStatus::SeenAtLeastOne;
+        self.arbitrary_substitution_functions = SeenStatus::DontCare;
         seen
     }
 
     #[inline]
     pub fn see_function(&mut self, name: &str) {
-        if self.var_or_env_functions == SeenStatus::LookingForThem
-            && (name.eq_ignore_ascii_case("var") || name.eq_ignore_ascii_case("env"))
-        {
-            self.var_or_env_functions = SeenStatus::SeenAtLeastOne;
+        if let SeenStatus::LookingForThem(fns) = self.arbitrary_substitution_functions {
+            if fns.iter().any(|a| name.eq_ignore_ascii_case(a)) {
+                self.arbitrary_substitution_functions = SeenStatus::SeenAtLeastOne;
+            }
         }
     }
 
