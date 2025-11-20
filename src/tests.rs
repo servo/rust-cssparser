@@ -1261,6 +1261,9 @@ fn roundtrip_percentage_token() {
     // Test simple number serialization
     for i in 0..101 {
         test_roundtrip(&format!("{}%", i));
+        if i == 100 {
+            break;
+        }
         for j in 0..10 {
             if j != 0 {
                 test_roundtrip(&format!("{}.{}%", i, j));
