@@ -20,8 +20,8 @@ pub fn parse_nth<'i>(input: &mut Parser<'i, '_>) -> Result<(i32, i32), BasicPars
         } => {
             match_ignore_ascii_case! {
                 unit,
-                "n" => Ok(parse_b(input, a)?),
-                "n-" => Ok(parse_signless_b(input, a, -1)?),
+                "n" => parse_b(input, a),
+                "n-" => parse_signless_b(input, a, -1),
                 _ => match parse_n_dash_digits(unit) {
                     Ok(b) => Ok((a, b)),
                     Err(()) => {
@@ -35,10 +35,10 @@ pub fn parse_nth<'i>(input: &mut Parser<'i, '_>) -> Result<(i32, i32), BasicPars
             match_ignore_ascii_case! { value,
                 "even" => Ok((2, 0)),
                 "odd" => Ok((2, 1)),
-                "n" => Ok(parse_b(input, 1)?),
-                "-n" => Ok(parse_b(input, -1)?),
-                "n-" => Ok(parse_signless_b(input, 1, -1)?),
-                "-n-" => Ok(parse_signless_b(input, -1, -1)?),
+                "n" => parse_b(input, 1),
+                "-n" => parse_b(input, -1),
+                "n-" => parse_signless_b(input, 1, -1),
+                "-n-" => parse_signless_b(input, -1, -1),
                 _ => {
                     let (slice, a) = if let Some(stripped) = value.strip_prefix('-') {
                         (stripped, -1)
