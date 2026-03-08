@@ -33,8 +33,9 @@ inherits = "release"
 debug = true
 
 [features]
+default = ["fast_match_byte"]
 bench = []
-dummy_match_byte = []
+fast_match_byte = []
 # Useful for skipping tests when execution is slow, e.g., under miri
 skip_long_tests = []
 

@@ -10,19 +10,8 @@ use crate::parser::{ArbitrarySubstitutionFunctions, ParserState};
 use std::char;
 use std::ops::Range;
 
-#[cfg(not(feature = "dummy_match_byte"))]
-use cssparser_macros::match_byte;
-
-#[cfg(feature = "dummy_match_byte")]
-macro_rules! match_byte {
-    ($value:expr, $($rest:tt)* ) => {
-        match $value {
-            $(
-                $rest
-            )+
-        }
-    };
-}
+#[cfg(feature = "fast_match_byte")]
+pub use crate::match_byte;
 
 /// One of the pieces the CSS input is broken into.
 ///
