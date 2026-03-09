@@ -20,7 +20,7 @@ difference = "2.0"
 encoding_rs = "0.8"
 
 [dependencies]
-cssparser-macros = { path = "./macros", version = "0.6.1" }
+cssparser-macros = { path = "./macros", version = "0.6.1", optional = true }
 dtoa-short = "0.3"
 itoa = "1.0"
 phf = { version = "0.13.1", features = ["macros"] }
@@ -35,7 +35,7 @@ debug = true
 [features]
 default = ["fast_match_byte"]
 bench = []
-fast_match_byte = []
+fast_match_byte = ["dep:cssparser-macros"]
 # Useful for skipping tests when execution is slow, e.g., under miri
 skip_long_tests = []
 
