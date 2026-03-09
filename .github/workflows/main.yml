@@ -21,13 +21,11 @@ jobs:
           - 1.68.0
         features:
           -
-          - --features dummy_match_byte
+          - --no-default-features
           - --features malloc_size_of
         include:
           - toolchain: nightly
             features: --features bench
-          - toolchain: nightly
-            features: --features bench,dummy_match_byte
     steps:
       - uses: actions/checkout@v2
 
