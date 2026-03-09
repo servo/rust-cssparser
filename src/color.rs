@@ -172,7 +172,7 @@ pub fn parse_hash_color(value: &[u8]) -> Result<(u8, u8, u8, f32), ()> {
     })
 }
 
-ascii_case_insensitive_phf_map! {
+ascii_case_insensitive_map! {
     named_colors -> (u8, u8, u8) = {
         "black" => (0, 0, 0),
         "silver" => (192, 192, 192),

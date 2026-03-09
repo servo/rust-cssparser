@@ -116,6 +116,9 @@ mod mac {
   }
 }
 
+// Re-exporting phf here means that the crate using the ascii_case_insensitive_phf_map macro do
+// do not have to depend on phf directly.
+#[cfg(feature = "fast_match_color")]
 #[doc(hidden)]
 pub use phf as _cssparser_internal_phf;
 

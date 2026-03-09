@@ -1085,7 +1085,7 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Value {
 /// including in string literals.
 #[test]
 fn procedural_masquerade_whitespace() {
-    ascii_case_insensitive_phf_map! {
+    ascii_case_insensitive_map! {
         map -> () = {
             "  \t\n" => ()
         }
