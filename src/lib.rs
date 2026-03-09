@@ -84,7 +84,6 @@ pub use crate::serializer::{serialize_identifier, serialize_name, serialize_stri
 pub use crate::serializer::{CssStringWriter, ToCss, TokenSerializationType};
 pub use crate::tokenizer::{SourceLocation, SourcePosition, Token};
 pub use crate::unicode_range::UnicodeRange;
-pub use cssparser_macros::_cssparser_internal_max_len;
 
 #[cfg(feature = "fast_match_byte")]
 pub use cssparser_macros::match_byte;
