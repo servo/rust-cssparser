@@ -34,22 +34,34 @@ macro_rules! match_ignore_ascii_case {
     ( $input:expr,
         $(
             $( #[$meta: meta] )*
-            $( $pattern: pat )|+ $( if $guard: expr )? => $then: expr
+            $( $pattern:literal )|+ $( if $guard: expr )? => $then: expr
         ),+
+        $(,_ => $fallback:expr)?
         $(,)?
     ) => {
         {
-            // This dummy module works around the feature gate
-            // `error[E0658]: procedural macros cannot be expanded to statements`
-            // by forcing the macro to be in an item context
-            // rather than expression/statement context,
-            // even though the macro only expands to items.
-            mod cssparser_internal {
-                $crate::_cssparser_internal_max_len! {
-                    $( $( $pattern )+ )+
+            #[inline(always)]
+            const fn const_usize_max(a: usize, b: usize) -> usize {
+                if a > b {
+                    a
+                } else {
+                    b
                 }
             }
-            $crate::_cssparser_internal_to_lowercase!($input, cssparser_internal::MAX_LENGTH => lowercase);
+
+            const MAX_LENGTH : usize = {
+                let mut maxlen : usize = 0;
+                $(
+                    $( #[$meta] )*
+                    // {} is necessary to work around "[E0658]: attributes on expressions are experimental"
+                    {
+                        $( maxlen = const_usize_max(maxlen, $pattern.len()); )+
+                    }
+                )+
+                maxlen
+            };
+
+            $crate::_cssparser_internal_to_lowercase!($input, MAX_LENGTH => lowercase);
             // "A" is a short string that we know is different for every string pattern,
             // since we’ve verified that none of them include ASCII upper case letters.
             match lowercase.unwrap_or("A") {
@@ -57,11 +69,14 @@ macro_rules! match_ignore_ascii_case {
                     $( #[$meta] )*
                     $( $pattern )|+ $( if $guard )? => $then,
                 )+
+                $(_ => $fallback,)?
             }
         }
     };
 }
 
+#[cfg(not(feature = "fast_match_color"))]
+#[macro_export]
 /// Define a function `$name(&str) -> Option<&'static $ValueType>`
 ///
 /// The function finds a match for the input string
@@ -75,7 +90,7 @@ macro_rules! match_ignore_ascii_case {
 /// # fn main() {}  // Make doctest not wrap everything in its own main
 ///
 /// fn color_rgb(input: &str) -> Option<(u8, u8, u8)> {
-///     cssparser::ascii_case_insensitive_phf_map! {
+///     cssparser::ascii_case_insensitive_map! {
 ///         keywords -> (u8, u8, u8) = {
 ///             "red" => (255, 0, 0),
 ///             "green" => (0, 255, 0),
@@ -87,6 +102,71 @@ macro_rules! match_ignore_ascii_case {
 /// ```
 ///
 /// You can also iterate over the map entries by using `keywords::entries()`.
+macro_rules! ascii_case_insensitive_map {
+    ($name: ident -> $ValueType: ty = { $( $key: tt => $value: expr ),+ }) => {
+        ascii_case_insensitive_map!($name -> $ValueType = { $( $key => $value, )+ })
+    };
+    ($name: ident -> $ValueType: ty = { $( $key: tt => $value: expr, )+ }) => {
+
+        // While the obvious choice for this would be an inner module, it's not possible to
+        // reference from types from there, see:
+        // <https://github.com/rust-lang/rust/issues/114369>
+        //
+        // So we abuse a struct with static associated functions instead.
+        #[allow(non_camel_case_types)]
+        struct $name;
+        impl $name {
+            #[allow(dead_code)]
+            fn entries() -> impl Iterator<Item = (&'static &'static str, &'static $ValueType)> {
+                [ $((&$key, &$value),)* ].iter().copied()
+            }
+
+            fn get(input: &str) -> Option<&'static $ValueType> {
+                $crate::match_ignore_ascii_case!(input,
+                    $($key => Some(&$value),)*
+                    _ => None,
+                )
+            }
+        }
+    }
+}
+
+#[cfg(feature = "fast_match_color")]
+#[macro_export]
+/// Define a function `$name(&str) -> Option<&'static $ValueType>`
+///
+/// The function finds a match for the input string
+/// in a [`phf` map](https://github.com/sfackler/rust-phf)
+/// and returns a reference to the corresponding value.
+/// Matching is case-insensitive in the ASCII range.
+///
+/// ## Example:
+///
+/// ```rust
+/// # fn main() {}  // Make doctest not wrap everything in its own main
+///
+/// fn color_rgb(input: &str) -> Option<(u8, u8, u8)> {
+///     cssparser::ascii_case_insensitive_map! {
+///         keywords -> (u8, u8, u8) = {
+///             "red" => (255, 0, 0),
+///             "green" => (0, 255, 0),
+///             "blue" => (0, 0, 255),
+///         }
+///     }
+///     keywords::get(input).cloned()
+/// }
+/// ```
+///
+/// You can also iterate over the map entries by using `keywords::entries()`.
+macro_rules! ascii_case_insensitive_map {
+    ($($any:tt)+) => {
+        $crate::ascii_case_insensitive_phf_map!($($any)+);
+    };
+}
+
+/// Fast implementation of `ascii_case_insensitive_map!` using a phf map.
+/// See `ascii_case_insensitive_map!` above for docs
+#[cfg(feature = "fast_match_color")]
 #[macro_export]
 macro_rules! ascii_case_insensitive_phf_map {
     ($name: ident -> $ValueType: ty = { $( $key: tt => $value: expr ),+ }) => {
@@ -95,14 +175,22 @@ macro_rules! ascii_case_insensitive_phf_map {
     ($name: ident -> $ValueType: ty = { $( $key: tt => $value: expr, )+ }) => {
         use $crate::_cssparser_internal_phf as phf;
 
-        // See macro above for context.
-        mod cssparser_internal {
-            $crate::_cssparser_internal_max_len! {
-                $( $key )+
+        #[inline(always)]
+        const fn const_usize_max(a: usize, b: usize) -> usize {
+            if a > b {
+                a
+            } else {
+                b
             }
         }
 
-        static MAP: phf::Map<&'static str, $ValueType> = phf::phf_map! {
+        const MAX_LENGTH : usize = {
+            let mut maxlen : usize = 0;
+            $( maxlen = const_usize_max(maxlen, ($key).len()); )+
+            maxlen
+        };
+
+        static __MAP: phf::Map<&'static str, $ValueType> = phf::phf_map! {
             $(
                 $key => $value,
             )*
@@ -118,12 +206,12 @@ macro_rules! ascii_case_insensitive_phf_map {
         impl $name {
             #[allow(dead_code)]
             fn entries() -> impl Iterator<Item = (&'static &'static str, &'static $ValueType)> {
-                MAP.entries()
+                __MAP.entries()
             }
 
             fn get(input: &str) -> Option<&'static $ValueType> {
-                $crate::_cssparser_internal_to_lowercase!(input, cssparser_internal::MAX_LENGTH => lowercase);
-                MAP.get(lowercase?)
+                $crate::_cssparser_internal_to_lowercase!(input, MAX_LENGTH => lowercase);
+                __MAP.get(lowercase?)
             }
         }
     }

@@ -10,31 +10,35 @@ readme = "README.md"
 keywords = ["css", "syntax", "parser"]
 license = "MPL-2.0"
 edition = "2018"
-rust-version = "1.68"
+rust-version = "1.71"
 
 exclude = ["src/css-parsing-tests/**", "src/big-data-url.css"]
+
+[dependencies]
+dtoa-short = "0.3"
+itoa = "1.0"
+smallvec = "1.0"
+
+# Optional dependencies
+cssparser-macros = { path = "./macros", version = "0.6.1", optional = true }
+malloc_size_of = { version = "0.1", default-features = false, optional = true }
+phf = { version = "0.13.1", features = ["macros"], optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
 serde_json = "1.0.25"
 difference = "2.0"
 encoding_rs = "0.8"
 
-[dependencies]
-cssparser-macros = { path = "./macros", version = "0.6.1" }
-dtoa-short = "0.3"
-itoa = "1.0"
-phf = { version = "0.13.1", features = ["macros"] }
-serde = { version = "1.0", features = ["derive"], optional = true }
-malloc_size_of = { version = "0.1", default-features = false, optional = true }
-smallvec = "1.0"
-
 [profile.profiling]
 inherits = "release"
 debug = true
 
 [features]
+default = ["fast_match_byte", "fast_match_color"]
 bench = []
-dummy_match_byte = []
+fast_match_byte = ["dep:cssparser-macros"]
+fast_match_color = ["dep:phf"]
 # Useful for skipping tests when execution is slow, e.g., under miri
 skip_long_tests = []
 

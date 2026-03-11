@@ -1085,7 +1085,7 @@ fn one_component_value_to_json(token: Token, input: &mut Parser) -> Value {
 /// including in string literals.
 #[test]
 fn procedural_masquerade_whitespace() {
-    ascii_case_insensitive_phf_map! {
+    ascii_case_insensitive_map! {
         map -> () = {
             "  \t\n" => ()
         }
@@ -1333,7 +1333,7 @@ fn utf16_columns() {
 #[test]
 fn servo_define_css_keyword_enum() {
     macro_rules! define_css_keyword_enum {
-        (pub enum $name:ident { $($variant:ident = $css:pat,)+ }) => {
+        (pub enum $name:ident { $($variant:ident = $css:literal,)+ }) => {
             #[derive(PartialEq, Debug)]
             pub enum $name {
                 $($variant),+
