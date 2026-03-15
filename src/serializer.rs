@@ -46,10 +46,8 @@ where
         return write!(dest, "{}", v);
     }
 
-    let notation = dtoa_short::write(dest, value)?;
-    if value.fract() == 0. && !notation.decimal_point && !notation.scientific {
-        dest.write_str(".0")?;
-    }
+    dest.write_str(zmij::Buffer::new().format(value))?;
+
     Ok(())
 }
 
@@ -364,7 +362,7 @@ macro_rules! impl_tocss_for_float {
             where
                 W: fmt::Write,
             {
-                dtoa_short::write(dest, *self).map(|_| ())
+                dest.write_str(zmij::Buffer::new().format(*self))
             }
         }
     };

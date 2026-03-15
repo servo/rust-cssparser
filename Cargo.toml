@@ -15,7 +15,7 @@ rust-version = "1.71"
 exclude = ["src/css-parsing-tests/**", "src/big-data-url.css"]
 
 [dependencies]
-dtoa-short = "0.3"
+zmij = "1.0.21"
 itoa = "1.0"
 smallvec = "1.0"
 
