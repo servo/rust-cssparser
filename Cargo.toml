@@ -44,3 +44,4 @@ skip_long_tests = []
 
 [workspace]
 members = [".", "./macros", "./color"]
+default-members = [".", "./macros", "./color"]
