@@ -41,29 +41,26 @@ jobs:
         run: cargo fmt --check && cargo clippy -- -Dwarnings
 
       - name: Cargo build
-        run: cargo build ${{ matrix.features }}
+        run: cargo build -p cssparser ${{ matrix.features }}
 
       - name: Cargo doc
-        run: cargo doc ${{ matrix.features }}
+        run: cargo doc -p cssparser ${{ matrix.features }}
 
       - name: Cargo test
-        run: cargo test ${{ matrix.features }}
+        run: cargo test -p cssparser ${{ matrix.features }}
 
       - name: macros build
-        run: cargo build
-        working-directory: macros
+        run: cargo build -p cssparser-macros
 
       - name: Color build
-        run: cargo build
-        working-directory: color
+        run: cargo build -p cssparser-color
 
       - name: Color test
-        run: cargo test
-        working-directory: color
+        run: cargo test -p cssparser-color
 
       - name: Cargo miri test
         if: "matrix.toolchain == 'nightly'"
-        run: cargo miri test --features skip_long_tests ${{ matrix.features }}
+        run: cargo miri test -p cssparser --features skip_long_tests ${{ matrix.features }}
 
   build_result:
     name: Result
