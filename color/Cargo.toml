@@ -1,6 +1,6 @@
 [package]
 name = "cssparser-color"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Emilio Cobos Álvarez <emilio@crisal.io>"]
 description = "Color implementation based on cssparser"
 documentation = "https://docs.rs/cssparser-color/"
@@ -13,7 +13,7 @@ rust-version = "1.71"
 path = "lib.rs"
 
 [dependencies]
-cssparser = { path = "..", version = "0.36", default-features = false }
+cssparser = { path = "..", version = "0.37", default-features = false }
 serde = { version = "1.0", features = ["derive"], optional = true }
 
 [features]
