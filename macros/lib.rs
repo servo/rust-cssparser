@@ -71,7 +71,7 @@ fn parse_pat_to_table<'a>(
             }
         }
         _ => {
-            panic!("Unexpected pattern: {:?}. Buggy code ?", pat);
+            panic!("Unexpected or unsupported pattern: {:?}. Buggy code ?", pat);
         }
     }
 }
@@ -80,7 +80,7 @@ fn parse_pat_to_table<'a>(
 ///
 /// ## Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// match_byte! { tokenizer.next_byte_unchecked(),
 ///     b'a'..b'z' => { ... }
 ///     b'0'..b'9' => { ... }
@@ -109,7 +109,6 @@ pub fn match_byte(input: TokenStream) -> TokenStream {
                     let mut arms = Vec::new();
                     while !input.is_empty() {
                         let arm = input.call(syn::Arm::parse)?;
-                        assert!(arm.guard.is_none(), "match_byte doesn't support guards");
                         assert!(
                             arm.attrs.is_empty(),
                             "match_byte doesn't support attributes"
