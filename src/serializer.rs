@@ -514,7 +514,7 @@ impl TokenSerializationType {
             ),
             DelimHash | DelimMinus => matches!(
                 other,
-                Ident | Function | UrlOrBadUrl | DelimMinus | Number | Percentage | Dimension
+                Ident | Function | UrlOrBadUrl | DelimMinus | Number | Percentage | Dimension | CDC
             ),
             Number => matches!(
                 other,
@@ -526,8 +526,9 @@ impl TokenSerializationType {
                     | Percentage
                     | DelimPercent
                     | Dimension
+                    | CDC
             ),
-            DelimAt => matches!(other, Ident | Function | UrlOrBadUrl | DelimMinus),
+            DelimAt => matches!(other, Ident | Function | UrlOrBadUrl | DelimMinus | CDC),
             DelimDotOrPlus => matches!(other, Number | Percentage | Dimension),
             DelimAssorted | DelimAsterisk => matches!(other, DelimEquals),
             DelimBar => matches!(other, DelimEquals | DelimBar | DashMatch),
@@ -566,7 +567,7 @@ impl Token<'_> {
             Token::Percentage { .. } => Percentage,
             Token::Dimension { .. } => Dimension,
             Token::WhiteSpace(_) => WhiteSpace,
-            Token::Comment(_) => DelimSlash,
+            Token::Comment(_) => Other,
             Token::DashMatch => DashMatch,
             Token::SubstringMatch => SubstringMatch,
             Token::CDC => CDC,

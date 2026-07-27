@@ -421,46 +421,56 @@ fn serializer_preserving_comments() {
     serializer(true)
 }
 
+fn write_to(
+    mut previous_token: TokenSerializationType,
+    input: &mut Parser,
+    string: &mut String,
+    preserve_comments: bool,
+) {
+    while let Ok(token) = if preserve_comments {
+        input.next_including_whitespace_and_comments().cloned()
+    } else {
+        input.next_including_whitespace().cloned()
+    } {
+        let token_type = token.serialization_type();
+        if previous_token.needs_separator_when_before(token_type) {
+            string.push_str("/**/")
+        }
+        previous_token = token_type;
+        token.to_css(string).unwrap();
+        let closing_token = match token {
+            Token::Function(_) | Token::ParenthesisBlock => Some(Token::CloseParenthesis),
+            Token::SquareBracketBlock => Some(Token::CloseSquareBracket),
+            Token::CurlyBracketBlock => Some(Token::CloseCurlyBracket),
+            _ => None,
+        };
+        if let Some(closing_token) = closing_token {
+            let result: Result<_, ParseError<()>> = input.parse_nested_block(|input| {
+                write_to(previous_token, input, string, preserve_comments);
+                Ok(())
+            });
+            result.unwrap();
+            closing_token.to_css(string).unwrap();
+        }
+    }
+}
+
+fn parse_and_serialize(css: &str, preserve_comments: bool) -> String {
+    let mut input = ParserInput::new(css);
+    let mut serialized = String::new();
+    write_to(
+        TokenSerializationType::Nothing,
+        &mut Parser::new(&mut input),
+        &mut serialized,
+        preserve_comments,
+    );
+    serialized
+}
+
 fn serializer(preserve_comments: bool) {
     run_json_tests(
         include_str!("css-parsing-tests/component_value_list.json"),
         |input| {
-            fn write_to(
-                mut previous_token: TokenSerializationType,
-                input: &mut Parser,
-                string: &mut String,
-                preserve_comments: bool,
-            ) {
-                while let Ok(token) = if preserve_comments {
-                    input.next_including_whitespace_and_comments().cloned()
-                } else {
-                    input.next_including_whitespace().cloned()
-                } {
-                    let token_type = token.serialization_type();
-                    if !preserve_comments && previous_token.needs_separator_when_before(token_type)
-                    {
-                        string.push_str("/**/")
-                    }
-                    previous_token = token_type;
-                    token.to_css(string).unwrap();
-                    let closing_token = match token {
-                        Token::Function(_) | Token::ParenthesisBlock => {
-                            Some(Token::CloseParenthesis)
-                        }
-                        Token::SquareBracketBlock => Some(Token::CloseSquareBracket),
-                        Token::CurlyBracketBlock => Some(Token::CloseCurlyBracket),
-                        _ => None,
-                    };
-                    if let Some(closing_token) = closing_token {
-                        let result: Result<_, ParseError<()>> = input.parse_nested_block(|input| {
-                            write_to(previous_token, input, string, preserve_comments);
-                            Ok(())
-                        });
-                        result.unwrap();
-                        closing_token.to_css(string).unwrap();
-                    }
-                }
-            }
             let mut serialized = String::new();
             write_to(
                 TokenSerializationType::Nothing,
@@ -468,11 +478,125 @@ fn serializer(preserve_comments: bool) {
                 &mut serialized,
                 preserve_comments,
             );
+            assert_eq!(
+                parse_and_serialize(&serialized, preserve_comments),
+                serialized,
+                "serializing again changed the output"
+            );
             let mut input = ParserInput::new(&serialized);
             let parser = &mut Parser::new(&mut input);
             Value::Array(component_values_to_json(parser))
         },
     );
+}
+
+/// One source snippet per token shape the tokenizer can produce, plus the
+/// delimiters that `TokenSerializationType` distinguishes.
+const SERIALIZATION_SAMPLES: &[&str] = &[
+    "a", "\\31 a", "-a", "--a", "@a", "@-a", "@--", "#a", "#1", "#--", "\"a\"", "url(a)", "url(a'",
+    "url(", "1", "+1", "-1", "0", "1.5", "1e3", "1%", "+1%", "-1%", "1px", "-1px", "1e", "1--",
+    " ", "\n", "/*a*/", "/**/", "/*/*/", "/***/", "#", "@", ".", "+", "-", "?", "$", "^", "~", "%",
+    "=", "|", "/", "*", "&", "!", "<", ">", "~=", "|=", "^=", "$=", "*=", "(", "[", "{", ")", "]",
+    "}", ":", ";", ",", "a(", "<!--", "-->",
+];
+
+fn tokenize(css: &str) -> Vec<Token<'_>> {
+    fn collect<'i>(input: &mut Parser<'i, '_>, tokens: &mut Vec<Token<'i>>) {
+        while let Ok(token) = input.next_including_whitespace_and_comments().cloned() {
+            tokens.push(token.clone());
+            let nested = matches!(
+                token,
+                Token::Function(_)
+                    | Token::ParenthesisBlock
+                    | Token::SquareBracketBlock
+                    | Token::CurlyBracketBlock
+            );
+            if nested {
+                let result: Result<_, ParseError<()>> = input.parse_nested_block(|input| {
+                    collect(input, tokens);
+                    Ok(())
+                });
+                result.unwrap();
+            }
+        }
+    }
+    let mut input = ParserInput::new(css);
+    let mut tokens = Vec::new();
+    collect(&mut Parser::new(&mut input), &mut tokens);
+    tokens
+}
+
+// Checks the whole separator table against the tokenizer: whenever it reports that
+// no `/**/` is needed, the two serializations really must re-parse to the same pair.
+#[test]
+#[cfg_attr(all(miri, feature = "skip_long_tests"), ignore)]
+fn needs_separator_when_before_agrees_with_the_tokenizer() {
+    let samples: Vec<_> = SERIALIZATION_SAMPLES
+        .iter()
+        .map(|css| {
+            let token = tokenize(css).remove(0);
+            let serialized = token.to_css_string();
+            (*css, token, serialized)
+        })
+        .collect();
+
+    for (first_css, first, first_serialized) in &samples {
+        for (second_css, second, second_serialized) in &samples {
+            if first
+                .serialization_type()
+                .needs_separator_when_before(second.serialization_type())
+            {
+                continue;
+            }
+            if matches!(first, Token::WhiteSpace(_)) && matches!(second, Token::WhiteSpace(_)) {
+                // The round-trip requirement lets consecutive whitespace collapse.
+                continue;
+            }
+            if matches!(
+                (first, second),
+                (
+                    Token::Function(_) | Token::ParenthesisBlock,
+                    Token::CloseParenthesis
+                ) | (Token::SquareBracketBlock, Token::CloseSquareBracket)
+                    | (Token::CurlyBracketBlock, Token::CloseCurlyBracket)
+            ) {
+                // A block opener and its own closer are one component value, not two tokens.
+                continue;
+            }
+            let joined = format!("{}{}", first_serialized, second_serialized);
+            assert_eq!(
+                tokenize(&joined),
+                vec![first.clone(), second.clone()],
+                "{:?} followed by {:?} serializes to {:?}, which re-parses differently",
+                first_css,
+                second_css,
+                joined
+            );
+        }
+    }
+}
+
+#[test]
+fn serialization_is_idempotent_preserving_comments() {
+    for css in [
+        "/*a*/*",
+        "/**/*",
+        "a/*x*/*=",
+        "1/**/*",
+        "-/*a*/*",
+        "/*a*//*b*/*",
+        "a{/*a*/*}",
+    ] {
+        let once = parse_and_serialize(css, true);
+        let twice = parse_and_serialize(&once, true);
+        assert_eq!(once, twice, "serializing {:?} twice differs", css);
+        assert_eq!(
+            tokenize(&once).len(),
+            tokenize(css).len(),
+            "serializing {:?} changed the number of tokens",
+            css
+        );
+    }
 }
 
 #[test]

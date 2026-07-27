@@ -80,7 +80,8 @@ fn fuzz(data: &str, preserving_comments: bool) {
     // TODO: This should ideally pass, but it doesn't for numbers near our
     // precision limits, so parsing e.g., 9999995e-45 generates a serialization
     // of 10e-39 because of dtoa rounding, and parsing _that_ generates a
-    // serialization of 1e-38.
+    // serialization of 1e-38. That is the only remaining source of
+    // non-idempotence, and it comes from dtoa-short, not from this crate.
     //
     // assert_eq!(
     //     serialization, reserialization,
@@ -90,7 +91,5 @@ fn fuzz(data: &str, preserving_comments: bool) {
 
 libfuzzer_sys::fuzz_target!(|data: &str| {
     fuzz(data, false);
-    // TODO(emilio): Serialization when preserving comments is not idempotent.
-    // But in browsers we never preserve comments so that's ok...
-    // fuzz(data, true);
+    fuzz(data, true);
 });
