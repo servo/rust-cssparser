@@ -74,11 +74,16 @@ pub enum BasicParseErrorKind<'i> {
     AtRuleBodyInvalid,
     /// A qualified rule was encountered that was invalid.
     QualifiedRuleInvalid,
+    /// We've gone over the nesting limit.
+    TooManyNestedBlocks,
 }
 
 impl fmt::Display for BasicParseErrorKind<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            BasicParseErrorKind::TooManyNestedBlocks => {
+                write!(f, "nesting block limit reached")
+            }
             BasicParseErrorKind::UnexpectedToken(token) => {
                 write!(f, "unexpected token: {token:?}")
             }
@@ -230,6 +235,8 @@ impl<E: fmt::Display + fmt::Debug> std::error::Error for ParseError<'_, E> {}
 pub struct ParserInput<'i> {
     tokenizer: Tokenizer<'i>,
     cached_token: Option<CachedToken<'i>>,
+    current_block_depth: u8,
+    nested_block_limit: u8,
 }
 
 struct CachedToken<'i> {
@@ -239,12 +246,24 @@ struct CachedToken<'i> {
 }
 
 impl<'i> ParserInput<'i> {
+    /// 75 nested blocks seems reasonable enough.
+    const REASONABLE_NESTED_BLOCK_LIMIT: u8 = 75;
+
     /// Create a new input for a parser.
     pub fn new(input: &'i str) -> ParserInput<'i> {
         ParserInput {
             tokenizer: Tokenizer::new(input),
+            nested_block_limit: Self::REASONABLE_NESTED_BLOCK_LIMIT,
+            current_block_depth: 0,
             cached_token: None,
         }
+    }
+
+    /// Sets a limit for how many nested blocks we're allowed to parse. This is useful to avoid
+    /// running out of stack space. By default, it's set to `REASONABLE_NESTED_BLOCK_LIMIT`, but it
+    /// can be overridden or cleared. A limit of 0 will be equivalent to no limit at all.
+    pub fn set_nested_block_limit(&mut self, limit: u8) {
+        self.nested_block_limit = limit;
     }
 
     #[inline]
@@ -1133,6 +1152,14 @@ where
          token was just consumed.\
          ",
     );
+    if parser.input.current_block_depth >= parser.input.nested_block_limit
+        && parser.input.nested_block_limit != 0
+    {
+        return Err(parser.new_error(BasicParseErrorKind::TooManyNestedBlocks));
+    }
+    // Fine to use wrapping addition, overflow can only occur without a limit.
+    parser.input.current_block_depth = parser.input.current_block_depth.wrapping_add(1);
+
     let closing_delimiter = match block_type {
         BlockType::CurlyBracket => ClosingDelimiter::CloseCurlyBracket,
         BlockType::SquareBracket => ClosingDelimiter::CloseSquareBracket,
@@ -1152,6 +1179,8 @@ where
         }
     }
     consume_until_end_of_block(block_type, &mut parser.input.tokenizer);
+    // See above.
+    parser.input.current_block_depth = parser.input.current_block_depth.wrapping_sub(1);
     result
 }
 
