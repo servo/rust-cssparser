@@ -70,9 +70,7 @@ fn parse_border_spacing(_context: &ParserContext, input: &mut Parser)
 pub use crate::cow_rc_str::CowRcStr;
 pub use crate::from_bytes::{stylesheet_encoding, EncodingSupport};
 #[doc(hidden)]
-pub use crate::macros::{
-    _cssparser_internal_create_uninit_array, _cssparser_internal_to_lowercase,
-};
+pub use crate::macros::_cssparser_internal_to_lowercase;
 pub use crate::nth::parse_nth;
 pub use crate::parser::{BasicParseError, BasicParseErrorKind, ParseError, ParseErrorKind};
 pub use crate::parser::{Delimiter, Delimiters, Parser, ParserInput, ParserState};
