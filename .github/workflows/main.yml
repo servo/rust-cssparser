@@ -18,7 +18,7 @@ jobs:
           - nightly
           - beta
           - stable
-          - 1.71.0
+          - 1.85.0
         features:
           -
           - --no-default-features

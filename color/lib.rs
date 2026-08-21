@@ -464,7 +464,7 @@ where
 /// floating point values.
 struct ModernComponent<'a>(&'a Option<f32>);
 
-impl<'a> ToCss for ModernComponent<'a> {
+impl ToCss for ModernComponent<'_> {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result
     where
         W: fmt::Write,
@@ -1041,7 +1041,7 @@ pub trait ColorParser<'i> {
 /// Default implementation of a [`ColorParser`]
 pub struct DefaultColorParser;
 
-impl<'i> ColorParser<'i> for DefaultColorParser {
+impl ColorParser<'_> for DefaultColorParser {
     type Output = Color;
     type Error = ();
 }

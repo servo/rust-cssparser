@@ -10,7 +10,7 @@ readme = "README.md"
 keywords = ["css", "syntax", "parser"]
 license = "MPL-2.0"
 edition = "2018"
-rust-version = "1.71"
+rust-version = "1.85"
 
 exclude = ["src/css-parsing-tests/**", "src/big-data-url.css"]
 
@@ -22,7 +22,7 @@ smallvec = "1.0"
 # Optional dependencies
 cssparser-macros = { path = "./macros", version = "0.7.0", optional = true }
 malloc_size_of = { version = "0.1", default-features = false, optional = true }
-phf = { version = "0.13.1", features = ["macros"], optional = true }
+phf = { version = "0.14.0", features = ["macros"], optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
