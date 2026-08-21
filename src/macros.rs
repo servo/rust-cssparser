@@ -61,7 +61,9 @@ macro_rules! match_ignore_ascii_case {
                 maxlen
             };
 
-            $crate::_cssparser_internal_to_lowercase!($input, MAX_LENGTH => lowercase);
+            let mut buffer = [const { core::mem::MaybeUninit::<u8>::uninit() }; MAX_LENGTH];
+            let input: &str = $input; // Extend lifetime of temporaries
+            let lowercase = $crate::_cssparser_internal_to_lowercase(&mut buffer, input);
             // "A" is a short string that we know is different for every string pattern,
             // since we’ve verified that none of them include ASCII upper case letters.
             match lowercase.unwrap_or("A") {
@@ -210,38 +212,12 @@ macro_rules! ascii_case_insensitive_phf_map {
             }
 
             fn get(input: &str) -> Option<&'static $ValueType> {
-                $crate::_cssparser_internal_to_lowercase!(input, MAX_LENGTH => lowercase);
-                __MAP.get(lowercase?)
+                let mut buffer = [const { core::mem::MaybeUninit::<u8>::uninit() }; MAX_LENGTH];
+                let lowercase = $crate::_cssparser_internal_to_lowercase(&mut buffer, input)?;
+                __MAP.get(lowercase)
             }
         }
     }
-}
-
-/// Create a new array of MaybeUninit<T> items, in an uninitialized state.
-#[inline(always)]
-pub fn _cssparser_internal_create_uninit_array<const N: usize>() -> [MaybeUninit<u8>; N] {
-    unsafe {
-        // SAFETY: An uninitialized `[MaybeUninit<_>; LEN]` is valid.
-        // See: https://doc.rust-lang.org/stable/core/mem/union.MaybeUninit.html#method.uninit_array
-        MaybeUninit::<[MaybeUninit<u8>; N]>::uninit().assume_init()
-    }
-}
-
-/// Implementation detail of match_ignore_ascii_case! and ascii_case_insensitive_phf_map! macros.
-///
-/// **This macro is not part of the public API. It can change or be removed between any versions.**
-///
-/// Define a local variable named `$output`
-/// and assign it the result of calling `_cssparser_internal_to_lowercase`
-/// with a stack-allocated buffer of length `$BUFFER_SIZE`.
-#[macro_export]
-#[doc(hidden)]
-macro_rules! _cssparser_internal_to_lowercase {
-    ($input: expr, $BUFFER_SIZE: expr => $output: ident) => {
-        let mut buffer = $crate::_cssparser_internal_create_uninit_array::<{ $BUFFER_SIZE }>();
-        let input: &str = $input;
-        let $output = $crate::_cssparser_internal_to_lowercase(&mut buffer, input);
-    };
 }
 
 /// Implementation detail of match_ignore_ascii_case! and ascii_case_insensitive_phf_map! macros.

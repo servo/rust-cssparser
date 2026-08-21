@@ -1151,6 +1151,17 @@ fn procedural_masquerade_whitespace() {
 }
 
 #[test]
+fn test_match_ignore_ascii_case_with_temporary_borrow() {
+    fn generate_string() -> String {
+        "test".to_owned()
+    }
+    assert!(match_ignore_ascii_case! { &generate_string(),
+        "test" => true,
+        _ => false,
+    });
+}
+
+#[test]
 fn parse_until_before_stops_at_delimiter_or_end_of_input() {
     // For all j and k, inputs[i].1[j] should parse the same as inputs[i].1[k]
     // when we use delimiters inputs[i].0.
