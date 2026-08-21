@@ -687,11 +687,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
             }
             &cached_token.token
         } else {
-            let new_token = self
-                .input
-                .tokenizer
-                .next()
-                .map_err(|()| self.new_basic_error(BasicParseErrorKind::EndOfInput))?;
+            let Ok(new_token) = self.input.tokenizer.next() else {
+                return Err(self.new_basic_error(BasicParseErrorKind::EndOfInput));
+            };
             self.input.cached_token = Some(CachedToken {
                 token: new_token,
                 start_position: token_start_position,
