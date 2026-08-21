@@ -52,11 +52,10 @@ fn normalize(json: &mut Value) {
                 normalize(item)
             }
         }
-        Value::String(ref mut s) => {
-            if *s == "extra-input" || *s == "empty" {
-                *s = "invalid".to_string()
-            }
+        Value::String(ref mut s) if *s == "extra-input" || *s == "empty" => {
+            *s = "invalid".to_string()
         }
+
         _ => {}
     }
 }
