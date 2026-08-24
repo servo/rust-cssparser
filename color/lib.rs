@@ -42,14 +42,13 @@ where
 
 /// Parse a CSS color using the specified [`ColorParser`] and return a new color
 /// value on success.
-pub fn parse_color_with<'i, 't, P>(
+pub fn parse_color_with<'i, P>(
     color_parser: &P,
-    input: &mut Parser<'i, 't>,
-) -> Result<P::Output, ParseError<'i, P::Error>>
+    input: &mut Parser<'i, '_>,
+) -> Result<P::Output, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
 {
-    let location = input.current_source_location();
     let token = input.next()?;
     match *token {
         Token::Hash(ref value) | Token::IDHash(ref value) => {
@@ -64,16 +63,16 @@ where
         }
         _ => Err(()),
     }
-    .map_err(|()| location.new_unexpected_token_error(token.clone()))
+    .map_err(|()| ParseError::unexpected_token())
 }
 
 /// Parse one of the color functions: rgba(), lab(), color(), etc.
 #[inline]
-fn parse_color_function<'i, 't, P>(
+fn parse_color_function<'i, P>(
     color_parser: &P,
     name: CowRcStr<'i>,
-    arguments: &mut Parser<'i, 't>,
-) -> Result<P::Output, ParseError<'i, P::Error>>
+    arguments: &mut Parser,
+) -> Result<P::Output, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
 {
@@ -102,7 +101,7 @@ where
 
         "color" => parse_color_with_color_space(color_parser, arguments),
 
-        _ => return Err(arguments.new_unexpected_token_error(Token::Ident(name))),
+        _ => return Err(ParseError::unexpected_token()),
     }?;
 
     arguments.expect_exhausted()?;
@@ -115,8 +114,8 @@ where
 #[inline]
 fn parse_alpha_component<'i, 't, P>(
     color_parser: &P,
-    arguments: &mut Parser<'i, 't>,
-) -> Result<f32, ParseError<'i, P::Error>>
+    arguments: &mut Parser,
+) -> Result<f32, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
 {
@@ -128,8 +127,8 @@ where
 
 fn parse_legacy_alpha<'i, 't, P>(
     color_parser: &P,
-    arguments: &mut Parser<'i, 't>,
-) -> Result<f32, ParseError<'i, P::Error>>
+    arguments: &mut Parser,
+) -> Result<f32, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
 {
@@ -143,8 +142,8 @@ where
 
 fn parse_modern_alpha<'i, 't, P>(
     color_parser: &P,
-    arguments: &mut Parser<'i, 't>,
-) -> Result<Option<f32>, ParseError<'i, P::Error>>
+    arguments: &mut Parser,
+) -> Result<Option<f32>, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
 {
@@ -159,8 +158,8 @@ where
 #[inline]
 fn parse_rgb<'i, 't, P>(
     color_parser: &P,
-    arguments: &mut Parser<'i, 't>,
-) -> Result<P::Output, ParseError<'i, P::Error>>
+    arguments: &mut Parser,
+) -> Result<P::Output, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
 {
@@ -225,8 +224,8 @@ where
 #[inline]
 fn parse_hsl<'i, 't, P>(
     color_parser: &P,
-    arguments: &mut Parser<'i, 't>,
-) -> Result<P::Output, ParseError<'i, P::Error>>
+    arguments: &mut Parser,
+) -> Result<P::Output, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
 {
@@ -264,8 +263,8 @@ where
 #[inline]
 fn parse_hwb<'i, 't, P>(
     color_parser: &P,
-    arguments: &mut Parser<'i, 't>,
-) -> Result<P::Output, ParseError<'i, P::Error>>
+    arguments: &mut Parser,
+) -> Result<P::Output, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
 {
@@ -343,11 +342,11 @@ type IntoColorFn<Output> =
 #[inline]
 fn parse_lab_like<'i, 't, P>(
     color_parser: &P,
-    arguments: &mut Parser<'i, 't>,
+    arguments: &mut Parser,
     lightness_range: f32,
     a_b_range: f32,
     into_color: IntoColorFn<P::Output>,
-) -> Result<P::Output, ParseError<'i, P::Error>>
+) -> Result<P::Output, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
 {
@@ -369,11 +368,11 @@ where
 #[inline]
 fn parse_lch_like<'i, 't, P>(
     color_parser: &P,
-    arguments: &mut Parser<'i, 't>,
+    arguments: &mut Parser,
     lightness_range: f32,
     chroma_range: f32,
     into_color: IntoColorFn<P::Output>,
-) -> Result<P::Output, ParseError<'i, P::Error>>
+) -> Result<P::Output, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
 {
@@ -396,8 +395,8 @@ where
 #[inline]
 fn parse_color_with_color_space<'i, 't, P>(
     color_parser: &P,
-    arguments: &mut Parser<'i, 't>,
-) -> Result<P::Output, ParseError<'i, P::Error>>
+    arguments: &mut Parser,
+) -> Result<P::Output, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
 {
@@ -424,22 +423,22 @@ where
     ))
 }
 
-type ComponentParseResult<'i, R1, R2, R3, Error> =
-    Result<(Option<R1>, Option<R2>, Option<R3>, Option<f32>), ParseError<'i, Error>>;
+type ComponentParseResult<R1, R2, R3, Error> =
+    Result<(Option<R1>, Option<R2>, Option<R3>, Option<f32>), ParseError<Error>>;
 
 /// Parse the color components and alpha with the modern [color-4] syntax.
 pub fn parse_components<'i, 't, P, F1, F2, F3, R1, R2, R3>(
     color_parser: &P,
-    input: &mut Parser<'i, 't>,
+    input: &mut Parser,
     f1: F1,
     f2: F2,
     f3: F3,
-) -> ComponentParseResult<'i, R1, R2, R3, P::Error>
+) -> ComponentParseResult<R1, R2, R3, P::Error>
 where
     P: ColorParser<'i>,
-    F1: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R1, ParseError<'i, P::Error>>,
-    F2: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R2, ParseError<'i, P::Error>>,
-    F3: FnOnce(&P, &mut Parser<'i, 't>) -> Result<R3, ParseError<'i, P::Error>>,
+    F1: FnOnce(&P, &mut Parser) -> Result<R1, ParseError<P::Error>>,
+    F2: FnOnce(&P, &mut Parser) -> Result<R2, ParseError<P::Error>>,
+    F3: FnOnce(&P, &mut Parser) -> Result<R3, ParseError<P::Error>>,
 {
     let r1 = parse_none_or(input, |p| f1(color_parser, p))?;
     let r2 = parse_none_or(input, |p| f2(color_parser, p))?;
@@ -450,9 +449,9 @@ where
     Ok((r1, r2, r3, alpha))
 }
 
-fn parse_none_or<'i, 't, F, T, E>(input: &mut Parser<'i, 't>, thing: F) -> Result<Option<T>, E>
+fn parse_none_or<F, T, E>(input: &mut Parser, thing: F) -> Result<Option<T>, E>
 where
-    F: FnOnce(&mut Parser<'i, 't>) -> Result<T, E>,
+    F: FnOnce(&mut Parser) -> Result<T, E>,
 {
     match input.try_parse(|p| p.expect_ident_matching("none")) {
         Ok(_) => Ok(None),
@@ -980,11 +979,10 @@ pub trait ColorParser<'i> {
     /// Parse an `<angle>` or `<number>`.
     ///
     /// Returns the result in degrees.
-    fn parse_angle_or_number<'t>(
+    fn parse_angle_or_number(
         &self,
-        input: &mut Parser<'i, 't>,
-    ) -> Result<AngleOrNumber, ParseError<'i, Self::Error>> {
-        let location = input.current_source_location();
+        input: &mut Parser,
+    ) -> Result<AngleOrNumber, ParseError<Self::Error>> {
         Ok(match *input.next()? {
             Token::Number { value, .. } => AngleOrNumber::Number { value },
             Token::Dimension {
@@ -995,45 +993,36 @@ pub trait ColorParser<'i> {
                     "grad" => v * 360. / 400.,
                     "rad" => v * 360. / (2. * PI),
                     "turn" => v * 360.,
-                    _ => {
-                        return Err(location.new_unexpected_token_error(Token::Ident(unit.clone())))
-                    }
+                    _ => return Err(ParseError::unexpected_token()),
                 };
 
                 AngleOrNumber::Angle { degrees }
             }
-            ref t => return Err(location.new_unexpected_token_error(t.clone())),
+            _ => return Err(ParseError::unexpected_token()),
         })
     }
 
     /// Parse a `<percentage>` value.
     ///
     /// Returns the result in a number from 0.0 to 1.0.
-    fn parse_percentage<'t>(
-        &self,
-        input: &mut Parser<'i, 't>,
-    ) -> Result<f32, ParseError<'i, Self::Error>> {
+    fn parse_percentage(&self, input: &mut Parser) -> Result<f32, ParseError<Self::Error>> {
         input.expect_percentage().map_err(From::from)
     }
 
     /// Parse a `<number>` value.
-    fn parse_number<'t>(
-        &self,
-        input: &mut Parser<'i, 't>,
-    ) -> Result<f32, ParseError<'i, Self::Error>> {
+    fn parse_number(&self, input: &mut Parser) -> Result<f32, ParseError<Self::Error>> {
         input.expect_number().map_err(From::from)
     }
 
     /// Parse a `<number>` value or a `<percentage>` value.
-    fn parse_number_or_percentage<'t>(
+    fn parse_number_or_percentage(
         &self,
-        input: &mut Parser<'i, 't>,
-    ) -> Result<NumberOrPercentage, ParseError<'i, Self::Error>> {
-        let location = input.current_source_location();
+        input: &mut Parser,
+    ) -> Result<NumberOrPercentage, ParseError<Self::Error>> {
         Ok(match *input.next()? {
             Token::Number { value, .. } => NumberOrPercentage::Number { value },
             Token::Percentage { unit_value, .. } => NumberOrPercentage::Percentage { unit_value },
-            ref t => return Err(location.new_unexpected_token_error(t.clone())),
+            _ => return Err(ParseError::unexpected_token()),
         })
     }
 }
@@ -1050,7 +1039,7 @@ impl Color {
     /// Parse a <color> value, per CSS Color Module Level 3.
     ///
     /// FIXME(#2) Deprecated CSS2 System Colors are not supported yet.
-    pub fn parse<'i>(input: &mut Parser<'i, '_>) -> Result<Color, ParseError<'i, ()>> {
+    pub fn parse(input: &mut Parser) -> Result<Color, ParseError<()>> {
         parse_color_with(&DefaultColorParser, input)
     }
 }
