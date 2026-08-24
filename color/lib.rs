@@ -44,7 +44,7 @@ where
 /// value on success.
 pub fn parse_color_with<'i, P>(
     color_parser: &P,
-    input: &mut Parser<'i, '_>,
+    input: &mut Parser<'i>,
 ) -> Result<P::Output, ParseError<P::Error>>
 where
     P: ColorParser<'i>,
@@ -112,7 +112,7 @@ where
 /// Parse the alpha component by itself from either number or percentage,
 /// clipping the result to [0.0..1.0].
 #[inline]
-fn parse_alpha_component<'i, 't, P>(
+fn parse_alpha_component<'i, P>(
     color_parser: &P,
     arguments: &mut Parser,
 ) -> Result<f32, ParseError<P::Error>>
@@ -125,7 +125,7 @@ where
         .clamp(0.0, OPAQUE))
 }
 
-fn parse_legacy_alpha<'i, 't, P>(
+fn parse_legacy_alpha<'i, P>(
     color_parser: &P,
     arguments: &mut Parser,
 ) -> Result<f32, ParseError<P::Error>>
@@ -140,7 +140,7 @@ where
     })
 }
 
-fn parse_modern_alpha<'i, 't, P>(
+fn parse_modern_alpha<'i, P>(
     color_parser: &P,
     arguments: &mut Parser,
 ) -> Result<Option<f32>, ParseError<P::Error>>
@@ -156,7 +156,7 @@ where
 }
 
 #[inline]
-fn parse_rgb<'i, 't, P>(
+fn parse_rgb<'i, P>(
     color_parser: &P,
     arguments: &mut Parser,
 ) -> Result<P::Output, ParseError<P::Error>>
@@ -222,7 +222,7 @@ where
 ///
 /// <https://drafts.csswg.org/css-color/#the-hsl-notation>
 #[inline]
-fn parse_hsl<'i, 't, P>(
+fn parse_hsl<'i, P>(
     color_parser: &P,
     arguments: &mut Parser,
 ) -> Result<P::Output, ParseError<P::Error>>
@@ -261,7 +261,7 @@ where
 ///
 /// <https://drafts.csswg.org/css-color/#the-hbw-notation>
 #[inline]
-fn parse_hwb<'i, 't, P>(
+fn parse_hwb<'i, P>(
     color_parser: &P,
     arguments: &mut Parser,
 ) -> Result<P::Output, ParseError<P::Error>>
@@ -340,7 +340,7 @@ type IntoColorFn<Output> =
     fn(l: Option<f32>, a: Option<f32>, b: Option<f32>, alpha: Option<f32>) -> Output;
 
 #[inline]
-fn parse_lab_like<'i, 't, P>(
+fn parse_lab_like<'i, P>(
     color_parser: &P,
     arguments: &mut Parser,
     lightness_range: f32,
@@ -366,7 +366,7 @@ where
 }
 
 #[inline]
-fn parse_lch_like<'i, 't, P>(
+fn parse_lch_like<'i, P>(
     color_parser: &P,
     arguments: &mut Parser,
     lightness_range: f32,
@@ -393,7 +393,7 @@ where
 
 /// Parse the color() function.
 #[inline]
-fn parse_color_with_color_space<'i, 't, P>(
+fn parse_color_with_color_space<'i, P>(
     color_parser: &P,
     arguments: &mut Parser,
 ) -> Result<P::Output, ParseError<P::Error>>
@@ -427,7 +427,7 @@ type ComponentParseResult<R1, R2, R3, Error> =
     Result<(Option<R1>, Option<R2>, Option<R3>, Option<f32>), ParseError<Error>>;
 
 /// Parse the color components and alpha with the modern [color-4] syntax.
-pub fn parse_components<'i, 't, P, F1, F2, F3, R1, R2, R3>(
+pub fn parse_components<'i, P, F1, F2, F3, R1, R2, R3>(
     color_parser: &P,
     input: &mut Parser,
     f1: F1,
