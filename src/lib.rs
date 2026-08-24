@@ -73,7 +73,7 @@ pub use crate::from_bytes::{EncodingSupport, stylesheet_encoding};
 pub use crate::macros::_cssparser_internal_to_lowercase;
 pub use crate::nth::parse_nth;
 pub use crate::parser::{BasicParseError, BasicParseErrorKind, ParseError, ParseErrorKind};
-pub use crate::parser::{Delimiter, Delimiters, Parser, ParserInput, ParserState};
+pub use crate::parser::{Delimiter, Delimiters, Parser, ParserState};
 pub use crate::rules_and_declarations::{AtRuleParser, QualifiedRuleParser};
 pub use crate::rules_and_declarations::{DeclarationParser, RuleBodyItemParser, RuleBodyParser};
 pub use crate::rules_and_declarations::{StyleSheetParser, parse_one_rule};

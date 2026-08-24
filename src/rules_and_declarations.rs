@@ -49,7 +49,7 @@ pub trait DeclarationParser<'i> {
     fn parse_value(
         &mut self,
         _name: CowRcStr<'i>,
-        _input: &mut Parser<'i, '_>,
+        _input: &mut Parser<'i>,
         _declaration_start: &ParserState,
     ) -> Result<Self::Declaration, ParseError<Self::Error>> {
         Err(ParseError::unexpected_token())
@@ -93,7 +93,7 @@ pub trait AtRuleParser<'i> {
     fn parse_prelude(
         &mut self,
         _name: CowRcStr<'i>,
-        _input: &mut Parser<'i, '_>,
+        _input: &mut Parser<'i>,
     ) -> Result<Self::Prelude, ParseError<Self::Error>> {
         Err(ParseError::from_basic_kind(
             BasicParseErrorKind::AtRuleInvalid,
@@ -133,7 +133,7 @@ pub trait AtRuleParser<'i> {
         &mut self,
         prelude: Self::Prelude,
         start: &ParserState,
-        _input: &mut Parser<'i, '_>,
+        _input: &mut Parser<'i>,
     ) -> Result<Self::AtRule, ParseError<Self::Error>> {
         let _ = prelude;
         let _ = start;
@@ -174,7 +174,7 @@ pub trait QualifiedRuleParser<'i> {
     /// that ends where the prelude should end (before the next `{`).
     fn parse_prelude(
         &mut self,
-        _input: &mut Parser<'i, '_>,
+        _input: &mut Parser<'i>,
     ) -> Result<Self::Prelude, ParseError<Self::Error>> {
         Err(ParseError::from_basic_kind(
             BasicParseErrorKind::QualifiedRuleInvalid,
@@ -192,7 +192,7 @@ pub trait QualifiedRuleParser<'i> {
         &mut self,
         prelude: Self::Prelude,
         start: &ParserState,
-        _input: &mut Parser<'i, '_>,
+        _input: &mut Parser<'i>,
     ) -> Result<Self::QualifiedRule, ParseError<Self::Error>> {
         let _ = prelude;
         let _ = start;
@@ -203,9 +203,9 @@ pub trait QualifiedRuleParser<'i> {
 }
 
 /// Provides an iterator for rule bodies and declaration lists.
-pub struct RuleBodyParser<'i, 't, 'a, P, I, E> {
+pub struct RuleBodyParser<'i, 'a, P, I, E> {
     /// The input given to the parser.
-    pub input: &'a mut Parser<'i, 't>,
+    pub input: &'a mut Parser<'i>,
     /// The parser given to `RuleBodyParser::new`
     pub parser: &'a mut P,
 
@@ -226,7 +226,7 @@ pub trait RuleBodyItemParser<'i, DeclOrRule, Error>:
     fn parse_qualified(&self) -> bool;
 }
 
-impl<'i, 't, 'a, P, I, E> RuleBodyParser<'i, 't, 'a, P, I, E> {
+impl<'i, 'a, P, I, E> RuleBodyParser<'i, 'a, P, I, E> {
     /// Create a new `RuleBodyParser` for the given `input` and `parser`.
     ///
     /// Note that all CSS declaration lists can on principle contain at-rules.
@@ -241,7 +241,7 @@ impl<'i, 't, 'a, P, I, E> RuleBodyParser<'i, 't, 'a, P, I, E> {
     /// The return type for finished declarations and at-rules also needs to be the same,
     /// since `<RuleBodyParser as Iterator>::next` can return either.
     /// It could be a custom enum.
-    pub fn new(input: &'a mut Parser<'i, 't>, parser: &'a mut P) -> Self {
+    pub fn new(input: &'a mut Parser<'i>, parser: &'a mut P) -> Self {
         Self {
             input,
             parser,
@@ -251,7 +251,7 @@ impl<'i, 't, 'a, P, I, E> RuleBodyParser<'i, 't, 'a, P, I, E> {
 }
 
 /// https://drafts.csswg.org/css-syntax/#consume-a-blocks-contents
-impl<'i, I, P, E> Iterator for RuleBodyParser<'i, '_, '_, P, I, E>
+impl<'i, I, P, E> Iterator for RuleBodyParser<'i, '_, P, I, E>
 where
     P: RuleBodyItemParser<'i, I, E>,
 {
@@ -339,9 +339,9 @@ where
 }
 
 /// Provides an iterator for rule list parsing at the top-level of a stylesheet.
-pub struct StyleSheetParser<'i, 't, 'a, P> {
+pub struct StyleSheetParser<'i, 'a, P> {
     /// The input given.
-    pub input: &'a mut Parser<'i, 't>,
+    pub input: &'a mut Parser<'i>,
 
     /// The parser given.
     pub parser: &'a mut P,
@@ -349,7 +349,7 @@ pub struct StyleSheetParser<'i, 't, 'a, P> {
     any_rule_so_far: bool,
 }
 
-impl<'i, 't, 'a, R, P, E> StyleSheetParser<'i, 't, 'a, P>
+impl<'i, 'a, R, P, E> StyleSheetParser<'i, 'a, P>
 where
     P: QualifiedRuleParser<'i, QualifiedRule = R, Error = E>
         + AtRuleParser<'i, AtRule = R, Error = E>,
@@ -360,7 +360,7 @@ where
     ///
     /// The return type for finished qualified rules and at-rules also needs to be the same,
     /// since `<StyleSheetParser as Iterator>::next` can return either. It could be a custom enum.
-    pub fn new(input: &'a mut Parser<'i, 't>, parser: &'a mut P) -> Self {
+    pub fn new(input: &'a mut Parser<'i>, parser: &'a mut P) -> Self {
         Self {
             input,
             parser,
@@ -370,7 +370,7 @@ where
 }
 
 /// `StyleSheetParser` is an iterator that yields `Ok(_)` for a rule or an `Err(..)` for an invalid one.
-impl<'i, R, P, E> Iterator for StyleSheetParser<'i, '_, '_, P>
+impl<'i, R, P, E> Iterator for StyleSheetParser<'i, '_, P>
 where
     P: QualifiedRuleParser<'i, QualifiedRule = R, Error = E>
         + AtRuleParser<'i, AtRule = R, Error = E>,
@@ -429,7 +429,7 @@ where
 
 /// Parse a single declaration, such as an `( /* ... */ )` parenthesis in an `@supports` prelude.
 pub fn parse_one_declaration<'i, P, E>(
-    input: &mut Parser<'i, '_>,
+    input: &mut Parser<'i>,
     parser: &mut P,
 ) -> Result<<P as DeclarationParser<'i>>::Declaration, (ParseError<E>, &'i str, SourceLocation)>
 where
@@ -448,7 +448,7 @@ where
 
 /// Parse a single rule, such as for CSSOM’s `CSSStyleSheet.insertRule`.
 pub fn parse_one_rule<'i, R, P, E>(
-    input: &mut Parser<'i, '_>,
+    input: &mut Parser<'i>,
     parser: &mut P,
 ) -> Result<R, ParseError<E>>
 where
@@ -481,7 +481,7 @@ where
 fn parse_at_rule<'i, P, E>(
     start: &ParserState,
     name: CowRcStr<'i>,
-    input: &mut Parser<'i, '_>,
+    input: &mut Parser<'i>,
     parser: &mut P,
 ) -> Result<<P as AtRuleParser<'i>>::AtRule, (ParseError<E>, &'i str, SourceLocation)>
 where
@@ -536,7 +536,7 @@ fn looks_like_a_custom_property(input: &mut Parser) -> bool {
 // https://drafts.csswg.org/css-syntax/#consume-a-qualified-rule
 fn parse_qualified_rule<'i, P, E>(
     start: &ParserState,
-    input: &mut Parser<'i, '_>,
+    input: &mut Parser<'i>,
     parser: &mut P,
     nested: bool,
 ) -> Result<<P as QualifiedRuleParser<'i>>::QualifiedRule, ParseError<E>>
