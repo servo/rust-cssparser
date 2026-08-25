@@ -22,7 +22,7 @@ fn parse_and_serialize(input: &str, preserving_comments: bool) -> String {
 }
 
 fn do_parse_and_serialize<'i>(
-    input: &mut Parser<'i, '_>,
+    input: &mut Parser,
     preserving_comments: bool,
     mut previous_token_type: TokenSerializationType,
     serialization: &mut String,
@@ -46,7 +46,7 @@ fn do_parse_and_serialize<'i>(
         }
         if token.is_parse_error() {
             let token = token.clone();
-            return Err(input.new_unexpected_token_error(token))
+            return Err(input.new_unexpected_token_error(token));
         }
         let token_type = token.serialization_type();
         if previous_token_type.needs_separator_when_before(token_type) {
@@ -62,7 +62,13 @@ fn do_parse_and_serialize<'i>(
         };
 
         input.parse_nested_block(|input| -> Result<_, ParseError<()>> {
-            do_parse_and_serialize(input, preserving_comments, previous_token_type, serialization, indent_level + 1)
+            do_parse_and_serialize(
+                input,
+                preserving_comments,
+                previous_token_type,
+                serialization,
+                indent_level + 1,
+            )
         })?;
 
         closing_token.to_css(serialization).unwrap();

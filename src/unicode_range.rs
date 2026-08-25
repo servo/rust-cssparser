@@ -24,7 +24,7 @@ pub struct UnicodeRange {
 
 impl UnicodeRange {
     /// https://drafts.csswg.org/css-syntax/#urange-syntax
-    pub fn parse<'i>(input: &mut Parser<'i, '_>) -> Result<Self, BasicParseError<'i>> {
+    pub fn parse(input: &mut Parser) -> Result<Self, BasicParseError> {
         // <urange> =
         //   u '+' <ident-token> '?'* |
         //   u <dimension-token> '?'* |
@@ -44,29 +44,23 @@ impl UnicodeRange {
 
         let range = match parse_concatenated(concatenated_tokens.as_bytes()) {
             Ok(range) => range,
-            Err(()) => {
-                return Err(input
-                    .new_basic_unexpected_token_error(Token::Ident(concatenated_tokens.into())))
-            }
+            Err(()) => return Err(BasicParseError::unexpected_token()),
         };
         if range.end > char::MAX as u32 || range.start > range.end {
-            Err(input.new_basic_unexpected_token_error(Token::Ident(concatenated_tokens.into())))
+            Err(BasicParseError::unexpected_token())
         } else {
             Ok(range)
         }
     }
 }
 
-fn parse_tokens<'i>(input: &mut Parser<'i, '_>) -> Result<(), BasicParseError<'i>> {
-    match input.next_including_whitespace()?.clone() {
+fn parse_tokens(input: &mut Parser) -> Result<(), BasicParseError> {
+    match *input.next_including_whitespace()? {
         Token::Delim('+') => {
             match *input.next_including_whitespace()? {
                 Token::Ident(_) => {}
                 Token::Delim('?') => {}
-                ref t => {
-                    let t = t.clone();
-                    return Err(input.new_basic_unexpected_token_error(t));
-                }
+                _ => return Err(BasicParseError::unexpected_token()),
             }
             parse_question_marks(input)
         }
@@ -80,7 +74,7 @@ fn parse_tokens<'i>(input: &mut Parser<'i, '_>) -> Result<(), BasicParseError<'i
                 _ => input.reset(&after_number),
             }
         }
-        t => return Err(input.new_basic_unexpected_token_error(t)),
+        _ => return Err(BasicParseError::unexpected_token()),
     }
     Ok(())
 }

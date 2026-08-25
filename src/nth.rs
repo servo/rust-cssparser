@@ -8,7 +8,7 @@ use super::{BasicParseError, Parser, ParserInput, Token};
 /// The input is typically the arguments of a function,
 /// in which case the caller needs to check if the arguments’ parser is exhausted.
 /// Return `Ok((A, B))`, or an `Err(..)` for a syntax error.
-pub fn parse_nth<'i>(input: &mut Parser<'i, '_>) -> Result<(i32, i32), BasicParseError<'i>> {
+pub fn parse_nth(input: &mut Parser) -> Result<(i32, i32), BasicParseError> {
     match *input.next()? {
         Token::Number {
             int_value: Some(b), ..
@@ -25,8 +25,7 @@ pub fn parse_nth<'i>(input: &mut Parser<'i, '_>) -> Result<(i32, i32), BasicPars
                 _ => match parse_n_dash_digits(unit) {
                     Ok(b) => Ok((a, b)),
                     Err(()) => {
-                        let unit = unit.clone();
-                        Err(input.new_basic_unexpected_token_error(Token::Ident(unit)))
+                        Err(BasicParseError::unexpected_token())
                     }
                 }
             }
@@ -48,8 +47,7 @@ pub fn parse_nth<'i>(input: &mut Parser<'i, '_>) -> Result<(i32, i32), BasicPars
                     match parse_n_dash_digits(slice) {
                         Ok(b) => Ok((a, b)),
                         Err(()) => {
-                            let value = value.clone();
-                            Err(input.new_basic_unexpected_token_error(Token::Ident(value)))
+                            Err(BasicParseError::unexpected_token())
                         }
                     }
                 }
@@ -63,25 +61,18 @@ pub fn parse_nth<'i>(input: &mut Parser<'i, '_>) -> Result<(i32, i32), BasicPars
                     _ => match parse_n_dash_digits(value) {
                         Ok(b) => Ok((1, b)),
                         Err(()) => {
-                            let value = value.clone();
-                            Err(input.new_basic_unexpected_token_error(Token::Ident(value)))
+                            Err(BasicParseError::unexpected_token())
                         }
                     }
                 }
             }
-            ref token => {
-                let token = token.clone();
-                Err(input.new_basic_unexpected_token_error(token))
-            }
+            _ => Err(BasicParseError::unexpected_token()),
         },
-        ref token => {
-            let token = token.clone();
-            Err(input.new_basic_unexpected_token_error(token))
-        }
+        _ => Err(BasicParseError::unexpected_token()),
     }
 }
 
-fn parse_b<'i>(input: &mut Parser<'i, '_>, a: i32) -> Result<(i32, i32), BasicParseError<'i>> {
+fn parse_b(input: &mut Parser, a: i32) -> Result<(i32, i32), BasicParseError> {
     let start = input.state();
     match input.next() {
         Ok(&Token::Delim('+')) => parse_signless_b(input, a, 1),
@@ -98,19 +89,18 @@ fn parse_b<'i>(input: &mut Parser<'i, '_>, a: i32) -> Result<(i32, i32), BasicPa
     }
 }
 
-fn parse_signless_b<'i>(
-    input: &mut Parser<'i, '_>,
+fn parse_signless_b(
+    input: &mut Parser,
     a: i32,
     b_sign: i32,
-) -> Result<(i32, i32), BasicParseError<'i>> {
-    // FIXME: remove .clone() when lifetimes are non-lexical.
-    match input.next()?.clone() {
-        Token::Number {
+) -> Result<(i32, i32), BasicParseError> {
+    match input.next()? {
+        &Token::Number {
             has_sign: false,
             int_value: Some(b),
             ..
         } => Ok((a, b_sign * b)),
-        token => Err(input.new_basic_unexpected_token_error(token)),
+        _ => Err(BasicParseError::unexpected_token()),
     }
 }
 
