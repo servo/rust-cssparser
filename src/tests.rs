@@ -21,7 +21,6 @@ use super::{
     ToCss, Token, TokenSerializationType, UnicodeRange,
 };
 
-
 fn css_parsing_test_json(file_name: &str) -> String {
     let path = format!(
         "{}/src/css-parsing-tests/{}",
