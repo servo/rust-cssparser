@@ -137,26 +137,20 @@ fn one_component_value() {
 
 #[test]
 fn declaration_list() {
-    run_json_tests(
-        &css_parsing_test_json("declaration_list.json"),
-        |input| {
-            Value::Array(
-                RuleBodyParser::new(input, &mut JsonParser)
-                    .map(|result| result.unwrap_or(JArray!["error", "invalid"]))
-                    .collect(),
-            )
-        },
-    );
+    run_json_tests(&css_parsing_test_json("declaration_list.json"), |input| {
+        Value::Array(
+            RuleBodyParser::new(input, &mut JsonParser)
+                .map(|result| result.unwrap_or(JArray!["error", "invalid"]))
+                .collect(),
+        )
+    });
 }
 
 #[test]
 fn one_declaration() {
-    run_json_tests(
-        &css_parsing_test_json("one_declaration.json"),
-        |input| {
-            parse_one_declaration(input, &mut JsonParser).unwrap_or(JArray!["error", "invalid"])
-        },
-    );
+    run_json_tests(&css_parsing_test_json("one_declaration.json"), |input| {
+        parse_one_declaration(input, &mut JsonParser).unwrap_or(JArray!["error", "invalid"])
+    });
 }
 
 #[test]
