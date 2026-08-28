@@ -14,7 +14,7 @@ use std::ops::Range;
 ///
 /// Can be used with the `Parser::reset` method to restore that state.
 /// Should only be used with the `Parser` instance it came from.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ParserState {
     pub(crate) position: usize,
     pub(crate) current_line_start_position: usize,
@@ -223,7 +223,7 @@ impl<E: fmt::Display + fmt::Debug> std::error::Error for ParseError<E> {}
 /// The owned input for a parser.
 pub struct ParserInput<'i> {
     tokenizer: Tokenizer<'i>,
-    cached_token: Option<CachedToken<'i>>,
+    cached_token: CachedToken<'i>,
     current_block_depth: u8,
     nested_block_limit: u8,
 }
@@ -244,7 +244,11 @@ impl<'i> ParserInput<'i> {
             tokenizer: Tokenizer::new(input),
             nested_block_limit: Self::REASONABLE_NESTED_BLOCK_LIMIT,
             current_block_depth: 0,
-            cached_token: None,
+            cached_token: CachedToken {
+                token: Token::Semicolon,                    // Anything would do.
+                start_position: SourcePosition(usize::MAX), // No token would match this cache.
+                end_state: ParserState::default(),
+            },
         }
     }
 
@@ -253,11 +257,6 @@ impl<'i> ParserInput<'i> {
     /// can be overridden or cleared. A limit of 0 will be equivalent to no limit at all.
     pub fn set_nested_block_limit(&mut self, limit: u8) {
         self.nested_block_limit = limit;
-    }
-
-    #[inline]
-    fn cached_token_ref(&self) -> &Token<'i> {
-        &self.cached_token.as_ref().unwrap().token
     }
 }
 
@@ -600,14 +599,10 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     /// Same as `Parser::next`, but does not skip whitespace tokens.
     pub fn next_including_whitespace(&mut self) -> Result<&Token<'i>, BasicParseError> {
-        loop {
-            match self.next_including_whitespace_and_comments() {
-                Err(e) => return Err(e),
-                Ok(&Token::Comment(_)) => {}
-                _ => break,
-            }
+        while let Token::Comment(..) = self.next_including_whitespace_and_comments()? {
+            // Keep going
         }
-        Ok(self.input.cached_token_ref())
+        Ok(&self.input.cached_token.token)
     }
 
     /// Same as `Parser::next`, but does not skip whitespace or comment tokens.
@@ -629,13 +624,9 @@ impl<'i: 't, 't> Parser<'i, 't> {
         }
 
         let token_start_position = self.input.tokenizer.position();
-        let using_cached_token = self
-            .input
-            .cached_token
-            .as_ref()
-            .is_some_and(|cached_token| cached_token.start_position == token_start_position);
+        let using_cached_token = self.input.cached_token.start_position == token_start_position;
         let token = if using_cached_token {
-            let cached_token = self.input.cached_token.as_ref().unwrap();
+            let cached_token = &self.input.cached_token;
             self.input.tokenizer.reset(&cached_token.end_state);
             if let Token::Function(ref name) = cached_token.token {
                 self.input.tokenizer.see_function(name)
@@ -645,12 +636,12 @@ impl<'i: 't, 't> Parser<'i, 't> {
             let Ok(new_token) = self.input.tokenizer.next() else {
                 return Err(BasicParseError::new(BasicParseErrorKind::EndOfInput));
             };
-            self.input.cached_token = Some(CachedToken {
+            self.input.cached_token = CachedToken {
                 token: new_token,
                 start_position: token_start_position,
                 end_state: self.input.tokenizer.state(),
-            });
-            self.input.cached_token_ref()
+            };
+            &self.input.cached_token.token
         };
 
         if let Some(block_type) = BlockType::opening(token) {
