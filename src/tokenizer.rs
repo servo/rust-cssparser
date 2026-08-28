@@ -312,6 +312,16 @@ impl<'a> Tokenizer<'a> {
         unsafe { self.input.get_unchecked(range.start.0..range.end.0) }
     }
 
+    #[inline]
+    pub(crate) fn byte_slice(&self, range: Range<usize>) -> &'a [u8] {
+        &self.input.as_bytes()[range]
+    }
+
+    #[inline]
+    pub(crate) fn byte_slice_from(&self, start: usize) -> &'a [u8] {
+        self.byte_slice(start..self.position)
+    }
+
     pub fn current_source_line(&self) -> &'a str {
         let current = self.position();
         let start = self
@@ -363,6 +373,26 @@ impl<'a> Tokenizer<'a> {
             }
         }
         self.position += n
+    }
+
+    /// Equivalent to calling advance() for runs of bytes for which `matches` returns true.
+    /// Returns the byte slice advanced over.
+    fn advance_while(&mut self, mut matches: impl FnMut(u8) -> bool) -> &[u8] {
+        let start = self.position;
+        let mut position = start;
+
+        let bytes = &self.input.as_bytes()[start..];
+        for b in bytes {
+            if !matches(*b) {
+                break;
+            }
+            position += 1;
+        }
+
+        // Equivalent to self.position = position, but with advance()'s debug_assert!s
+        self.advance(position - self.position);
+
+        self.byte_slice_from(start)
     }
 
     // Assumes non-EOF
@@ -917,15 +947,26 @@ fn consume_ident_like<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 }
 
 fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowRcStr<'a> {
+    // These are the overwhelmingly common bytes, that we can just skip over in a tight loop.
+    static IS_SIMPLE_NAME_BYTE: [bool; 256] = {
+        let mut table = [false; 256];
+        let mut i = 0;
+        while i < 256 {
+            table[i as usize] = matches!(i as u8, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-' | b'\xC0'..=b'\xEF');
+            i += 1;
+        }
+        table
+    };
+
     // start_pos is the end of the previous token, therefore at a code point boundary
     let start_pos = tokenizer.position();
     let mut value_bytes;
     loop {
+        tokenizer.advance_while(|b| IS_SIMPLE_NAME_BYTE[b as usize]);
         if tokenizer.is_eof() {
             return tokenizer.slice_from(start_pos).into();
         }
         match_byte! { tokenizer.next_byte_unchecked(),
-            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-' => tokenizer.advance(1),
             b'\\' | b'\0' => {
                 // * The tokenizer’s input is UTF-8 since it’s `&str`.
                 // * start_pos is at a code point boundary
@@ -936,7 +977,6 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowRcStr<'a> {
                 break
             }
             b'\x80'..=b'\xBF' => { tokenizer.consume_continuation_byte(); }
-            b'\xC0'..=b'\xEF' => { tokenizer.advance(1); }
             b'\xF0'..=b'\xFF' => { tokenizer.consume_4byte_intro(); }
             _b => {
                 return tokenizer.slice_from(start_pos).into();
@@ -944,13 +984,13 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowRcStr<'a> {
         }
     }
 
-    while !tokenizer.is_eof() {
+    loop {
+        value_bytes.extend(tokenizer.advance_while(|b| IS_SIMPLE_NAME_BYTE[b as usize]));
+        if tokenizer.is_eof() {
+            break;
+        }
         let b = tokenizer.next_byte_unchecked();
         match_byte! { b,
-            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-'  => {
-                tokenizer.advance(1);
-                value_bytes.push(b)  // ASCII
-            }
             b'\\' => {
                 if tokenizer.has_newline_at(1) { break }
                 tokenizer.advance(1);
@@ -962,15 +1002,7 @@ fn consume_name<'a>(tokenizer: &mut Tokenizer<'a>) -> CowRcStr<'a> {
                 value_bytes.extend("\u{FFFD}".as_bytes());
             },
             b'\x80'..=b'\xBF' => {
-                // This byte *is* part of a multi-byte code point,
-                // we’ll end up copying the whole code point before this loop does something else.
                 tokenizer.consume_continuation_byte();
-                value_bytes.push(b)
-            }
-            b'\xC0'..=b'\xEF' => {
-                // This byte *is* part of a multi-byte code point,
-                // we’ll end up copying the whole code point before this loop does something else.
-                tokenizer.advance(1);
                 value_bytes.push(b)
             }
             b'\xF0'..=b'\xFF' => {
