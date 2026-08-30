@@ -6,7 +6,7 @@
 
 use super::{BasicParseError, BasicParseErrorKind, Delimiter, ParseError, Parser, Token};
 use crate::cow_rc_str::CowRcStr;
-use crate::parser::{parse_nested_block, parse_until_after, ParseUntilErrorBehavior, ParserState};
+use crate::parser::{ParseUntilErrorBehavior, ParserState, parse_nested_block, parse_until_after};
 use crate::tokenizer::SourceLocation;
 
 /// Parse `!important`.
@@ -266,14 +266,14 @@ where
                 | Token::WhiteSpace(..)
                 | Token::Semicolon
                 | Token::Comment(..) => continue,
-                Token::AtKeyword(ref name) => {
+                Token::AtKeyword(name) => {
                     let name = name.clone();
                     return Some(parse_at_rule(&start, name, self.input, &mut *self.parser));
                 }
                 // https://drafts.csswg.org/css-syntax/#consume-a-declaration bails out just to
                 // keep parsing as a qualified rule if the token is not an ident, so we implement
                 // that in a slightly more straight-forward way
-                Token::Ident(ref name) if self.parser.parse_declarations() => {
+                Token::Ident(name) if self.parser.parse_declarations() => {
                     let name = name.clone();
                     let parse_qualified = self.parser.parse_qualified();
                     let result = {

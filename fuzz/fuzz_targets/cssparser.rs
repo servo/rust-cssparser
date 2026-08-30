@@ -11,7 +11,7 @@ fn parse_and_serialize(input: &str, preserving_comments: bool) -> String {
     let result = do_parse_and_serialize(
         &mut parser,
         preserving_comments,
-        TokenSerializationType::nothing(),
+        TokenSerializationType::Nothing,
         &mut serialization,
         0,
     );
@@ -27,7 +27,7 @@ fn do_parse_and_serialize<'i>(
     mut previous_token_type: TokenSerializationType,
     serialization: &mut String,
     indent_level: usize,
-) -> Result<(), ParseError<'i, ()>> {
+) -> Result<(), ParseError<()>> {
     loop {
         let token = if preserving_comments {
             input.next_including_whitespace_and_comments()
@@ -45,8 +45,7 @@ fn do_parse_and_serialize<'i>(
             println!("{:?}", token);
         }
         if token.is_parse_error() {
-            let token = token.clone();
-            return Err(input.new_unexpected_token_error(token));
+            return Err(ParseError::unexpected_token());
         }
         let token_type = token.serialization_type();
         if previous_token_type.needs_separator_when_before(token_type) {

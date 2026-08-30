@@ -4,7 +4,7 @@
 
 use super::*;
 use cssparser::ParserInput;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn almost_equals(a: &Value, b: &Value) -> bool {
     match (a, b) {

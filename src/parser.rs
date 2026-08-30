@@ -157,8 +157,8 @@ impl<T> ParseErrorKind<T> {
 impl<E: fmt::Display> fmt::Display for ParseErrorKind<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ParseErrorKind::Basic(ref basic) => basic.fmt(f),
-            ParseErrorKind::Custom(ref custom) => custom.fmt(f),
+            ParseErrorKind::Basic(basic) => basic.fmt(f),
+            ParseErrorKind::Custom(custom) => custom.fmt(f),
         }
     }
 }

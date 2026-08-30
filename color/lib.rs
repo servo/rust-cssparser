@@ -12,10 +12,10 @@
 mod tests;
 
 use cssparser::color::{
-    clamp_floor_256_f32, clamp_unit_f32, parse_hash_color, serialize_color_alpha,
-    PredefinedColorSpace, OPAQUE,
+    OPAQUE, PredefinedColorSpace, clamp_floor_256_f32, clamp_unit_f32, parse_hash_color,
+    serialize_color_alpha,
 };
-use cssparser::{match_ignore_ascii_case, CowRcStr, ParseError, Parser, ToCss, Token};
+use cssparser::{CowRcStr, ParseError, Parser, ToCss, Token, match_ignore_ascii_case};
 use std::f32::consts::PI;
 use std::fmt;
 
@@ -1070,7 +1070,7 @@ pub trait FromParsedColor {
 
     /// Construct a new color from the `lab` notation.
     fn from_lab(lightness: Option<f32>, a: Option<f32>, b: Option<f32>, alpha: Option<f32>)
-        -> Self;
+    -> Self;
 
     /// Construct a new color from the `lch` notation.
     fn from_lch(
