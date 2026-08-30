@@ -811,7 +811,7 @@ fn consume_quoted_string<'a>(
     single_quote: bool,
 ) -> Result<CowRcStr<'a>, CowRcStr<'a>> {
     tokenizer.advance(1); // Skip the initial quote
-                          // start_pos is at code point boundary, after " or '
+    // start_pos is at code point boundary, after " or '
     let start_pos = tokenizer.position();
     let mut string_bytes;
     loop {
@@ -1159,10 +1159,12 @@ fn consume_numeric<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
 
 #[inline]
 unsafe fn from_utf8_release_unchecked(string_bytes: Vec<u8>) -> String {
-    if cfg!(debug_assertions) {
-        String::from_utf8(string_bytes).unwrap()
-    } else {
-        String::from_utf8_unchecked(string_bytes)
+    unsafe {
+        if cfg!(debug_assertions) {
+            String::from_utf8(string_bytes).unwrap()
+        } else {
+            String::from_utf8_unchecked(string_bytes)
+        }
     }
 }
 

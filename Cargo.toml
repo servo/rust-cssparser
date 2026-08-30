@@ -9,7 +9,7 @@ repository = "https://github.com/servo/rust-cssparser"
 readme = "README.md"
 keywords = ["css", "syntax", "parser"]
 license = "MPL-2.0"
-edition = "2018"
+edition = "2024"
 rust-version = "1.85"
 
 exclude = ["src/css-parsing-tests/**", "src/big-data-url.css"]

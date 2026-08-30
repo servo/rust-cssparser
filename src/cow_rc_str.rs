@@ -102,7 +102,7 @@ impl Clone for CowRcStr<'_> {
 #[cold]
 #[inline(never)]
 unsafe fn drop_slow(ptr: *const String) {
-    mem::drop(Rc::from_raw(ptr))
+    unsafe { mem::drop(Rc::from_raw(ptr)) }
 }
 
 impl Drop for CowRcStr<'_> {

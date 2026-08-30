@@ -5,7 +5,7 @@
 #[cfg(feature = "bench")]
 extern crate test;
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 #[cfg(feature = "bench")]
 use crate::parser::ArbitrarySubstitutionFunctions;
@@ -14,11 +14,11 @@ use crate::parser::ArbitrarySubstitutionFunctions;
 use self::test::Bencher;
 
 use super::{
-    parse_important, parse_nth, parse_one_declaration, parse_one_rule, stylesheet_encoding,
     AtRuleParser, BasicParseError, BasicParseErrorKind, CowRcStr, DeclarationParser, Delimiter,
     EncodingSupport, ParseError, ParseErrorKind, Parser, ParserInput, ParserState,
     QualifiedRuleParser, RuleBodyItemParser, RuleBodyParser, SourceLocation, StyleSheetParser,
-    ToCss, Token, TokenSerializationType, UnicodeRange,
+    ToCss, Token, TokenSerializationType, UnicodeRange, parse_important, parse_nth,
+    parse_one_declaration, parse_one_rule, stylesheet_encoding,
 };
 
 macro_rules! JArray {
@@ -275,11 +275,13 @@ fn outer_block_end_consumed() {
     let mut input = ParserInput::new("(calc(true))");
     let mut input = Parser::new(&mut input);
     assert!(input.expect_parenthesis_block().is_ok());
-    assert!(input
-        .parse_nested_block(|input| input
-            .expect_function_matching("calc")
-            .map_err(Into::<ParseError<()>>::into))
-        .is_ok());
+    assert!(
+        input
+            .parse_nested_block(|input| input
+                .expect_function_matching("calc")
+                .map_err(Into::<ParseError<()>>::into))
+            .is_ok()
+    );
     println!("{:?}", input.position());
     assert!(input.next().is_err());
 }
@@ -643,12 +645,14 @@ fn line_delimited() {
     let mut input = ParserInput::new(" { foo ; bar } baz;,");
     let mut input = Parser::new(&mut input);
     assert_eq!(input.next(), Ok(&Token::CurlyBracketBlock));
-    assert!({
-        let result: Result<_, ParseError<()>> =
-            input.parse_until_after(Delimiter::Semicolon, |_| Ok(42));
-        result
-    }
-    .is_err());
+    assert!(
+        {
+            let result: Result<_, ParseError<()>> =
+                input.parse_until_after(Delimiter::Semicolon, |_| Ok(42));
+            result
+        }
+        .is_err()
+    );
     assert_eq!(input.next(), Ok(&Token::Comma));
     assert!(input.next().is_err());
 }
@@ -904,24 +908,24 @@ impl<'i> DeclarationParser<'i> for JsonParser {
         let mut important = false;
         loop {
             let start = input.state();
-            if let Ok(mut token) = input.next_including_whitespace().cloned() {
-                // Hack to deal with css-parsing-tests assuming that
-                // `!important` in the middle of a declaration value is OK.
-                // This can never happen per spec
-                // (even CSS Variables forbid top-level `!`)
-                if token == Token::Delim('!') {
-                    input.reset(&start);
-                    if parse_important(input).is_ok() && input.is_exhausted() {
-                        important = true;
-                        break;
-                    }
-                    input.reset(&start);
-                    token = input.next_including_whitespace().unwrap().clone();
-                }
-                value.push(one_component_value_to_json(token, input));
-            } else {
+            let Ok(token) = input.next_including_whitespace() else {
                 break;
+            };
+            let mut token = token.clone();
+            // Hack to deal with css-parsing-tests assuming that
+            // `!important` in the middle of a declaration value is OK.
+            // This can never happen per spec
+            // (even CSS Variables forbid top-level `!`)
+            if token == Token::Delim('!') {
+                input.reset(&start);
+                if parse_important(input).is_ok() && input.is_exhausted() {
+                    important = true;
+                    break;
+                }
+                input.reset(&start);
+                token = input.next_including_whitespace().unwrap().clone();
             }
+            value.push(one_component_value_to_json(token, input));
         }
         Ok(JArray!["declaration", name, value, important,])
     }
@@ -1004,8 +1008,8 @@ impl RuleBodyItemParser<'_, Value, ()> for JsonParser {
 
 fn component_values_to_json(input: &mut Parser) -> Vec<Value> {
     let mut values = vec![];
-    while let Ok(token) = input.next_including_whitespace().cloned() {
-        values.push(one_component_value_to_json(token, input));
+    while let Ok(token) = input.next_including_whitespace() {
+        values.push(one_component_value_to_json(token.clone(), input));
     }
     values
 }
