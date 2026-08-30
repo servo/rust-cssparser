@@ -786,7 +786,7 @@ fn delimiter_from_byte(b: &mut Bencher) {
     b.iter(|| {
         for _ in 0..1000 {
             for i in 0..256 {
-                std::hint::black_box(Delimiters::from_byte(Some(i as u8)));
+                std::hint::black_box(Delimiters::from_byte(i as u8));
             }
         }
     })
