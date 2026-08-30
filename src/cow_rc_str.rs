@@ -99,11 +99,17 @@ impl Clone for CowRcStr<'_> {
     }
 }
 
+#[cold]
+#[inline(never)]
+unsafe fn drop_slow(ptr: *const String) {
+    mem::drop(Rc::from_raw(ptr))
+}
+
 impl Drop for CowRcStr<'_> {
     #[inline]
     fn drop(&mut self) {
         if let Err(ptr) = self.unpack() {
-            mem::drop(unsafe { Rc::from_raw(ptr) })
+            unsafe { drop_slow(ptr) }
         }
     }
 }
