@@ -42,7 +42,10 @@ impl<'a> From<&'a str> for CowRcStr<'a> {
     #[inline]
     fn from(s: &'a str) -> Self {
         let len = s.len();
-        assert!(len < usize::MAX);
+        // Guaranteed by https://doc.rust-lang.org/stable/reference/types/numeric.html:
+        //     The theoretical upper bound on object and array size is the maximum isize value
+        // (which by definition is smaller than usize::MAX).
+        debug_assert!(len < usize::MAX);
         CowRcStr {
             ptr: unsafe { ptr::NonNull::new_unchecked(s.as_ptr() as *mut ()) },
             borrowed_len_or_max: len,
