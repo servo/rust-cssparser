@@ -256,7 +256,15 @@ impl<'a> Tokenizer<'a> {
 
     #[inline]
     pub fn next(&mut self) -> Result<Token<'a>, ()> {
-        next_token(self)
+        if self.is_eof() {
+            return Err(());
+        }
+        Ok(self.next_unchecked())
+    }
+
+    #[inline]
+    pub fn next_unchecked(&mut self) -> Token<'a> {
+        next_token_unchecked(self)
     }
 
     #[inline]
@@ -580,10 +588,8 @@ pub struct SourceLocation {
 #[cfg(feature = "malloc_size_of")]
 malloc_size_of::malloc_size_of_is_0!(SourceLocation);
 
-fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
-    if tokenizer.is_eof() {
-        return Err(());
-    }
+fn next_token_unchecked<'a>(tokenizer: &mut Tokenizer<'a>) -> Token<'a> {
+    debug_assert!(!tokenizer.is_eof());
     let b = tokenizer.next_byte_unchecked();
     let token = match_byte! { b,
         b' ' | b'\t' => {
@@ -712,7 +718,7 @@ fn next_token<'a>(tokenizer: &mut Tokenizer<'a>) -> Result<Token<'a>, ()> {
             }
         },
     };
-    Ok(token)
+    token
 }
 
 fn consume_whitespace<'a>(tokenizer: &mut Tokenizer<'a>, newline: bool) -> Token<'a> {

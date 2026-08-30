@@ -354,7 +354,7 @@ impl Delimiters {
     }
 
     #[inline]
-    pub(crate) fn from_byte(byte: Option<u8>) -> Delimiters {
+    pub(crate) fn from_byte(byte: u8) -> Delimiters {
         const TABLE: [Delimiters; 256] = {
             let mut table = [Delimiter::None; 256];
             table[b';' as usize] = Delimiter::Semicolon;
@@ -367,8 +367,7 @@ impl Delimiters {
             table
         };
 
-        assert_eq!(TABLE[0], Delimiter::None);
-        TABLE[byte.unwrap_or(0) as usize]
+        TABLE[byte as usize]
     }
 }
 
@@ -506,11 +505,11 @@ impl<'i: 't, 't> Parser<'i, 't> {
 
     #[inline]
     pub(crate) fn next_byte(&self) -> Option<u8> {
-        let byte = self.input.tokenizer.next_byte();
+        let byte = self.input.tokenizer.next_byte()?;
         if self.stop_before.contains(Delimiters::from_byte(byte)) {
             return None;
         }
-        byte
+        Some(byte)
     }
 
     /// Restore the internal state of the parser (including position within the input)
@@ -618,7 +617,10 @@ impl<'i: 't, 't> Parser<'i, 't> {
             consume_until_end_of_block(block_type, &mut self.input.tokenizer);
         }
 
-        let byte = self.input.tokenizer.next_byte();
+        let Some(byte) = self.input.tokenizer.next_byte() else {
+            return Err(BasicParseError::new(BasicParseErrorKind::EndOfInput));
+        };
+
         if self.stop_before.contains(Delimiters::from_byte(byte)) {
             return Err(BasicParseError::new(BasicParseErrorKind::EndOfInput));
         }
@@ -633,9 +635,7 @@ impl<'i: 't, 't> Parser<'i, 't> {
             }
             &cached_token.token
         } else {
-            let Ok(new_token) = self.input.tokenizer.next() else {
-                return Err(BasicParseError::new(BasicParseErrorKind::EndOfInput));
-            };
+            let new_token = self.input.tokenizer.next_unchecked();
             self.input.cached_token = CachedToken {
                 token: new_token,
                 start_position: token_start_position,
@@ -1027,16 +1027,13 @@ where
         }
     }
     // FIXME: have a special-purpose tokenizer method for this that does less work.
-    loop {
-        if delimiters.contains(Delimiters::from_byte(parser.input.tokenizer.next_byte())) {
+    while let Some(next_byte) = parser.input.tokenizer.next_byte() {
+        if delimiters.contains(Delimiters::from_byte(next_byte)) {
             break;
         }
-        if let Ok(token) = parser.input.tokenizer.next() {
-            if let Some(block_type) = BlockType::opening(&token) {
-                consume_until_end_of_block(block_type, &mut parser.input.tokenizer);
-            }
-        } else {
-            break;
+        let token = parser.input.tokenizer.next_unchecked();
+        if let Some(block_type) = BlockType::opening(&token) {
+            consume_until_end_of_block(block_type, &mut parser.input.tokenizer);
         }
     }
     result
@@ -1055,17 +1052,15 @@ where
     if error_behavior == ParseUntilErrorBehavior::Stop && result.is_err() {
         return result;
     }
-    let next_byte = parser.input.tokenizer.next_byte();
-    if next_byte.is_some()
-        && !parser
-            .stop_before
-            .contains(Delimiters::from_byte(next_byte))
-    {
-        debug_assert!(delimiters.contains(Delimiters::from_byte(next_byte)));
-        // We know this byte is ASCII.
-        parser.input.tokenizer.advance(1);
-        if next_byte == Some(b'{') {
-            consume_until_end_of_block(BlockType::CurlyBracket, &mut parser.input.tokenizer);
+    if let Some(next_byte) = parser.input.tokenizer.next_byte() {
+        let delimiter = Delimiters::from_byte(next_byte);
+        if !parser.stop_before.contains(delimiter) {
+            debug_assert!(delimiters.contains(delimiter));
+            // We know this byte is ASCII.
+            parser.input.tokenizer.advance(1);
+            if next_byte == b'{' {
+                consume_until_end_of_block(BlockType::CurlyBracket, &mut parser.input.tokenizer);
+            }
         }
     }
     result
