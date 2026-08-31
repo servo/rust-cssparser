@@ -23,8 +23,31 @@ use super::{
 
 fn css_parsing_test_json(file_name: &str) -> String {
     // Fixtures are Cargo.toml `exclude`d so crates.io packages can compile tests
-    // without include_str!. Miri isolation cannot open() them; those tests are
-    // #[cfg_attr(miri, ignore)].
+    // without include_str!. Miri isolation cannot open() them, so keep
+    // include_str! on the miri path (git checkout only).
+    css_parsing_test_json_impl(file_name)
+}
+
+#[cfg(miri)]
+fn css_parsing_test_json_impl(file_name: &str) -> String {
+    let s = match file_name {
+        "component_value_list.json" => include_str!("css-parsing-tests/component_value_list.json"),
+        "one_component_value.json" => include_str!("css-parsing-tests/one_component_value.json"),
+        "declaration_list.json" => include_str!("css-parsing-tests/declaration_list.json"),
+        "one_declaration.json" => include_str!("css-parsing-tests/one_declaration.json"),
+        "rule_list.json" => include_str!("css-parsing-tests/rule_list.json"),
+        "stylesheet.json" => include_str!("css-parsing-tests/stylesheet.json"),
+        "one_rule.json" => include_str!("css-parsing-tests/one_rule.json"),
+        "stylesheet_bytes.json" => include_str!("css-parsing-tests/stylesheet_bytes.json"),
+        "An+B.json" => include_str!("css-parsing-tests/An+B.json"),
+        "urange.json" => include_str!("css-parsing-tests/urange.json"),
+        other => panic!("unknown css-parsing-tests fixture: {other}"),
+    };
+    s.to_owned()
+}
+
+#[cfg(not(miri))]
+fn css_parsing_test_json_impl(file_name: &str) -> String {
     let path = format!(
         "{}/src/css-parsing-tests/{}",
         env!("CARGO_MANIFEST_DIR"),
@@ -117,7 +140,6 @@ fn run_json_tests<F: Fn(&mut Parser) -> Value>(json_data: &str, parse: F) {
     });
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn component_value_list() {
     run_json_tests(
@@ -126,7 +148,6 @@ fn component_value_list() {
     );
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn one_component_value() {
     run_json_tests(
@@ -140,7 +161,6 @@ fn one_component_value() {
     );
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn declaration_list() {
     run_json_tests(&css_parsing_test_json("declaration_list.json"), |input| {
@@ -152,7 +172,6 @@ fn declaration_list() {
     });
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn one_declaration() {
     run_json_tests(&css_parsing_test_json("one_declaration.json"), |input| {
@@ -160,7 +179,6 @@ fn one_declaration() {
     });
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn rule_list() {
     run_json_tests(&css_parsing_test_json("rule_list.json"), |input| {
@@ -172,7 +190,6 @@ fn rule_list() {
     });
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn stylesheet() {
     run_json_tests(&css_parsing_test_json("stylesheet.json"), |input| {
@@ -184,7 +201,6 @@ fn stylesheet() {
     });
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn one_rule() {
     run_json_tests(&css_parsing_test_json("one_rule.json"), |input| {
@@ -192,7 +208,6 @@ fn one_rule() {
     });
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn stylesheet_from_bytes() {
     pub struct EncodingRs;
@@ -366,7 +381,6 @@ fn test_expect_url() {
     assert!(parse(&mut input).is_err());
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn nth() {
     run_json_tests(&css_parsing_test_json("An+B.json"), |input| {
@@ -396,7 +410,6 @@ fn parse_comma_separated_ignoring_errors() {
     assert_eq!(result[2], (0, 0, 255));
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn unicode_range() {
     run_json_tests(&css_parsing_test_json("urange.json"), |input| {
@@ -424,13 +437,11 @@ fn unicode_range() {
     });
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn serializer_not_preserving_comments() {
     serializer(false)
 }
 
-#[cfg_attr(miri, ignore)]
 #[test]
 fn serializer_preserving_comments() {
     serializer(true)
