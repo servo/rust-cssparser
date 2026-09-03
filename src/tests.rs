@@ -21,39 +21,18 @@ use super::{
     ToCss, Token, TokenSerializationType, UnicodeRange,
 };
 
-fn css_parsing_test_json(file_name: &str) -> String {
-    // Fixtures are Cargo.toml `exclude`d so crates.io packages can compile tests
-    // without include_str!. Miri isolation cannot open() them, so keep
-    // include_str! on the miri path (git checkout only).
-    css_parsing_test_json_impl(file_name)
-}
-
-#[cfg(miri)]
-fn css_parsing_test_json_impl(file_name: &str) -> String {
-    let s = match file_name {
-        "component_value_list.json" => include_str!("css-parsing-tests/component_value_list.json"),
-        "one_component_value.json" => include_str!("css-parsing-tests/one_component_value.json"),
-        "declaration_list.json" => include_str!("css-parsing-tests/declaration_list.json"),
-        "one_declaration.json" => include_str!("css-parsing-tests/one_declaration.json"),
-        "rule_list.json" => include_str!("css-parsing-tests/rule_list.json"),
-        "stylesheet.json" => include_str!("css-parsing-tests/stylesheet.json"),
-        "one_rule.json" => include_str!("css-parsing-tests/one_rule.json"),
-        "stylesheet_bytes.json" => include_str!("css-parsing-tests/stylesheet_bytes.json"),
-        "An+B.json" => include_str!("css-parsing-tests/An+B.json"),
-        "urange.json" => include_str!("css-parsing-tests/urange.json"),
-        other => panic!("unknown css-parsing-tests fixture: {other}"),
-    };
-    s.to_owned()
-}
-
-#[cfg(not(miri))]
-fn css_parsing_test_json_impl(file_name: &str) -> String {
-    let path = format!(
-        "{}/src/css-parsing-tests/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        file_name
-    );
-    std::fs::read_to_string(&path).unwrap()
+// Fixtures are Cargo.toml `exclude`d so crates.io packages can compile tests
+// without include_str!. Miri isolation cannot open() them, so keep
+// include_str! on the miri path (git checkout only).
+macro_rules! css_parsing_test_json {
+    ($path:tt) => {{
+        #[cfg(miri)]
+        let s = String::from(include_str!($path));
+        #[cfg(not(miri))]
+        let s = std::fs::read_to_string(&format!("{}/src/{}", env!("CARGO_MANIFEST_DIR"), $path))
+            .unwrap();
+        s
+    }};
 }
 
 macro_rules! JArray {
@@ -143,7 +122,7 @@ fn run_json_tests<F: Fn(&mut Parser) -> Value>(json_data: &str, parse: F) {
 #[test]
 fn component_value_list() {
     run_json_tests(
-        &css_parsing_test_json("component_value_list.json"),
+        &css_parsing_test_json!("css-parsing-tests/component_value_list.json"),
         |input| Value::Array(component_values_to_json(input)),
     );
 }
@@ -151,7 +130,7 @@ fn component_value_list() {
 #[test]
 fn one_component_value() {
     run_json_tests(
-        &css_parsing_test_json("one_component_value.json"),
+        &css_parsing_test_json!("css-parsing-tests/one_component_value.json"),
         |input| {
             let result: Result<Value, ParseError<()>> = input.parse_entirely(|input| {
                 Ok(one_component_value_to_json(input.next()?.clone(), input))
@@ -163,49 +142,62 @@ fn one_component_value() {
 
 #[test]
 fn declaration_list() {
-    run_json_tests(&css_parsing_test_json("declaration_list.json"), |input| {
-        Value::Array(
-            RuleBodyParser::new(input, &mut JsonParser)
-                .map(|result| result.unwrap_or(JArray!["error", "invalid"]))
-                .collect(),
-        )
-    });
+    run_json_tests(
+        &css_parsing_test_json!("css-parsing-tests/declaration_list.json"),
+        |input| {
+            Value::Array(
+                RuleBodyParser::new(input, &mut JsonParser)
+                    .map(|result| result.unwrap_or(JArray!["error", "invalid"]))
+                    .collect(),
+            )
+        },
+    );
 }
 
 #[test]
 fn one_declaration() {
-    run_json_tests(&css_parsing_test_json("one_declaration.json"), |input| {
-        parse_one_declaration(input, &mut JsonParser).unwrap_or(JArray!["error", "invalid"])
-    });
+    run_json_tests(
+        &css_parsing_test_json!("css-parsing-tests/one_declaration.json"),
+        |input| {
+            parse_one_declaration(input, &mut JsonParser).unwrap_or(JArray!["error", "invalid"])
+        },
+    );
 }
 
 #[test]
 fn rule_list() {
-    run_json_tests(&css_parsing_test_json("rule_list.json"), |input| {
-        Value::Array(
-            RuleBodyParser::new(input, &mut JsonParser)
-                .map(|result| result.unwrap_or(JArray!["error", "invalid"]))
-                .collect(),
-        )
-    });
+    run_json_tests(
+        &css_parsing_test_json!("css-parsing-tests/rule_list.json"),
+        |input| {
+            Value::Array(
+                RuleBodyParser::new(input, &mut JsonParser)
+                    .map(|result| result.unwrap_or(JArray!["error", "invalid"]))
+                    .collect(),
+            )
+        },
+    );
 }
 
 #[test]
 fn stylesheet() {
-    run_json_tests(&css_parsing_test_json("stylesheet.json"), |input| {
-        Value::Array(
-            StyleSheetParser::new(input, &mut JsonParser)
-                .map(|result| result.unwrap_or(JArray!["error", "invalid"]))
-                .collect(),
-        )
-    });
+    run_json_tests(
+        &css_parsing_test_json!("css-parsing-tests/stylesheet.json"),
+        |input| {
+            Value::Array(
+                StyleSheetParser::new(input, &mut JsonParser)
+                    .map(|result| result.unwrap_or(JArray!["error", "invalid"]))
+                    .collect(),
+            )
+        },
+    );
 }
 
 #[test]
 fn one_rule() {
-    run_json_tests(&css_parsing_test_json("one_rule.json"), |input| {
-        parse_one_rule(input, &mut JsonParser).unwrap_or(JArray!["error", "invalid"])
-    });
+    run_json_tests(
+        &css_parsing_test_json!("css-parsing-tests/one_rule.json"),
+        |input| parse_one_rule(input, &mut JsonParser).unwrap_or(JArray!["error", "invalid"]),
+    );
 }
 
 #[test]
@@ -229,7 +221,7 @@ fn stylesheet_from_bytes() {
     }
 
     run_raw_json_tests(
-        &css_parsing_test_json("stylesheet_bytes.json"),
+        &css_parsing_test_json!("css-parsing-tests/stylesheet_bytes.json"),
         |input, expected| {
             let map = match input {
                 Value::Object(map) => map,
@@ -383,16 +375,19 @@ fn test_expect_url() {
 
 #[test]
 fn nth() {
-    run_json_tests(&css_parsing_test_json("An+B.json"), |input| {
-        input
-            .parse_entirely(|i| {
-                let result: Result<_, ParseError<()>> = parse_nth(i).map_err(Into::into);
-                result
-            })
-            .ok()
-            .map(|(v0, v1)| json!([v0, v1]))
-            .unwrap_or(Value::Null)
-    });
+    run_json_tests(
+        &css_parsing_test_json!("css-parsing-tests/An+B.json"),
+        |input| {
+            input
+                .parse_entirely(|i| {
+                    let result: Result<_, ParseError<()>> = parse_nth(i).map_err(Into::into);
+                    result
+                })
+                .ok()
+                .map(|(v0, v1)| json!([v0, v1]))
+                .unwrap_or(Value::Null)
+        },
+    );
 }
 
 #[test]
@@ -412,29 +407,32 @@ fn parse_comma_separated_ignoring_errors() {
 
 #[test]
 fn unicode_range() {
-    run_json_tests(&css_parsing_test_json("urange.json"), |input| {
-        let result: Result<_, ParseError<()>> = input.parse_comma_separated(|input| {
-            let result = UnicodeRange::parse(input).ok().map(|r| (r.start, r.end));
-            if input.is_exhausted() {
-                Ok(result)
-            } else {
-                while input.next().is_ok() {}
-                Ok(None)
-            }
-        });
-        result
-            .unwrap()
-            .iter()
-            .map(|v| {
-                if let Some((v0, v1)) = v {
-                    json!([v0, v1])
+    run_json_tests(
+        &css_parsing_test_json!("css-parsing-tests/urange.json"),
+        |input| {
+            let result: Result<_, ParseError<()>> = input.parse_comma_separated(|input| {
+                let result = UnicodeRange::parse(input).ok().map(|r| (r.start, r.end));
+                if input.is_exhausted() {
+                    Ok(result)
                 } else {
-                    Value::Null
+                    while input.next().is_ok() {}
+                    Ok(None)
                 }
-            })
-            .collect::<Vec<_>>()
-            .to_json()
-    });
+            });
+            result
+                .unwrap()
+                .iter()
+                .map(|v| {
+                    if let Some((v0, v1)) = v {
+                        json!([v0, v1])
+                    } else {
+                        Value::Null
+                    }
+                })
+                .collect::<Vec<_>>()
+                .to_json()
+        },
+    );
 }
 
 #[test]
@@ -449,7 +447,7 @@ fn serializer_preserving_comments() {
 
 fn serializer(preserve_comments: bool) {
     run_json_tests(
-        &css_parsing_test_json("component_value_list.json"),
+        &css_parsing_test_json!("css-parsing-tests/component_value_list.json"),
         |input| {
             fn write_to(
                 mut previous_token: TokenSerializationType,
