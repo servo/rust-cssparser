@@ -5,7 +5,8 @@ use cssparser::*;
 const DEBUG: bool = false;
 
 fn parse_and_serialize(input: &str, preserving_comments: bool) -> String {
-    let mut parser = Parser::new(input);
+    let mut input = ParserInput::new(input);
+    let mut parser = Parser::new(&mut input);
     let mut serialization = String::new();
     let result = do_parse_and_serialize(
         &mut parser,
@@ -20,7 +21,7 @@ fn parse_and_serialize(input: &str, preserving_comments: bool) -> String {
     serialization
 }
 
-fn do_parse_and_serialize(
+fn do_parse_and_serialize<'i>(
     input: &mut Parser,
     preserving_comments: bool,
     mut previous_token_type: TokenSerializationType,

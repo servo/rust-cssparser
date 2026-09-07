@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use super::*;
+use cssparser::ParserInput;
 use serde_json::{Value, json};
 
 fn almost_equals(a: &Value, b: &Value) -> bool {
@@ -59,7 +60,8 @@ fn run_raw_json_tests<F: Fn(Value, Value)>(json_data: &str, run: F) {
 fn run_json_tests<F: Fn(&mut Parser) -> Value>(json_data: &str, parse: F) {
     run_raw_json_tests(json_data, |input, expected| match input {
         Value::String(input) => {
-            let result = parse(&mut Parser::new(&input));
+            let mut parse_input = ParserInput::new(&input);
+            let result = parse(&mut Parser::new(&mut parse_input));
             assert_json_eq(result, expected, &input);
         }
         _ => panic!("Unexpected JSON"),
@@ -147,7 +149,9 @@ fn color4_color_function() {
 
 macro_rules! parse_single_color {
     ($i:expr) => {{
-        let mut input = Parser::new($i);
+        let input = $i;
+        let mut input = ParserInput::new(input);
+        let mut input = Parser::new(&mut input);
         Color::parse(&mut input).map_err(Into::<ParseError<()>>::into)
     }};
 }
@@ -351,7 +355,8 @@ fn generic_parser() {
     ];
 
     for (input, expected) in TESTS {
-        let mut input = Parser::new(input);
+        let mut input = ParserInput::new(input);
+        let mut input = Parser::new(&mut input);
 
         let actual: OutputType = parse_color_with(&TestColorParser, &mut input).unwrap();
         assert_eq!(actual, *expected);
