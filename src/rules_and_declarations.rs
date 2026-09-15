@@ -381,7 +381,7 @@ where
         loop {
             self.input.skip_cdc_and_cdo();
             let start = self.input.state();
-            let at_keyword = match self.input.next_byte()? {
+            let at_keyword = match self.input.next_byte_before_delimiter()? {
                 b'@' => match self.input.next_including_whitespace_and_comments() {
                     Ok(Token::AtKeyword(name)) => Some(name.clone()),
                     _ => {
@@ -458,7 +458,7 @@ where
     input.parse_entirely(|input| {
         input.skip_whitespace();
         let start = input.state();
-        let at_keyword = if input.next_byte() == Some(b'@') {
+        let at_keyword = if input.next_byte_before_delimiter() == Some(b'@') {
             match *input.next_including_whitespace_and_comments()? {
                 Token::AtKeyword(ref name) => Some(name.clone()),
                 _ => {
