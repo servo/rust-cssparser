@@ -6,7 +6,7 @@
 
 use self::Token::*;
 use crate::cow_rc_str::CowRcStr;
-use crate::parser::{ArbitrarySubstitutionFunctions, Parser};
+use crate::parser::{ArbitrarySubstitutionFunctions, BlockType, Parser};
 use std::char;
 use std::ops::Range;
 
@@ -234,11 +234,20 @@ impl<'a> Parser<'a> {
         seen
     }
 
-    /// Tokenize the next token, without any of the block / delimiter handling that
-    /// `Parser::next` and friends do. Assumes non-EOF.
+    /// Tokenize the next token, without the delimiter handling that `Parser::next` and friends do.
+    /// Assumes non-EOF.
     #[inline]
     pub(crate) fn next_unchecked(&mut self) -> Token<'a> {
+        debug_assert!(self.state.at_start_of.is_none());
         next_token_unchecked(self)
+    }
+
+    /// If the last token returned opened a block, skip until after the end of that block.
+    #[inline]
+    pub(crate) fn skip_block_at_start(&mut self) {
+        if let Some(block_type) = self.state.at_start_of.take() {
+            self.consume_until_end_of_block(block_type);
+        }
     }
 
     /// Return the current position within the input.
@@ -478,9 +487,7 @@ impl<'a> Parser<'a> {
 
     /// Advance the input until the next token that’s not whitespace or a comment.
     pub fn skip_whitespace(&mut self) {
-        if let Some(block_type) = self.state.at_start_of.take() {
-            self.consume_until_end_of_block(block_type);
-        }
+        self.skip_block_at_start();
         while !self.is_eof() {
             match_byte! { self.next_byte_unchecked(),
                 b' ' | b'\t' => {
@@ -502,9 +509,7 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn skip_cdc_and_cdo(&mut self) {
-        if let Some(block_type) = self.state.at_start_of.take() {
-            self.consume_until_end_of_block(block_type);
-        }
+        self.skip_block_at_start();
         while !self.is_eof() {
             match_byte! { self.next_byte_unchecked(),
                 b' ' | b'\t' => {
@@ -574,7 +579,7 @@ malloc_size_of::malloc_size_of_is_0!(SourceLocation);
 fn next_token_unchecked<'a>(parser: &mut Parser<'a>) -> Token<'a> {
     debug_assert!(!parser.is_eof());
     let b = parser.next_byte_unchecked();
-    let token = match_byte! { b,
+    match_byte! { b,
         b' ' | b'\t' => {
             consume_whitespace(parser, false)
         },
@@ -595,7 +600,11 @@ fn next_token_unchecked<'a>(parser: &mut Parser<'a>) -> Token<'a> {
             else { parser.advance(1); Delim('$') }
         },
         b'\'' => consume_string(parser, true),
-        b'(' => { parser.advance(1); ParenthesisBlock },
+        b'(' => {
+            parser.advance(1);
+            parser.state.at_start_of = Some(BlockType::Parenthesis);
+            ParenthesisBlock
+        },
         b')' => { parser.advance(1); CloseParenthesis },
         b'*' => {
             if parser.starts_with(b"*=") { parser.advance(2); SubstringMatch }
@@ -672,7 +681,11 @@ fn next_token_unchecked<'a>(parser: &mut Parser<'a>) -> Token<'a> {
             else { Delim('@') }
         },
         b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'\0' => consume_ident_like(parser),
-        b'[' => { parser.advance(1); SquareBracketBlock },
+        b'[' => {
+            parser.advance(1);
+            parser.state.at_start_of = Some(BlockType::SquareBracket);
+            SquareBracketBlock
+        },
         b'\\' => {
             if !parser.has_newline_at(1) { consume_ident_like(parser) }
             else { parser.advance(1); Delim('\\') }
@@ -682,7 +695,11 @@ fn next_token_unchecked<'a>(parser: &mut Parser<'a>) -> Token<'a> {
             if parser.starts_with(b"^=") { parser.advance(2); PrefixMatch }
             else { parser.advance(1); Delim('^') }
         },
-        b'{' => { parser.advance(1); CurlyBracketBlock },
+        b'{' => {
+            parser.advance(1);
+            parser.state.at_start_of = Some(BlockType::CurlyBracket);
+            CurlyBracketBlock
+        },
         b'|' => {
             if parser.starts_with(b"|=") { parser.advance(2); DashMatch }
             else { parser.advance(1); Delim('|') }
@@ -700,8 +717,7 @@ fn next_token_unchecked<'a>(parser: &mut Parser<'a>) -> Token<'a> {
                 Delim(b as char)
             }
         },
-    };
-    token
+    }
 }
 
 fn consume_whitespace<'a>(parser: &mut Parser<'a>, newline: bool) -> Token<'a> {
@@ -925,11 +941,13 @@ fn consume_ident_like<'a>(parser: &mut Parser<'a>) -> Token<'a> {
     if !parser.is_eof() && parser.next_byte_unchecked() == b'(' {
         parser.advance(1);
         if value.eq_ignore_ascii_case("url") {
-            consume_unquoted_url(parser).unwrap_or(Function(value))
-        } else {
-            parser.arbitrary_substitution_functions.see_function(&value);
-            Function(value)
+            if let Ok(url) = consume_unquoted_url(parser) {
+                return url;
+            }
         }
+        parser.state.at_start_of = Some(BlockType::Parenthesis);
+        parser.arbitrary_substitution_functions.see_function(&value);
+        Function(value)
     } else {
         Ident(value)
     }

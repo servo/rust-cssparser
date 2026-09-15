@@ -248,15 +248,6 @@ pub(crate) enum BlockType {
 }
 
 impl BlockType {
-    fn opening(token: &Token) -> Option<BlockType> {
-        match *token {
-            Token::Function(_) | Token::ParenthesisBlock => Some(BlockType::Parenthesis),
-            Token::SquareBracketBlock => Some(BlockType::SquareBracket),
-            Token::CurlyBracketBlock => Some(BlockType::CurlyBracket),
-            _ => None,
-        }
-    }
-
     fn closing(token: &Token) -> Option<BlockType> {
         match *token {
             Token::CloseParenthesis => Some(BlockType::Parenthesis),
@@ -513,9 +504,7 @@ impl<'i> Parser<'i> {
     pub fn next_including_whitespace_and_comments(
         &mut self,
     ) -> Result<&Token<'i>, BasicParseError> {
-        if let Some(block_type) = self.state.at_start_of.take() {
-            self.consume_until_end_of_block(block_type);
-        }
+        self.skip_block_at_start();
 
         if self.next_byte_before_delimiter().is_none() {
             return Err(BasicParseError::new(BasicParseErrorKind::EndOfInput));
@@ -527,9 +516,6 @@ impl<'i> Parser<'i> {
             self.state = self.cached_token.end_state.clone();
         } else {
             let new_token = self.next_unchecked();
-            if let Some(block_type) = BlockType::opening(&new_token) {
-                self.state.at_start_of = Some(block_type);
-            }
             self.cached_token = CachedToken {
                 token: new_token,
                 start_position: token_start_position,
@@ -907,18 +893,14 @@ where
     if error_behavior == ParseUntilErrorBehavior::Stop && result.is_err() {
         return result;
     }
-    if let Some(block_type) = parser.state.at_start_of.take() {
-        parser.consume_until_end_of_block(block_type);
-    }
+    parser.skip_block_at_start();
     // FIXME: have a special-purpose tokenizer method for this that does less work.
     while let Some(next_byte) = parser.next_byte() {
         if delimiters.contains(Delimiters::from_byte(next_byte)) {
             break;
         }
-        let token = parser.next_unchecked();
-        if let Some(block_type) = BlockType::opening(&token) {
-            parser.consume_until_end_of_block(block_type);
-        }
+        parser.next_unchecked();
+        parser.skip_block_at_start();
     }
     result
 }
@@ -979,9 +961,7 @@ where
         BlockType::Parenthesis => ClosingDelimiter::CloseParenthesis,
     };
     let result = parser.parse_entirely(parse);
-    if let Some(nested_block_type) = parser.state.at_start_of.take() {
-        parser.consume_until_end_of_block(nested_block_type);
-    }
+    parser.skip_block_at_start();
     parser.consume_until_end_of_block(block_type);
     parser.stop_before = old_stop_before;
     parser.current_block_depth = parser.current_block_depth.wrapping_sub(1);
@@ -1000,6 +980,10 @@ impl Parser<'_> {
         // FIXME: have a special-purpose tokenizer method for this that does less work.
         while !self.is_eof() {
             let token = self.next_unchecked();
+            if let Some(nested_block_type) = self.state.at_start_of.take() {
+                stack.push(nested_block_type);
+                continue;
+            }
             if let Some(b) = BlockType::closing(&token) {
                 if *stack.last().unwrap() == b {
                     stack.pop();
@@ -1007,10 +991,6 @@ impl Parser<'_> {
                         return;
                     }
                 }
-            }
-
-            if let Some(block_type) = BlockType::opening(&token) {
-                stack.push(block_type);
             }
         }
     }
