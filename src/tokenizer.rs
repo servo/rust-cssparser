@@ -456,7 +456,7 @@ impl<'a> Parser<'a> {
         if byte == b'\r' && self.next_byte() == Some(b'\n') {
             self.state.position += 1;
         }
-        self.state.current_line_start_position = self.state.position;
+        self.state.current_line_start_position = self.state.position as u32;
         self.state.current_line_number += 1;
     }
 
@@ -476,7 +476,7 @@ impl<'a> Parser<'a> {
         self.state.current_line_start_position = self
             .state
             .current_line_start_position
-            .wrapping_add(len_utf8 - c.len_utf16());
+            .wrapping_add((len_utf8 - c.len_utf16()) as u32);
         c
     }
 
@@ -1218,7 +1218,7 @@ fn consume_unquoted_url<'a>(parser: &mut Parser<'a>) -> Result<Token<'a>, ()> {
         parser.state.current_line_number += newlines;
         // No need for wrapping_add here, because there's no possible
         // way to wrap.
-        parser.state.current_line_start_position = start_position + last_newline + 1;
+        parser.state.current_line_start_position = (start_position + last_newline + 1) as u32;
     }
 
     if found_printable_char {
