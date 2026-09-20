@@ -238,14 +238,14 @@ impl<'a> Parser<'a> {
     /// Assumes non-EOF.
     #[inline]
     pub(crate) fn next_unchecked(&mut self) -> Token<'a> {
-        debug_assert!(self.state.at_start_of.is_none());
+        debug_assert!(self.state.at_start_of().is_none());
         next_token_unchecked(self)
     }
 
     /// If the last token returned opened a block, skip until after the end of that block.
     #[inline]
     pub(crate) fn skip_block_at_start(&mut self) {
-        if let Some(block_type) = self.state.at_start_of.take() {
+        if let Some(block_type) = self.state.take_at_start_of() {
             self.consume_until_end_of_block(block_type);
         }
     }
@@ -457,7 +457,7 @@ impl<'a> Parser<'a> {
             self.state.position += 1;
         }
         self.state.current_line_start_position = self.state.position as u32;
-        self.state.current_line_number += 1;
+        self.state.advance_line_number(1);
     }
 
     #[inline]
@@ -602,7 +602,7 @@ fn next_token_unchecked<'a>(parser: &mut Parser<'a>) -> Token<'a> {
         b'\'' => consume_string(parser, true),
         b'(' => {
             parser.advance(1);
-            parser.state.at_start_of = Some(BlockType::Parenthesis);
+            parser.state.set_at_start_of(BlockType::Parenthesis);
             ParenthesisBlock
         },
         b')' => { parser.advance(1); CloseParenthesis },
@@ -683,7 +683,7 @@ fn next_token_unchecked<'a>(parser: &mut Parser<'a>) -> Token<'a> {
         b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'\0' => consume_ident_like(parser),
         b'[' => {
             parser.advance(1);
-            parser.state.at_start_of = Some(BlockType::SquareBracket);
+            parser.state.set_at_start_of(BlockType::SquareBracket);
             SquareBracketBlock
         },
         b'\\' => {
@@ -697,7 +697,7 @@ fn next_token_unchecked<'a>(parser: &mut Parser<'a>) -> Token<'a> {
         },
         b'{' => {
             parser.advance(1);
-            parser.state.at_start_of = Some(BlockType::CurlyBracket);
+            parser.state.set_at_start_of(BlockType::CurlyBracket);
             CurlyBracketBlock
         },
         b'|' => {
@@ -945,7 +945,7 @@ fn consume_ident_like<'a>(parser: &mut Parser<'a>) -> Token<'a> {
                 return url;
             }
         }
-        parser.state.at_start_of = Some(BlockType::Parenthesis);
+        parser.state.set_at_start_of(BlockType::Parenthesis);
         parser.arbitrary_substitution_functions.see_function(&value);
         Function(value)
     } else {
@@ -1215,7 +1215,7 @@ fn consume_unquoted_url<'a>(parser: &mut Parser<'a>) -> Result<Token<'a>, ()> {
     }
 
     if newlines > 0 {
-        parser.state.current_line_number += newlines;
+        parser.state.advance_line_number(newlines);
         // No need for wrapping_add here, because there's no possible
         // way to wrap.
         parser.state.current_line_start_position = (start_position + last_newline + 1) as u32;

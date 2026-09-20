@@ -42,9 +42,9 @@ size_of_test!(token, Token, 32);
 size_of_test!(std_cow_str, std::borrow::Cow<'static, str>, 24, 32);
 size_of_test!(cow_rc_str, CowRcStr, 16);
 
-size_of_test!(parser, crate::parser::Parser, 168);
+size_of_test!(parser, crate::parser::Parser, 152);
 size_of_test!(source_position, crate::SourcePosition, 8);
-size_of_test!(parser_state, crate::ParserState, 24);
+size_of_test!(parser_state, crate::ParserState, 16);
 
 size_of_test!(basic_parse_error, crate::BasicParseError, 1);
 size_of_test!(parse_error_lower_bound, crate::ParseError<()>, 1);
