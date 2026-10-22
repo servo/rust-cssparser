@@ -489,6 +489,13 @@ impl ToCss for ModernComponent<'_> {
 
 // Guaratees hue in [0..360)
 fn normalize_hue(hue: f32) -> f32 {
+    // An infinite hue normalizes to 0 degrees:
+    // <https://drafts.csswg.org/css-color-4/#hue-syntax>
+    // NaN is censored to 0:
+    // <https://drafts.csswg.org/css-values-4/#calc-ieee>
+    if !hue.is_finite() {
+        return 0.0;
+    }
     // <https://drafts.csswg.org/css-values/#angles>
     // Subtract an integer before rounding, to avoid some rounding errors:
     hue - 360.0 * (hue / 360.0).floor()
