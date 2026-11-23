@@ -8,6 +8,9 @@ rust-cssparser
 Rust implementation of
 [CSS Syntax Module Level 3](https://drafts.csswg.org/css-syntax/)
 
+The Servo [Code of Conduct](https://book.servo.org/policy/code-of-conduct.html) and
+[AI Usage Policy](https://book.servo.org/policy/ai-usage.html) apply to this repository.
+
 
 Overview
 --------
