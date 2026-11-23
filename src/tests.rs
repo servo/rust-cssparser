@@ -1384,3 +1384,31 @@ fn servo_define_css_keyword_enum() {
 
     assert_eq!(UserZoom::from_ident("fixed"), Ok(UserZoom::Fixed));
 }
+
+/// https://github.com/servo/rust-cssparser/issues/459
+/// `Parser::slice` is a safe, public method, so it must not be able to trigger
+/// undefined behavior. A valid range returns the expected substring.
+#[test]
+fn parser_slice_valid_range() {
+    let mut parser = Parser::new("abc def");
+    let start = parser.position();
+    parser.next().unwrap(); // consume `abc`
+    let end = parser.position();
+    assert_eq!(parser.slice(start..end), "abc");
+    // `slice_from` goes from the given position to the current one.
+    assert_eq!(parser.slice_from(start), "abc");
+}
+
+/// https://github.com/servo/rust-cssparser/issues/459
+/// An inverted range used to reach `get_unchecked` and was undefined behavior
+/// from safe code. It now goes through checked string indexing, so it panics
+/// instead of invoking UB.
+#[test]
+#[should_panic]
+fn parser_slice_inverted_range_panics_instead_of_ub() {
+    let mut parser = Parser::new("abc");
+    let start = parser.position();
+    parser.next().unwrap(); // advance past `abc`
+    let end = parser.position();
+    let _ = parser.slice(end..start);
+}

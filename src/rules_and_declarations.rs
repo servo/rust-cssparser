@@ -307,7 +307,7 @@ where
                     return Some(result.map_err(|e| {
                         (
                             e,
-                            self.input.slice_from(start.position()),
+                            self.input.slice_from_unchecked(start.position()),
                             start.source_location(),
                         )
                     }));
@@ -325,7 +325,7 @@ where
                     return Some(result.map_err(|e| {
                         (
                             e,
-                            self.input.slice_from(start.position()),
+                            self.input.slice_from_unchecked(start.position()),
                             start.source_location(),
                         )
                     }));
@@ -415,7 +415,7 @@ where
                 return Some(result.map_err(|e| {
                     (
                         e,
-                        self.input.slice_from(start.position()),
+                        self.input.slice_from_unchecked(start.position()),
                         start.source_location(),
                     )
                 }));
@@ -440,7 +440,13 @@ where
             input.expect_colon()?;
             parser.parse_value(name, input, &start)
         })
-        .map_err(|e| (e, input.slice_from(start_position), start.source_location()))
+        .map_err(|e| {
+            (
+                e,
+                input.slice_from_unchecked(start_position),
+                start.source_location(),
+            )
+        })
 }
 
 /// Parse a single rule, such as for CSSOM’s `CSSStyleSheet.insertRule`.
@@ -500,7 +506,7 @@ where
             result.map_err(|e| {
                 (
                     e,
-                    input.slice_from(start.position()),
+                    input.slice_from_unchecked(start.position()),
                     start.source_location(),
                 )
             })
@@ -513,7 +519,7 @@ where
             };
             Err((
                 error,
-                input.slice(start.position()..end_position),
+                input.slice_unchecked(start.position()..end_position),
                 start.source_location(),
             ))
         }

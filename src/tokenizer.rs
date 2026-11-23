@@ -294,6 +294,27 @@ impl<'a> Parser<'a> {
     /// Return a slice of the CSS input
     #[inline]
     pub fn slice(&self, range: Range<SourcePosition>) -> &'a str {
+        &self.input[range.start.0..range.end.0]
+    }
+
+    /// Like `slice_from`, but skips the bounds and char-boundary checks.
+    ///
+    /// The caller must guarantee that `start_pos` is a char boundary that is
+    /// `<= self.position()`, which is always true for positions produced by the
+    /// tokenizer for the current input.
+    #[inline]
+    pub(crate) fn slice_from_unchecked(&self, start_pos: SourcePosition) -> &'a str {
+        self.slice_unchecked(start_pos..self.position())
+    }
+
+    /// Like `slice`, but skips the bounds and char-boundary checks.
+    ///
+    /// The caller must guarantee that `range.start.0 <= range.end.0 <=
+    /// self.input.len()` and that both ends are char boundaries, which is always
+    /// true for positions produced by the tokenizer for the current input.
+    #[inline]
+    pub(crate) fn slice_unchecked(&self, range: Range<SourcePosition>) -> &'a str {
+        debug_assert!(range.start.0 <= range.end.0);
         debug_assert!(self.input.is_char_boundary(range.start.0));
         debug_assert!(self.input.is_char_boundary(range.end.0));
         unsafe { self.input.get_unchecked(range.start.0..range.end.0) }
@@ -741,7 +762,7 @@ fn consume_whitespace<'a>(parser: &mut Parser<'a>, newline: bool) -> Token<'a> {
             }
         }
     }
-    WhiteSpace(parser.slice_from(start_position))
+    WhiteSpace(parser.slice_from_unchecked(start_position))
 }
 
 // Check for sourceMappingURL or sourceURL comments and update the
@@ -776,7 +797,7 @@ fn consume_comment<'a>(parser: &mut Parser<'a>) -> &'a str {
                 parser.advance(1);
                 if parser.next_byte() == Some(b'/') {
                     parser.advance(1);
-                    let contents = parser.slice(start_position..end_position);
+                    let contents = parser.slice_unchecked(start_position..end_position);
                     check_for_source_map(parser, contents);
                     return contents
                 }
@@ -792,7 +813,7 @@ fn consume_comment<'a>(parser: &mut Parser<'a>) -> &'a str {
             }
         }
     }
-    let contents = parser.slice_from(start_position);
+    let contents = parser.slice_from_unchecked(start_position);
     check_for_source_map(parser, contents);
     contents
 }
@@ -815,12 +836,12 @@ fn consume_quoted_string<'a>(
     let mut string_bytes;
     loop {
         if parser.is_eof() {
-            return Ok(parser.slice_from(start_pos).into());
+            return Ok(parser.slice_from_unchecked(start_pos).into());
         }
         match_byte! { parser.next_byte_unchecked(),
             b'"' => {
                 if !single_quote {
-                    let value = parser.slice_from(start_pos);
+                    let value = parser.slice_from_unchecked(start_pos);
                     parser.advance(1);
                     return Ok(value.into())
                 }
@@ -828,7 +849,7 @@ fn consume_quoted_string<'a>(
             }
             b'\'' => {
                 if single_quote {
-                    let value = parser.slice_from(start_pos);
+                    let value = parser.slice_from_unchecked(start_pos);
                     parser.advance(1);
                     return Ok(value.into())
                 }
@@ -840,11 +861,11 @@ fn consume_quoted_string<'a>(
                 // * so is the current position (which is before '\\' or '\0'
                 //
                 // So `string_bytes` is well-formed UTF-8.
-                string_bytes = parser.slice_from(start_pos).as_bytes().to_owned();
+                string_bytes = parser.slice_from_unchecked(start_pos).as_bytes().to_owned();
                 break
             }
             b'\n' | b'\r' | b'\x0C' => {
-                return Err(parser.slice_from(start_pos).into())
+                return Err(parser.slice_from_unchecked(start_pos).into())
             },
             b'\x80'..=b'\xBF' => { parser.consume_continuation_byte(); }
             b'\xF0'..=b'\xFF' => { parser.consume_4byte_intro(); }
@@ -971,7 +992,7 @@ fn consume_name<'a>(parser: &mut Parser<'a>) -> CowRcStr<'a> {
     loop {
         parser.advance_while(|b| IS_SIMPLE_NAME_BYTE[b as usize]);
         if parser.is_eof() {
-            return parser.slice_from(start_pos).into();
+            return parser.slice_from_unchecked(start_pos).into();
         }
         match_byte! { parser.next_byte_unchecked(),
             b'\\' | b'\0' => {
@@ -980,13 +1001,13 @@ fn consume_name<'a>(parser: &mut Parser<'a>) -> CowRcStr<'a> {
                 // * so is the current position (which is before '\\' or '\0'
                 //
                 // So `value_bytes` is well-formed UTF-8.
-                value_bytes = parser.slice_from(start_pos).as_bytes().to_owned();
+                value_bytes = parser.slice_from_unchecked(start_pos).as_bytes().to_owned();
                 break
             }
             b'\x80'..=b'\xBF' => { parser.consume_continuation_byte(); }
             b'\xF0'..=b'\xFF' => { parser.consume_4byte_intro(); }
             _b => {
-                return parser.slice_from(start_pos).into();
+                return parser.slice_from_unchecked(start_pos).into();
             }
         }
     }
@@ -1235,15 +1256,15 @@ fn consume_unquoted_url<'a>(parser: &mut Parser<'a>) -> Result<Token<'a>, ()> {
         let mut string_bytes: Vec<u8>;
         loop {
             if parser.is_eof() {
-                return UnquotedUrl(parser.slice_from(start_pos).into());
+                return UnquotedUrl(parser.slice_from_unchecked(start_pos).into());
             }
             match_byte! { parser.next_byte_unchecked(),
                 b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' => {
-                    let value = parser.slice_from(start_pos);
+                    let value = parser.slice_from_unchecked(start_pos);
                     return consume_url_end(parser, start_pos, value.into())
                 }
                 b')' => {
-                    let value = parser.slice_from(start_pos);
+                    let value = parser.slice_from_unchecked(start_pos);
                     parser.advance(1);
                     return UnquotedUrl(value.into())
                 }
@@ -1258,7 +1279,7 @@ fn consume_unquoted_url<'a>(parser: &mut Parser<'a>) -> Result<Token<'a>, ()> {
                     // * so is the current position (which is before '\\' or '\0'
                     //
                     // So `string_bytes` is well-formed UTF-8.
-                    string_bytes = parser.slice_from(start_pos).as_bytes().to_owned();
+                    string_bytes = parser.slice_from_unchecked(start_pos).as_bytes().to_owned();
                     break
                 }
                 b'\x80'..=b'\xBF' => { parser.consume_continuation_byte(); }
@@ -1353,7 +1374,7 @@ fn consume_unquoted_url<'a>(parser: &mut Parser<'a>) -> Result<Token<'a>, ()> {
         while !parser.is_eof() {
             match_byte! { parser.next_byte_unchecked(),
                 b')' => {
-                    let contents = parser.slice_from(start_pos).into();
+                    let contents = parser.slice_from_unchecked(start_pos).into();
                     parser.advance(1);
                     return BadUrl(contents)
                 }
@@ -1371,7 +1392,7 @@ fn consume_unquoted_url<'a>(parser: &mut Parser<'a>) -> Result<Token<'a>, ()> {
                 }
             }
         }
-        BadUrl(parser.slice_from(start_pos).into())
+        BadUrl(parser.slice_from_unchecked(start_pos).into())
     }
 }
 

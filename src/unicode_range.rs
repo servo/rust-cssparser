@@ -40,7 +40,7 @@ impl UnicodeRange {
         // This deviates from the spec in case there are CSS comments
         // between tokens in the middle of one <unicode-range>,
         // but oh well…
-        let concatenated_tokens = input.slice_from(after_u);
+        let concatenated_tokens = input.slice_from_unchecked(after_u);
 
         let range = match parse_concatenated(concatenated_tokens.as_bytes()) {
             Ok(range) => range,
