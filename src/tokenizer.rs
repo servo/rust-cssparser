@@ -927,7 +927,7 @@ fn is_ident_start(parser: &Parser) -> bool {
                     b'a'..=b'z' | b'A'..=b'Z' | b'-' | b'_' | b'\0' => {
                         true
                     }
-                    b'\\' => !parser.has_newline_at(1),
+                    b'\\' => !parser.has_newline_at(2),
                     b => !b.is_ascii(),
                 }
             },

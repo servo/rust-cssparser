@@ -306,6 +306,25 @@ fn bad_url_escape_after_whitespace() {
     assert_eq!(result, Ok(&Token::BadUrl("foo \\\\".into())));
 }
 
+/// https://github.com/servo/rust-cssparser/issues/440
+#[test]
+fn hyphen_before_invalid_escape() {
+    // A backslash followed by a newline is not a valid escape, so `-\` followed by a newline
+    // doesn't start an identifier.
+    let mut parser = Parser::new("-\\\n");
+    let result = parser.next_including_whitespace_and_comments();
+    assert_eq!(result, Ok(&Token::Delim('-')));
+    let mut parser = Parser::new("@-\\\n");
+    let result = parser.next_including_whitespace_and_comments();
+    assert_eq!(result, Ok(&Token::Delim('@')));
+    let mut parser = Parser::new("#-\\\n");
+    let result = parser.next_including_whitespace_and_comments();
+    assert_eq!(result, Ok(&Token::Hash("-".into())));
+    let mut parser = Parser::new("1-\\\n");
+    let result = parser.next_including_whitespace_and_comments();
+    assert!(matches!(result, Ok(Token::Number { .. })));
+}
+
 #[test]
 fn unquoted_url_escaping() {
     let token = Token::UnquotedUrl(
