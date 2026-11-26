@@ -394,3 +394,49 @@ fn serialize_modern_components() {
         "calc(NaN)".to_string()
     );
 }
+
+fn parse_and_serialize(css: &str) -> String {
+    Color::parse(&mut Parser::new(css)).unwrap().to_css_string()
+}
+
+#[test]
+fn normalize_non_finite_hue() {
+    // <https://drafts.csswg.org/css-color-4/#hue-syntax>: an infinite hue
+    // normalizes to 0 degrees. 1e40 does not fit in an f32, so it parses
+    // as an infinity.
+    for (input, expected) in [
+        ("hsl(1e40 50% 50%)", "hsl(0 50% 50%)"),
+        ("hsl(-1e40 50% 50%)", "hsl(0 50% 50%)"),
+        ("hsl(1e40deg 50% 50%)", "hsl(0 50% 50%)"),
+        ("hsl(1e38turn 50% 50%)", "hsl(0 50% 50%)"),
+        ("hwb(1e40 0% 0%)", "hwb(0 0% 0%)"),
+        ("hwb(-1e40 0% 0%)", "hwb(0 0% 0%)"),
+        ("lch(50% 30 1e40)", "lch(50% 30 0)"),
+        ("oklch(50% 0.1 -1e40)", "oklch(50% 0.1 0)"),
+    ] {
+        assert_eq!(
+            parse_and_serialize(input),
+            parse_and_serialize(expected),
+            "{input}"
+        );
+    }
+    assert_eq!(parse_and_serialize("hwb(1e40 0% 0%)"), "rgb(255, 0, 0)");
+    assert_eq!(parse_and_serialize("lch(50% 30 1e40)"), "lch(50 30 0)");
+}
+
+#[test]
+fn normalize_finite_hue() {
+    for (input, expected) in [
+        ("hsl(480 50% 50%)", "hsl(120 50% 50%)"),
+        ("hsl(-240 50% 50%)", "hsl(120 50% 50%)"),
+        ("hsl(360 50% 50%)", "hsl(0 50% 50%)"),
+        ("hwb(-540 10% 10%)", "hwb(180 10% 10%)"),
+        ("lch(50% 30 400)", "lch(50% 30 40)"),
+    ] {
+        assert_eq!(
+            parse_and_serialize(input),
+            parse_and_serialize(expected),
+            "{input}"
+        );
+    }
+}
